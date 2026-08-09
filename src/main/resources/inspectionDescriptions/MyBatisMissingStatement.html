@@ -1,0 +1,11 @@
+<html>
+<body>
+<p>检查 Java Mapper 接口方法在已有 MyBatis Mapper XML 中是否缺少同名 statement。</p>
+<p>
+    仅检查接口直接声明且没有同名重载的抽象实例方法；静态方法、默认方法、使用 MyBatis SQL 或 Provider 注解的方法，以及 <code>@Flush</code> 方法不会报告问题。
+</p>
+<p>
+    此检查只在确认对应 namespace 的 Mapper XML 已存在、但 statement 缺失时给出警告，不会自动修改 XML。
+</p>
+</body>
+</html>

@@ -4,8 +4,8 @@
     <vendor url="https://github.com/ns3154/mybatis-idea-assistant">ns3154</vendor>
 
     <description><![CDATA[
-        <p>MyBatis Assistant connects Java mapper methods with MyBatis XML statements through safe indexed navigation.</p>
-        <p>当前开发预览版提供 Java Mapper 方法与 XML statement 之间的双向安全导航。</p>
+        <p>MyBatis Assistant connects Java mapper methods with MyBatis XML statements and conservatively reports missing statements.</p>
+        <p>当前开发预览版提供 Java Mapper 方法与 XML statement 之间的双向安全导航，以及缺失 statement 检查。</p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
@@ -22,5 +22,14 @@
         <codeInsight.lineMarkerProvider
                 language="XML"
                 implementationClass="io.github.ns3154.mybatisassistant.navigation.MyBatisXmlLineMarkerProvider"/>
+        <localInspection
+                language="JAVA"
+                shortName="MyBatisMissingStatement"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.missing.statement.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisMissingStatementInspection"/>
     </extensions>
 </idea-plugin>

@@ -9,6 +9,7 @@
 - 为 `select`、`insert`、`update`、`delete` 建立 statement 索引；
 - 从 Java Mapper 方法导航到 XML statement，重复 statement 交由平台展示候选；
 - 从 XML statement 导航回精确全限定名对应的 Java 接口方法，Java 重载全部保留为候选；
+- 当精确 namespace 的 Mapper XML 已存在但同名 statement 缺失时，在 Java 方法名提供保守警告；
 - 类型化区分无 Mapper XML、statement 缺失、多候选、索引未就绪、源失效和不支持的源，不做猜测跳转。
 
 ## 开发环境

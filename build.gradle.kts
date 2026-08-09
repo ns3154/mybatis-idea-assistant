@@ -37,8 +37,8 @@ intellijPlatform {
         name = "MyBatis Assistant"
         version = project.version.toString()
         description = """
-            <p>MyBatis Assistant connects Java mapper methods with MyBatis XML statements through safe indexed navigation.</p>
-            <p>当前开发预览版提供 Java Mapper 方法与 XML statement 之间的双向安全导航，并区分缺失、重复与索引未就绪状态。</p>
+            <p>MyBatis Assistant connects Java mapper methods with MyBatis XML statements and conservatively reports missing statements.</p>
+            <p>当前开发预览版提供双向安全导航、类型化解析，以及已有 Mapper XML 中缺失 statement 的保守检查。</p>
         """.trimIndent()
 
         ideaVersion {
