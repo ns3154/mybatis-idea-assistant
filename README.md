@@ -2,13 +2,14 @@
 
 面向 IntelliJ IDEA 的 MyBatis 智能开发助手，采用独立实现路线开发。
 
-当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，首批只打通一条可验证的语义主链：
+当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，已打通一条可验证的双向语义主链：
 
 - 识别 Java Mapper 接口；
 - 识别 MyBatis XML 的 `namespace`；
 - 为 `select`、`insert`、`update`、`delete` 建立 statement 索引；
-- 在唯一匹配时，从 Mapper 方法行号图标跳转到 XML statement；
-- 对缺失、重复、重载等不确定场景保持静默，不做错误跳转。
+- 从 Java Mapper 方法导航到 XML statement，重复 statement 交由平台展示候选；
+- 从 XML statement 导航回精确全限定名对应的 Java 接口方法，Java 重载全部保留为候选；
+- 类型化区分无 Mapper XML、statement 缺失、多候选、索引未就绪、源失效和不支持的源，不做猜测跳转。
 
 ## 开发环境
 
@@ -20,9 +21,8 @@
 ## 常用命令
 
 ```bash
-./gradlew test
-./gradlew buildPlugin
-./gradlew verifyPlugin
+mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
+./gradlew check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin
 ./gradlew runIde
 ```
 
@@ -34,7 +34,8 @@
 - [首批开发任务卡](docs/首批任务卡.md)
 - [功能矩阵](docs/功能矩阵.md)
 - [风险清单](docs/风险清单.md)
-- [首批自动化验收记录](docs/首批验收记录.md)
+- [首批验收记录](docs/首批验收记录.md)
+- [安全策略](.github/SECURITY.md)
 
 ## 独立实现边界
 

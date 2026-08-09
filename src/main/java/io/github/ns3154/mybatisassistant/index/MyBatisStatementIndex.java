@@ -51,6 +51,7 @@ public final class MyBatisStatementIndex extends FileBasedIndexExtension<String,
             }
 
             Map<String, Void> keys = new LinkedHashMap<>();
+            keys.put(MyBatisStatementKey.forNamespace(namespace), null);
             for (XmlTag child : rootTag.getSubTags()) {
                 ProgressManager.checkCanceled();
                 if (!MyBatisXmlModel.isStatement(child)) {
@@ -58,7 +59,7 @@ public final class MyBatisStatementIndex extends FileBasedIndexExtension<String,
                 }
                 String statementId = MyBatisXmlModel.statementId(child);
                 if (statementId != null) {
-                    keys.put(MyBatisStatementKey.of(namespace, statementId), null);
+                    keys.put(MyBatisStatementKey.forStatement(namespace, statementId), null);
                 }
             }
             return keys;
@@ -90,6 +91,6 @@ public final class MyBatisStatementIndex extends FileBasedIndexExtension<String,
 
     @Override
     public int getVersion() {
-        return 1;
+        return 2;
     }
 }

@@ -1,0 +1,111 @@
+package io.github.ns3154.mybatisassistant.resolve;
+
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.project.DumbService;
+import com.intellij.openapi.project.IndexNotReadyException;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.JavaPsiFacade;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiMethod;
+import com.intellij.psi.search.GlobalSearchScope;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public final class MyBatisMapperMethodResolver {
+    private MyBatisMapperMethodResolver() {
+    }
+
+    /**
+     * 按完整 namespace 和 statement id 查找当前接口直接声明的方法。调用方必须持有读锁。
+     */
+    public static @NotNull List<PsiMethod> find(
+            @NotNull Project project,
+            @NotNull String namespace,
+            @NotNull String statementId) {
+        if (project.isDisposed()
+                || !project.isOpen()
+                || DumbService.isDumb(project)
+                || namespace.isBlank()
+                || statementId.isBlank()) {
+            return List.of();
+        }
+        ProgressManager.checkCanceled();
+
+        try {
+            return findFromIndex(project, namespace, statementId);
+        } catch (IndexNotReadyException ignored) {
+            // Dumb Mode 可能在预检查后开始；索引竞态按暂不可用安全降级。
+            return List.of();
+        }
+    }
+
+    private static @NotNull List<PsiMethod> findFromIndex(
+            @NotNull Project project,
+            @NotNull String namespace,
+            @NotNull String statementId) {
+        PsiClass[] mapperClasses = JavaPsiFacade.getInstance(project).findClasses(
+                namespace,
+                GlobalSearchScope.projectScope(project));
+        List<PsiMethod> targets = new ArrayList<>();
+        for (PsiClass mapperClass : mapperClasses) {
+            ProgressManager.checkCanceled();
+            if (project.isDisposed() || !project.isOpen()) {
+                return List.of();
+            }
+            if (!mapperClass.isValid()
+                    || !mapperClass.isInterface()
+                    || !namespace.equals(mapperClass.getQualifiedName())) {
+                continue;
+            }
+
+            for (PsiMethod method : mapperClass.findMethodsByName(statementId, false)) {
+                ProgressManager.checkCanceled();
+                if (method.isValid()) {
+                    targets.add(method);
+                }
+            }
+        }
+
+        ProgressManager.checkCanceled();
+        targets.sort((left, right) -> {
+            ProgressManager.checkCanceled();
+            int byPath = sourcePath(left).compareTo(sourcePath(right));
+            if (byPath != 0) {
+                return byPath;
+            }
+            int byOffset = Integer.compare(left.getTextOffset(), right.getTextOffset());
+            return byOffset != 0
+                    ? byOffset
+                    : methodSignature(left).compareTo(methodSignature(right));
+        });
+        ProgressManager.checkCanceled();
+        return List.copyOf(targets);
+    }
+
+    private static @NotNull String sourcePath(@NotNull PsiMethod method) {
+        PsiFile containingFile = method.getContainingFile();
+        if (containingFile == null) {
+            return "";
+        }
+        VirtualFile virtualFile = containingFile.getVirtualFile();
+        return virtualFile == null ? containingFile.getName() : virtualFile.getPath();
+    }
+
+    private static @NotNull String methodSignature(@NotNull PsiMethod method) {
+        StringBuilder signature = new StringBuilder(method.getName()).append('(');
+        for (int index = 0; index < method.getParameterList().getParametersCount(); index++) {
+            ProgressManager.checkCanceled();
+            if (index > 0) {
+                signature.append(',');
+            }
+            signature.append(method.getParameterList().getParameters()[index]
+                    .getType()
+                    .getCanonicalText());
+        }
+        return signature.append(')').toString();
+    }
+}

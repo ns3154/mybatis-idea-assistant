@@ -1,20 +1,28 @@
 package io.github.ns3154.mybatisassistant.navigation;
 
 import com.intellij.codeInsight.daemon.GutterMark;
+import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
+import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiDocumentManager;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiJavaFile;
 import com.intellij.psi.PsiMethod;
-import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.testFramework.DumbModeTestUtils;
+import com.intellij.testFramework.EdtTestUtil;
+import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 
 import java.util.ArrayList;
@@ -82,7 +90,7 @@ public final class MyBatisMapperLineMarkerProviderTest extends BasePlatformTestC
         assertEmpty(targets);
     }
 
-    public void testIgnoresDuplicateStatements() {
+    public void testPreservesDuplicateStatementsAsNavigationCandidates() {
         addMapperXml("""
                 <mapper namespace="com.example.UserMapper">
                     <select id="findById">select 1</select>
@@ -197,6 +205,43 @@ public final class MyBatisMapperLineMarkerProviderTest extends BasePlatformTestC
                 "跳转到 MyBatis XML statement".equals(gutter.getTooltipText())));
     }
 
+    public void testRegisteredGutterNavigatesToStatement() throws Throwable {
+        PsiFile xmlFile = addMapperXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <select id="findById">select 1</select>
+                </mapper>
+                """);
+        PsiMethod method = configureMapper("""
+                package com.example;
+                public interface UserMapper {
+                    Object findById(long id);
+                }
+                """, "findById");
+
+        myFixture.doHighlighting();
+        GutterMark gutter = myFixture.findAllGutters().stream()
+                .filter(candidate -> "跳转到 MyBatis XML statement".equals(candidate.getTooltipText()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(gutter instanceof LineMarkerInfo.LineMarkerGutterIconRenderer<?>);
+
+        LineMarkerInfo<?> markerInfo =
+                ((LineMarkerInfo.LineMarkerGutterIconRenderer<?>) gutter).getLineMarkerInfo();
+        navigate(markerInfo);
+        PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+
+        XmlTag statement = ((com.intellij.psi.xml.XmlFile) xmlFile)
+                .getRootTag()
+                .findFirstSubTag("select");
+        assertNotNull(statement);
+        FileEditorManager fileEditorManager = FileEditorManager.getInstance(getProject());
+        assertContainsElements(List.of(fileEditorManager.getSelectedFiles()), xmlFile.getVirtualFile());
+        assertNotNull(fileEditorManager.getSelectedTextEditor());
+        assertEquals(statement.getTextOffset(),
+                fileEditorManager.getSelectedTextEditor().getCaretModel().getOffset());
+        assertEquals(method.getName(), statement.getAttributeValue("id"));
+    }
+
     public void testReturnsEmptyInDumbMode() throws Throwable {
         addMapperXml("""
                 <mapper namespace="com.example.UserMapper">
@@ -297,6 +342,65 @@ public final class MyBatisMapperLineMarkerProviderTest extends BasePlatformTestC
                 () -> MyBatisMapperLineMarkerProvider.findTargets(method)));
     }
 
+    public void testXmlRenameInvalidatesAndRestoresLookup() throws Exception {
+        PsiFile xmlFile = addMapperXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <select id="findById">select 1</select>
+                </mapper>
+                """);
+        PsiMethod method = configureMapper("""
+                package com.example;
+                public interface UserMapper {
+                    Object findById(long id);
+                }
+                """, "findById");
+        VirtualFile virtualFile = xmlFile.getVirtualFile();
+
+        assertSize(1, ReadAction.compute(
+                () -> MyBatisMapperLineMarkerProvider.findTargets(method)));
+
+        rename(virtualFile, "UserMapper.disabled");
+        assertEmpty(ReadAction.compute(
+                () -> MyBatisMapperLineMarkerProvider.findTargets(method)));
+
+        rename(virtualFile, "RenamedUserMapper.xml");
+        List<XmlTag> restoredTargets = ReadAction.compute(
+                () -> MyBatisMapperLineMarkerProvider.findTargets(method));
+        assertSize(1, restoredTargets);
+        assertEquals("RenamedUserMapper.xml",
+                restoredTargets.getFirst().getContainingFile().getVirtualFile().getName());
+    }
+
+    public void testXmlMoveRefreshesIndexedPath() throws Exception {
+        PsiFile xmlFile = addMapperXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <select id="findById">select 1</select>
+                </mapper>
+                """);
+        PsiMethod method = configureMapper("""
+                package com.example;
+                public interface UserMapper {
+                    Object findById(long id);
+                }
+                """, "findById");
+        VirtualFile virtualFile = xmlFile.getVirtualFile();
+        VirtualFile targetDirectory = myFixture.getTempDirFixture()
+                .findOrCreateDir("src/main/resources/relocated");
+
+        assertSize(1, ReadAction.compute(
+                () -> MyBatisMapperLineMarkerProvider.findTargets(method)));
+
+        WriteAction.runAndWait(() -> virtualFile.move(this, targetDirectory));
+
+        List<XmlTag> movedTargets = ReadAction.compute(
+                () -> MyBatisMapperLineMarkerProvider.findTargets(method));
+        assertSize(1, movedTargets);
+        assertEquals(virtualFile,
+                movedTargets.getFirst().getContainingFile().getVirtualFile());
+        assertTrue(virtualFile.getPath().endsWith(
+                "/src/main/resources/relocated/UserMapper.xml"));
+    }
+
     public void testLookupHonorsCancellation() {
         addMapperXml("""
                 <mapper namespace="com.example.UserMapper">
@@ -339,5 +443,18 @@ public final class MyBatisMapperLineMarkerProviderTest extends BasePlatformTestC
                 .filter(method -> methodName.equals(method.getName()))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private void rename(VirtualFile virtualFile, String newName) throws Exception {
+        WriteAction.runAndWait(() -> virtualFile.rename(this, newName));
+    }
+
+    private static <T extends PsiElement> void navigate(LineMarkerInfo<T> markerInfo)
+            throws Throwable {
+        T source = markerInfo.getElement();
+        assertNotNull(source);
+        GutterIconNavigationHandler<T> navigationHandler = markerInfo.getNavigationHandler();
+        assertNotNull(navigationHandler);
+        EdtTestUtil.runInEdtAndWait(() -> navigationHandler.navigate(null, source));
     }
 }

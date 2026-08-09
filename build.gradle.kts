@@ -1,3 +1,4 @@
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
 
@@ -8,6 +9,8 @@ plugins {
 
 group = "io.github.ns3154.mybatisassistant"
 version = "0.1.0-SNAPSHOT"
+
+val pluginVerifierIdeVersion = providers.gradleProperty("pluginVerifierIdeVersion").orElse("2026.1")
 
 java {
     toolchain {
@@ -35,7 +38,7 @@ intellijPlatform {
         version = project.version.toString()
         description = """
             <p>MyBatis Assistant connects Java mapper methods with MyBatis XML statements through safe indexed navigation.</p>
-            <p>当前开发预览版聚焦 Mapper 接口、XML namespace 与 statement 之间的可靠语义关联。</p>
+            <p>当前开发预览版提供 Java Mapper 方法与 XML statement 之间的双向安全导航，并区分缺失、重复与索引未就绪状态。</p>
         """.trimIndent()
 
         ideaVersion {
@@ -52,7 +55,7 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            current()
+            create(IntelliJPlatformType.IntellijIdea, pluginVerifierIdeVersion)
         }
     }
 }
