@@ -30,7 +30,7 @@ mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
 
 ## 项目资料
 
-- [商业级阶段实现规划](商业级阶段实现规划.md)
+- [交付阶段实施规划](交付阶段实施规划.md)
 - [首批开发任务卡](docs/首批任务卡.md)
 - [功能矩阵](docs/功能矩阵.md)
 - [风险清单](docs/风险清单.md)
@@ -43,4 +43,4 @@ mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
 
 ## 许可证
 
-许可证尚未确定。在仓库加入明确许可证文件前，代码版权仍由作者保留。
+本项目采用 [Apache License 2.0](LICENSE) 许可证。
