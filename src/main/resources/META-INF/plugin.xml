@@ -1,0 +1,23 @@
+<idea-plugin>
+    <id>io.github.ns3154.mybatis-idea-assistant</id>
+    <name>MyBatis Assistant</name>
+    <vendor url="https://github.com/ns3154/mybatis-idea-assistant">ns3154</vendor>
+
+    <description><![CDATA[
+        <p>MyBatis Assistant connects Java mapper methods with MyBatis XML statements through safe indexed navigation.</p>
+        <p>当前开发预览版提供 Mapper 方法到 XML statement 的安全导航。</p>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.java</depends>
+    <depends>com.intellij.modules.xml</depends>
+
+    <resource-bundle>messages.MyBatisAssistantBundle</resource-bundle>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisStatementIndex"/>
+        <codeInsight.lineMarkerProvider
+                language="JAVA"
+                implementationClass="io.github.ns3154.mybatisassistant.navigation.MyBatisMapperLineMarkerProvider"/>
+    </extensions>
+</idea-plugin>

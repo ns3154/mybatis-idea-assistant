@@ -1,0 +1,17 @@
+.gradle/
+.idea/
+.intellijPlatform/
+.kotlin/
+build/
+out/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+
+# 本地 SDK 和运行参数
+local.properties
+
+# 样例项目构建产物
+samples/**/target/
+samples/**/build/

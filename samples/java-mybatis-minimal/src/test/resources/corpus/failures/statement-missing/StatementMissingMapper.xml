@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace 正确，但只提供另一个 statement，供缺失检测使用。 -->
+<mapper namespace="io.github.mybatisideaassistant.sample.fixtures.statement.StatementMissingMapper">
+    <select id="findAll" resultType="long">
+        SELECT 1
+    </select>
+</mapper>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 故意使用错误的全限定名，供 namespace 不匹配测试使用。 -->
+<mapper namespace="io.github.mybatisideaassistant.sample.fixtures.namespace.WrongNamespaceMapper">
+    <select id="findById" resultType="long">
+        SELECT 1
+    </select>
+</mapper>
