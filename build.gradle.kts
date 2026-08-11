@@ -62,7 +62,7 @@ intellijPlatform {
         version = project.version.toString()
         description = """
             <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
-            <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名，以及 XML 符号、Java/Kotlin Mapper、配置和模块可见性的增量语义模型。</p>
+            <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名，以及可增量失效的符号化动态 SQL 编译和字符级 source map。</p>
         """.trimIndent()
 
         ideaVersion {
@@ -128,6 +128,7 @@ tasks {
                     "io.github.ns3154.mybatisassistant.index.*",
                     "io.github.ns3154.mybatisassistant.model.*",
                     "io.github.ns3154.mybatisassistant.resolve.*",
+                    "io.github.ns3154.mybatisassistant.dynamic.*",
                 )
                 limit {
                     counter = "LINE"

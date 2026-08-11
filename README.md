@@ -2,7 +2,7 @@
 
 面向 IntelliJ IDEA 的 MyBatis 智能开发助手，采用独立实现路线开发。
 
-当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S3 已通过阶段验收，S4 参数、ResultMap、TypeAlias 与安全重构已经完成开发并进入最终统一验收：
+当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S3 已通过阶段验收，S4 与 S5 已完成开发并进入各自最终统一验收：
 
 - 识别 Java Mapper 接口；
 - 识别 MyBatis XML 的 `namespace`；
@@ -22,6 +22,7 @@
 - 按 MyBatis 参数命名规则解析 `#{}`、`${}`、`keyProperty`、`property` 与 `collection` 的根名、点路径和索引路径，对未知 Map 键与完整 OGNL 保守降级；
 - 解析 ResultMap 的可写属性、嵌套类型、constructor/discriminator 分支与 TypeAlias，提供精确引用、查找使用、补全候选和低误报检查；
 - 使用 IntelliJ 原生 Rename 同步更新 statement、resultMap/SQL fragment、`@Param`、JavaBean 属性与稳定类型引用；遇到动态 OGNL、include、多目标、只读或不完整语义时在写入前停止。
+- 将动态 statement 编译为不会组合爆炸的符号化 IR，覆盖 `if/choose/where/set/trim/foreach/bind/include`，并为普通文本、CDATA、entity 与 include property 建立双向字符级 source map；循环、重复目标、Dumb Mode、失效源与取消均保守停止。
 
 ## 开发环境
 
@@ -65,6 +66,8 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 - [S3 精确引用、基础检查与安全修复验收记录](docs/S3-精确引用基础检查与安全修复验收记录.md)
 - [S4 参数、ResultMap、TypeAlias 与安全重构任务卡](docs/S4-参数ResultMap-TypeAlias与安全重构任务卡.md)
 - [S4 参数、ResultMap、TypeAlias 与安全重构验收记录](docs/S4-参数ResultMap-TypeAlias与安全重构验收记录.md)
+- [S5 动态 SQL 编译器与源位置映射任务卡](docs/S5-动态SQL编译器与源位置映射任务卡.md)
+- [S5 动态 SQL 编译器与源位置映射验收记录](docs/S5-动态SQL编译器与源位置映射验收记录.md)
 - [风险清单](docs/风险清单.md)
 - [首批验收记录](docs/首批验收记录.md)
 - [交付完成度审计](docs/交付完成度审计.md)
