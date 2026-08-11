@@ -13,6 +13,13 @@ import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiJavaFile;
 import com.intellij.psi.PsiMethod;
+import com.intellij.psi.PsiPolyVariantReference;
+import com.intellij.psi.PsiReference;
+import com.intellij.psi.ResolveResult;
+import com.intellij.psi.util.PsiTreeUtil;
+import com.intellij.psi.xml.XmlAttribute;
+import com.intellij.psi.xml.XmlAttributeValue;
+import com.intellij.psi.xml.XmlFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.testFramework.PsiTestUtil;
 import com.intellij.testFramework.VfsTestUtil;
@@ -20,6 +27,7 @@ import com.intellij.testFramework.HeavyPlatformTestCase;
 import io.github.ns3154.mybatisassistant.resolve.MyBatisStatementResolution;
 import io.github.ns3154.mybatisassistant.resolve.MyBatisStatementResolver;
 import io.github.ns3154.mybatisassistant.resolve.MyBatisMapperMethodResolver;
+import io.github.ns3154.mybatisassistant.resolve.MyBatisProviderMethodResolver;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -168,6 +176,115 @@ public final class MyBatisMultiModuleScopeTest extends HeavyPlatformTestCase {
         assertSize(2, mapperMethods(xml));
     }
 
+    public void testXmlReferencesFollowModuleDependenciesAndRootChanges() throws Exception {
+        Module app = addModule("app");
+        Module visible = addModule("visible");
+        Module unrelated = addModule("unrelated");
+        XmlFile appXml = (XmlFile) addModuleFile("app", "resources/mapper/AppMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <select id="findAll">
+                        select <include refid="com.example.CommonMapper.columns"/> from users
+                    </select>
+                </mapper>
+                """);
+        addModuleFile("visible", "src/com/example/UserMapper.java", """
+                package com.example;
+                public interface UserMapper { Object findAll(); }
+                """);
+        addModuleFile("unrelated", "src/com/example/UserMapper.java", """
+                package com.example;
+                public interface UserMapper { Object findAll(); }
+                """);
+        addModuleFile("visible", "resources/mapper/CommonMapper.xml", """
+                <mapper namespace="com.example.CommonMapper">
+                    <sql id="columns">id</sql>
+                </mapper>
+                """);
+        addModuleFile("unrelated", "resources/mapper/CommonMapper.xml", """
+                <mapper namespace="com.example.CommonMapper">
+                    <sql id="columns">other_id</sql>
+                </mapper>
+                """);
+        PsiReference namespaceReference = xmlReference(appXml, "namespace");
+        PsiReference refidReference = xmlReference(appXml, "refid");
+
+        assertEmpty(multiResolve(namespaceReference));
+        assertEmpty(multiResolve(refidReference));
+
+        ModuleRootModificationUtil.addDependency(app, visible);
+        assertSize(1, multiResolve(namespaceReference));
+        assertSize(1, multiResolve(refidReference));
+
+        ModuleRootModificationUtil.addDependency(app, unrelated);
+        assertSize(2, multiResolve(namespaceReference));
+        assertSize(2, multiResolve(refidReference));
+    }
+
+    public void testParentMethodNavigationDiscoversDependentMapperAfterRootChange()
+            throws Exception {
+        Module base = addModule("base");
+        Module app = addModule("app");
+        PsiFile baseFile = addModuleFile("base", "src/com/example/BaseMapper.java", """
+                package com.example;
+                public interface BaseMapper {
+                    Object findById(Long id);
+                }
+                """);
+        addModuleFile("app", "src/com/example/UserMapper.java", """
+                package com.example;
+                public interface UserMapper extends com.example.BaseMapper {
+                }
+                """);
+        addModuleFile("app", "resources/mapper/UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <select id="findById">select 1</select>
+                </mapper>
+                """);
+        PsiMethod parentMethod = ((PsiJavaFile) baseFile).getClasses()[0].getMethods()[0];
+
+        assertInstanceOf(resolve(parentMethod), MyBatisStatementResolution.NoMapperXml.class);
+
+        ModuleRootModificationUtil.addDependency(app, base);
+        assertInstanceOf(resolve(parentMethod), MyBatisStatementResolution.UniqueMatch.class);
+    }
+
+    public void testProviderMethodNavigationFollowsJavaModuleDependencies() throws Exception {
+        Module app = addModule("app");
+        Module providers = addModule("providers");
+        addModuleFile(
+                "app",
+                "src/org/apache/ibatis/annotations/SelectProvider.java",
+                """
+                        package org.apache.ibatis.annotations;
+                        public @interface SelectProvider {
+                            Class<?> type();
+                            String method();
+                        }
+                        """);
+        PsiFile mapperFile = addModuleFile("app", "src/com/example/UserMapper.java", """
+                package com.example;
+                import org.apache.ibatis.annotations.SelectProvider;
+                public interface UserMapper {
+                    @SelectProvider(type = com.shared.UserSqlProvider.class, method = "findSql")
+                    Object findById(Long id);
+                }
+                """);
+        addModuleFile("providers", "src/com/shared/UserSqlProvider.java", """
+                package com.shared;
+                public final class UserSqlProvider {
+                    public static String findSql(Long id) { return "select 1"; }
+                }
+                """);
+        PsiMethod mapperMethod = ((PsiJavaFile) mapperFile).getClasses()[0].getMethods()[0];
+
+        assertEmpty(providerMethods(mapperMethod));
+
+        ModuleRootModificationUtil.addDependency(app, providers);
+        assertSize(1, providerMethods(mapperMethod));
+        assertEquals("com.shared.UserSqlProvider",
+                providerMethods(mapperMethod).getFirst().getContainingClass().getQualifiedName());
+    }
+
     private Module addModule(String name) throws Exception {
         VirtualFile root = VfsTestUtil.createDir(modulesRoot, name);
         moduleRoots.put(name, root);
@@ -228,10 +345,33 @@ public final class MyBatisMultiModuleScopeTest extends HeavyPlatformTestCase {
                 "findById"));
     }
 
+    private java.util.List<PsiMethod> providerMethods(PsiMethod mapperMethod) {
+        return ReadAction.compute(() -> MyBatisProviderMethodResolver.find(mapperMethod));
+    }
+
     private MyBatisProjectConfigurationModel configuration(PsiFile context) {
         MyBatisProjectConfigurationResolution resolution = ReadAction.compute(
                 () -> MyBatisProjectConfigurationResolver.resolve(context));
         assertInstanceOf(resolution, MyBatisProjectConfigurationResolution.Found.class);
         return ((MyBatisProjectConfigurationResolution.Found) resolution).model();
+    }
+
+    private PsiReference xmlReference(XmlFile file, String attributeName) {
+        return ReadAction.compute(() -> PsiTreeUtil.findChildrenOfType(file, XmlAttribute.class)
+                .stream()
+                .filter(attribute -> attributeName.equals(attribute.getName()))
+                .map(XmlAttribute::getValueElement)
+                .filter(java.util.Objects::nonNull)
+                .map(XmlAttributeValue::getReferences)
+                .filter(references -> references.length == 1)
+                .map(references -> references[0])
+                .findFirst()
+                .orElseThrow());
+    }
+
+    private ResolveResult[] multiResolve(PsiReference reference) {
+        assertTrue(reference instanceof PsiPolyVariantReference);
+        return ReadAction.compute(
+                () -> ((PsiPolyVariantReference) reference).multiResolve(false));
     }
 }

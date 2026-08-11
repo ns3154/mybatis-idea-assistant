@@ -22,6 +22,14 @@
         <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisXmlSymbolIndex"/>
         <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisConfigurationIndex"/>
         <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisBootConfigurationIndex"/>
+        <psi.referenceContributor
+                language="XML"
+                implementation="io.github.ns3154.mybatisassistant.reference.MyBatisXmlReferenceContributor"/>
+        <psi.referenceContributor
+                language="JAVA"
+                implementation="io.github.ns3154.mybatisassistant.reference.MyBatisJavaReferenceContributor"/>
+        <referencesSearch
+                implementation="io.github.ns3154.mybatisassistant.reference.MyBatisXmlReferencesSearchExecutor"/>
         <codeInsight.lineMarkerProvider
                 language="JAVA"
                 implementationClass="io.github.ns3154.mybatisassistant.navigation.MyBatisMapperLineMarkerProvider"/>

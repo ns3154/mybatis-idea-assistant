@@ -12,18 +12,21 @@ import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiMethod;
+import com.intellij.psi.PsiModifier;
 import com.intellij.psi.search.GlobalSearchScope;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 public final class MyBatisMapperMethodResolver {
     private MyBatisMapperMethodResolver() {
     }
 
     /**
-     * 按完整 namespace 和 statement id 查找当前接口直接声明的方法。调用方必须持有读锁。
+     * 按完整 namespace 和 statement id 查找接口当前可见的抽象实例方法。调用方必须持有读锁。
      */
     public static @NotNull List<PsiMethod> find(
             @NotNull PsiElement context,
@@ -80,7 +83,7 @@ public final class MyBatisMapperMethodResolver {
         PsiClass[] mapperClasses = JavaPsiFacade.getInstance(project).findClasses(
                 namespace,
                 scope);
-        List<PsiMethod> targets = new ArrayList<>();
+        Set<PsiMethod> targets = new LinkedHashSet<>();
         for (PsiClass mapperClass : mapperClasses) {
             ProgressManager.checkCanceled();
             if (project.isDisposed() || !project.isOpen()) {
@@ -92,16 +95,26 @@ public final class MyBatisMapperMethodResolver {
                 continue;
             }
 
-            for (PsiMethod method : mapperClass.findMethodsByName(statementId, false)) {
+            for (PsiMethod candidate : mapperClass.findMethodsByName(statementId, true)) {
                 ProgressManager.checkCanceled();
-                if (method.isValid()) {
+                PsiMethod method = mapperClass.findMethodBySignature(candidate, true);
+                if (method == null) {
+                    continue;
+                }
+                if (statementId.equals(method.getName())
+                        && method.isValid()
+                        && method.hasModifierProperty(PsiModifier.ABSTRACT)
+                        && !method.hasModifierProperty(PsiModifier.STATIC)
+                        && !method.hasModifierProperty(PsiModifier.DEFAULT)
+                        && method.getBody() == null) {
                     targets.add(method);
                 }
             }
         }
 
         ProgressManager.checkCanceled();
-        targets.sort((left, right) -> {
+        List<PsiMethod> sortedTargets = new ArrayList<>(targets);
+        sortedTargets.sort((left, right) -> {
             ProgressManager.checkCanceled();
             int byPath = sourcePath(left).compareTo(sourcePath(right));
             if (byPath != 0) {
@@ -110,7 +123,7 @@ public final class MyBatisMapperMethodResolver {
             return Integer.compare(left.getTextOffset(), right.getTextOffset());
         });
         ProgressManager.checkCanceled();
-        return List.copyOf(targets);
+        return List.copyOf(sortedTargets);
     }
 
     private static @NotNull String sourcePath(@NotNull PsiMethod method) {
