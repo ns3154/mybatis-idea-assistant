@@ -34,7 +34,7 @@ public final class MyBatisXmlLineMarkerProvider extends RelatedItemLineMarkerPro
         }
 
         List<PsiMethod> targets = MyBatisMapperMethodResolver.find(
-                element.getProject(),
+                element,
                 reference.namespace(),
                 reference.statementId());
         if (targets.isEmpty()) {
@@ -58,7 +58,7 @@ public final class MyBatisXmlLineMarkerProvider extends RelatedItemLineMarkerPro
             return List.of();
         }
         return MyBatisMapperMethodResolver.find(
-                element.getProject(),
+                element,
                 reference.namespace(),
                 reference.statementId());
     }

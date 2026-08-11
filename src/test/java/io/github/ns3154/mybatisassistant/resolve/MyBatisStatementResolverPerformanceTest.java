@@ -10,6 +10,7 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiJavaFile;
 import com.intellij.psi.PsiMethod;
+import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.xml.XmlFile;
 import com.intellij.psi.xml.XmlTag;
@@ -512,13 +513,17 @@ public final class MyBatisStatementResolverPerformanceTest extends BasePlatformT
         public @NotNull List<XmlTag> find(
                 @NotNull Project project,
                 @NotNull String namespace,
-                @NotNull String statementId) {
+                @NotNull String statementId,
+                @NotNull GlobalSearchScope scope) {
             statementQueries.add(new StatementQuery(namespace, statementId));
             return targets;
         }
 
         @Override
-        public boolean hasMapperXml(@NotNull Project project, @NotNull String namespace) {
+        public boolean hasMapperXml(
+                @NotNull Project project,
+                @NotNull String namespace,
+                @NotNull GlobalSearchScope scope) {
             namespaceQueries.add(namespace);
             return mapperXmlExists;
         }
@@ -534,12 +539,16 @@ public final class MyBatisStatementResolverPerformanceTest extends BasePlatformT
         public @NotNull List<XmlTag> find(
                 @NotNull Project project,
                 @NotNull String namespace,
-                @NotNull String statementId) {
+                @NotNull String statementId,
+                @NotNull GlobalSearchScope scope) {
             throw IndexNotReadyException.create();
         }
 
         @Override
-        public boolean hasMapperXml(@NotNull Project project, @NotNull String namespace) {
+        public boolean hasMapperXml(
+                @NotNull Project project,
+                @NotNull String namespace,
+                @NotNull GlobalSearchScope scope) {
             throw IndexNotReadyException.create();
         }
     }

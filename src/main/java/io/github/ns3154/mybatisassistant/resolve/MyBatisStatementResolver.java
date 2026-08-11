@@ -8,12 +8,12 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectRootModificationTracker;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.ModificationTracker;
-import com.intellij.psi.PsiAnnotation;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiModifier;
+import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.SmartPointerManager;
 import com.intellij.psi.SmartPsiElementPointer;
 import com.intellij.psi.util.CachedValue;
@@ -22,25 +22,15 @@ import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.psi.util.PsiModificationTracker;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.util.indexing.FileBasedIndex;
-import io.github.ns3154.mybatisassistant.index.MyBatisStatementIndex;
+import io.github.ns3154.mybatisassistant.index.MyBatisXmlSymbolIndex;
+import io.github.ns3154.mybatisassistant.model.MyBatisAnnotationModel;
+import io.github.ns3154.mybatisassistant.model.MyBatisStatementSourceKind;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 public final class MyBatisStatementResolver {
-    private static final String MYBATIS_ANNOTATION_PACKAGE = "org.apache.ibatis.annotations.";
-    private static final Set<String> NO_XML_STATEMENT_ANNOTATION_NAMES = Set.of(
-            "Select",
-            "Insert",
-            "Update",
-            "Delete",
-            "SelectProvider",
-            "InsertProvider",
-            "UpdateProvider",
-            "DeleteProvider",
-            "Flush");
     private static final Key<CachedValue<MyBatisStatementResolution>> RESOLUTION_CACHE_KEY =
             Key.create("mybatis.idea.assistant.statement.resolution");
 
@@ -107,7 +97,7 @@ public final class MyBatisStatementResolver {
         }
 
         try {
-            if (hasNoXmlStatementAnnotation(method)) {
+            if (MyBatisAnnotationModel.statementSource(method) != MyBatisStatementSourceKind.XML) {
                 return new MyBatisStatementResolution.UnsupportedSource();
             }
             String namespace = mapperInterface.getQualifiedName();
@@ -161,7 +151,7 @@ public final class MyBatisStatementResolver {
             ModificationTracker indexModificationTracker = () -> project.isDisposed()
                     ? Long.MAX_VALUE
                     : FileBasedIndex.getInstance().getIndexModificationStamp(
-                            MyBatisStatementIndex.NAME,
+                            MyBatisXmlSymbolIndex.NAME,
                             project);
             return CachedValueProvider.Result.create(
                     resolution,
@@ -180,12 +170,13 @@ public final class MyBatisStatementResolver {
             @NotNull String statementId,
             @NotNull MyBatisStatementLookup lookup) {
         ProgressManager.checkCanceled();
-        List<XmlTag> tags = lookup.find(project, namespace, statementId);
+        GlobalSearchScope scope = source.getResolveScope();
+        List<XmlTag> tags = lookup.find(project, namespace, statementId, scope);
         if (!isSourceUsable(project, source)) {
             return new MyBatisStatementResolution.SourceInvalid();
         }
         if (tags.isEmpty()) {
-            boolean mapperXmlExists = lookup.hasMapperXml(project, namespace);
+            boolean mapperXmlExists = lookup.hasMapperXml(project, namespace, scope);
             if (!isSourceUsable(project, source)) {
                 return new MyBatisStatementResolution.SourceInvalid();
             }
@@ -213,29 +204,6 @@ public final class MyBatisStatementResolver {
             return new MyBatisStatementResolution.UniqueMatch(targets.getFirst());
         }
         return new MyBatisStatementResolution.MultipleMatches(targets);
-    }
-
-    private static boolean hasNoXmlStatementAnnotation(@NotNull PsiMethod method) {
-        for (PsiAnnotation annotation : method.getAnnotations()) {
-            ProgressManager.checkCanceled();
-            String qualifiedName = annotation.getQualifiedName();
-            if (qualifiedName == null || !qualifiedName.startsWith(MYBATIS_ANNOTATION_PACKAGE)) {
-                continue;
-            }
-            String shortName = qualifiedName.substring(MYBATIS_ANNOTATION_PACKAGE.length());
-            int dotSeparator = shortName.indexOf('.');
-            int dollarSeparator = shortName.indexOf('$');
-            int nestedTypeSeparator = dotSeparator < 0
-                    ? dollarSeparator
-                    : dollarSeparator < 0 ? dotSeparator : Math.min(dotSeparator, dollarSeparator);
-            if (nestedTypeSeparator >= 0) {
-                shortName = shortName.substring(0, nestedTypeSeparator);
-            }
-            if (NO_XML_STATEMENT_ANNOTATION_NAMES.contains(shortName)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static boolean isSourceUsable(

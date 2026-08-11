@@ -1,12 +1,15 @@
 package io.github.ns3154.mybatisassistant.resolve;
 
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ModuleUtilCore;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.search.GlobalSearchScope;
@@ -23,9 +26,35 @@ public final class MyBatisMapperMethodResolver {
      * 按完整 namespace 和 statement id 查找当前接口直接声明的方法。调用方必须持有读锁。
      */
     public static @NotNull List<PsiMethod> find(
+            @NotNull PsiElement context,
+            @NotNull String namespace,
+            @NotNull String statementId) {
+        if (!context.isValid()) {
+            return List.of();
+        }
+        Module module = ModuleUtilCore.findModuleForPsiElement(context);
+        GlobalSearchScope scope = module == null
+                ? context.getResolveScope()
+                : GlobalSearchScope.moduleWithDependenciesAndLibrariesScope(module);
+        return find(context.getProject(), namespace, statementId, scope);
+    }
+
+    public static @NotNull List<PsiMethod> find(
             @NotNull Project project,
             @NotNull String namespace,
             @NotNull String statementId) {
+        return find(
+                project,
+                namespace,
+                statementId,
+                GlobalSearchScope.projectScope(project));
+    }
+
+    public static @NotNull List<PsiMethod> find(
+            @NotNull Project project,
+            @NotNull String namespace,
+            @NotNull String statementId,
+            @NotNull GlobalSearchScope scope) {
         if (project.isDisposed()
                 || !project.isOpen()
                 || DumbService.isDumb(project)
@@ -36,7 +65,7 @@ public final class MyBatisMapperMethodResolver {
         ProgressManager.checkCanceled();
 
         try {
-            return findFromIndex(project, namespace, statementId);
+            return findFromIndex(project, namespace, statementId, scope);
         } catch (IndexNotReadyException ignored) {
             // Dumb Mode 可能在预检查后开始；索引竞态按暂不可用安全降级。
             return List.of();
@@ -46,10 +75,11 @@ public final class MyBatisMapperMethodResolver {
     private static @NotNull List<PsiMethod> findFromIndex(
             @NotNull Project project,
             @NotNull String namespace,
-            @NotNull String statementId) {
+            @NotNull String statementId,
+            @NotNull GlobalSearchScope scope) {
         PsiClass[] mapperClasses = JavaPsiFacade.getInstance(project).findClasses(
                 namespace,
-                GlobalSearchScope.projectScope(project));
+                scope);
         List<PsiMethod> targets = new ArrayList<>();
         for (PsiClass mapperClass : mapperClasses) {
             ProgressManager.checkCanceled();

@@ -4,8 +4,8 @@
     <vendor url="https://github.com/ns3154/mybatis-idea-assistant">ns3154</vendor>
 
     <description><![CDATA[
-        <p>MyBatis Assistant connects Java mapper methods with MyBatis XML statements and conservatively reports missing statements.</p>
-        <p>当前开发预览版提供 Java Mapper 方法与 XML statement 之间的双向安全导航，以及缺失 statement 检查。</p>
+        <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
+        <p>当前开发预览版提供双向安全导航、缺失 statement 检查，以及 XML 符号、Java/Kotlin Mapper、配置、TypeAlias 和模块可见性的增量语义模型。</p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
@@ -19,7 +19,9 @@
     <resource-bundle>messages.MyBatisAssistantBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisStatementIndex"/>
+        <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisXmlSymbolIndex"/>
+        <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisConfigurationIndex"/>
+        <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisBootConfigurationIndex"/>
         <codeInsight.lineMarkerProvider
                 language="JAVA"
                 implementationClass="io.github.ns3154.mybatisassistant.navigation.MyBatisMapperLineMarkerProvider"/>

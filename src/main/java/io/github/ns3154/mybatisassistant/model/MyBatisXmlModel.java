@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.model;
 
+import com.intellij.psi.xml.XmlAttribute;
 import com.intellij.psi.xml.XmlTag;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -13,11 +14,17 @@ public final class MyBatisXmlModel {
     }
 
     public static boolean isMapperRoot(@NotNull XmlTag tag) {
-        return "mapper".equals(tag.getLocalName());
+        return "mapper".equals(tag.getName());
     }
 
     public static boolean isStatement(@NotNull XmlTag tag) {
-        return STATEMENT_TAGS.contains(tag.getLocalName());
+        return STATEMENT_TAGS.contains(tag.getName());
+    }
+
+    public static boolean isSymbolTag(
+            @NotNull XmlTag tag,
+            @NotNull MyBatisXmlSymbolKind kind) {
+        return kind.matchesMapperChildTag(tag.getName());
     }
 
     public static @Nullable String namespace(@NotNull XmlTag mapperTag) {
@@ -25,11 +32,18 @@ public final class MyBatisXmlModel {
     }
 
     public static @Nullable String statementId(@NotNull XmlTag statementTag) {
-        return normalizedAttribute(statementTag, "id");
+        return symbolId(statementTag);
+    }
+
+    public static @Nullable String symbolId(@NotNull XmlTag symbolTag) {
+        return normalizedAttribute(symbolTag, "id");
     }
 
     private static @Nullable String normalizedAttribute(@NotNull XmlTag tag, @NotNull String name) {
-        String value = tag.getAttributeValue(name);
+        XmlAttribute attribute = tag.getAttribute(name);
+        String value = attribute == null || !name.equals(attribute.getName())
+                ? null
+                : attribute.getValue();
         if (value == null) {
             return null;
         }
