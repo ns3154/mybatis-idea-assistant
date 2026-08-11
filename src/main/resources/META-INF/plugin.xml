@@ -164,4 +164,21 @@
     <extensions defaultExtensionNs="org.jetbrains.kotlin">
         <supportsKotlinPluginMode supportsK2="true"/>
     </extensions>
+    <actions>
+        <action
+                id="MyBatisAssistant.SqlTool.RestoreLogSql"
+                class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisLogSqlRestoreAction"
+                text="还原 MyBatis 日志 SQL…"
+                description="在本地还原 Preparing/Parameters 日志并标注 SQL 风险，不自动执行">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action
+                id="MyBatisAssistant.SqlTool.FormatMapperXml"
+                class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisXmlFormatAction"
+                text="格式化 MyBatis XML…"
+                description="预览并以单个可撤销命令格式化当前 MyBatis Mapper XML">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>

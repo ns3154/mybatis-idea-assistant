@@ -189,6 +189,14 @@ tasks {
         listOf("io/github/ns3154/mybatisassistant/methodsql/**"),
         "0.85",
     )
+    val logSqlCoverage = registerScopedCoverage(
+        "jacocoLogSqlCoverageVerification",
+        listOf(
+            "io/github/ns3154/mybatisassistant/sqltool/log/**",
+            "io/github/ns3154/mybatisassistant/sqltool/format/**",
+        ),
+        "0.85",
+    )
 
     check {
         dependsOn(
@@ -198,6 +206,7 @@ tasks {
             databaseAdapterCoverage,
             generatorCoverage,
             methodSqlCoverage,
+            logSqlCoverage,
         )
     }
 
