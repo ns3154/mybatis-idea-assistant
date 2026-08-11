@@ -90,6 +90,15 @@
                 enabledByDefault="false"
                 level="WARNING"
                 implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisUnusedStatementInspection"/>
+        <localInspection
+                language="XML"
+                shortName="MyBatisInvalidParameterPath"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.invalid.parameter.path.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisInvalidParameterPathInspection"/>
         <applicationService
                 serviceImplementation="io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettings"/>
         <applicationConfigurable

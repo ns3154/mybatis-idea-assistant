@@ -10,6 +10,8 @@ import com.intellij.psi.PsiReferenceRegistrar;
 import com.intellij.psi.xml.XmlAttribute;
 import com.intellij.psi.xml.XmlAttributeValue;
 import com.intellij.psi.xml.XmlTag;
+import com.intellij.psi.xml.XmlToken;
+import com.intellij.psi.xml.XmlTokenType;
 import com.intellij.util.ProcessingContext;
 import io.github.ns3154.mybatisassistant.model.MyBatisXmlModel;
 import io.github.ns3154.mybatisassistant.model.MyBatisXmlSymbolKind;
@@ -31,6 +33,10 @@ public final class MyBatisXmlReferenceContributor extends PsiReferenceContributo
         registrar.registerReferenceProvider(
                 PlatformPatterns.psiElement(XmlAttributeValue.class),
                 new MapperAttributeReferenceProvider());
+        registrar.registerReferenceProvider(
+                PlatformPatterns.psiElement(XmlToken.class)
+                        .withElementType(XmlTokenType.XML_DATA_CHARACTERS),
+                new MapperTextReferenceProvider());
     }
 
     private static final class MapperAttributeReferenceProvider extends PsiReferenceProvider {
@@ -68,6 +74,10 @@ public final class MyBatisXmlReferenceContributor extends PsiReferenceContributo
                 return PsiReference.EMPTY_ARRAY;
             }
 
+            if (isParameterPathAttribute(attribute, tag)) {
+                return directParameterReferences(value).toArray(PsiReference.EMPTY_ARRAY);
+            }
+
             if ("id".equals(attribute.getName())
                     && tag.getParentTag() == mapper
                     && MyBatisXmlModel.isStatement(tag)
@@ -95,6 +105,27 @@ public final class MyBatisXmlReferenceContributor extends PsiReferenceContributo
                         namespace)};
             }
             return PsiReference.EMPTY_ARRAY;
+        }
+
+        private static boolean isParameterPathAttribute(
+                @NotNull XmlAttribute attribute,
+                @NotNull XmlTag tag) {
+            return "collection".equals(attribute.getName()) && "foreach".equals(tag.getName())
+                    || "keyProperty".equals(attribute.getName())
+                    && ("insert".equals(tag.getName())
+                    || "update".equals(tag.getName())
+                    || "selectKey".equals(tag.getName()));
+        }
+
+        private static @NotNull List<PsiReference> directParameterReferences(
+                @NotNull XmlAttributeValue value) {
+            List<PsiReference> references = new ArrayList<>();
+            TextRange valueRange = MyBatisReferenceSupport.valueRange(value);
+            for (MyBatisParameterExpressionParser.ParameterPath path
+                    : MyBatisParameterExpressionParser.parseCommaSeparatedPaths(value.getValue())) {
+                addPathReferences(value, valueRange, path, references);
+            }
+            return List.copyOf(references);
         }
 
         private static PsiReference @NotNull [] resultMapReferences(
@@ -134,6 +165,44 @@ public final class MyBatisXmlReferenceContributor extends PsiReferenceContributo
                 segmentStart = comma + 1;
             }
             return references.toArray(PsiReference.EMPTY_ARRAY);
+        }
+    }
+
+    private static final class MapperTextReferenceProvider extends PsiReferenceProvider {
+        @Override
+        public PsiReference @NotNull [] getReferencesByElement(
+                @NotNull com.intellij.psi.PsiElement element,
+                @NotNull ProcessingContext context) {
+            ProgressManager.checkCanceled();
+            if (!(element instanceof XmlToken token)) {
+                return PsiReference.EMPTY_ARRAY;
+            }
+            return parameterReferences(token, token.getText(), TextRange.EMPTY_RANGE)
+                    .toArray(PsiReference.EMPTY_ARRAY);
+        }
+    }
+
+    private static @NotNull List<PsiReference> parameterReferences(
+            @NotNull com.intellij.psi.PsiElement element,
+            @NotNull String text,
+            @NotNull TextRange baseRange) {
+        List<PsiReference> references = new ArrayList<>();
+        for (MyBatisParameterExpressionParser.ParameterPath path
+                : MyBatisParameterExpressionParser.parsePlaceholders(text)) {
+            addPathReferences(element, baseRange, path, references);
+        }
+        return List.copyOf(references);
+    }
+
+    private static void addPathReferences(
+            @NotNull com.intellij.psi.PsiElement element,
+            @NotNull TextRange baseRange,
+            @NotNull MyBatisParameterExpressionParser.ParameterPath path,
+            @NotNull List<PsiReference> references) {
+        for (int index = 0; index < path.segments().size(); index++) {
+            ProgressManager.checkCanceled();
+            TextRange range = path.segments().get(index).range().shiftRight(baseRange.getStartOffset());
+            references.add(new MyBatisParameterReference(element, range, path, index));
         }
     }
 }
