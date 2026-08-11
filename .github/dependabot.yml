@@ -33,6 +33,22 @@ updates:
           - "minor"
           - "patch"
 
+  - package-ecosystem: "maven"
+    directory: "/samples/semantic-corpus"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:20"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    groups:
+      corpus-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="io.github.mybatisideaassistant.corpus.failure.CycleMapper">
+    <sql id="left"><include refid="right"/></sql>
+    <sql id="right"><include refid="left"/></sql>
+    <select id="find" resultType="map">select <include refid="left"/></select>
+</mapper>

@@ -23,19 +23,34 @@
 
 ```bash
 mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
+mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 ./gradlew check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin
+./scripts/verify-sandbox-lifecycle.sh 20
+./scripts/verify-optional-dependency-isolation.sh
 ./gradlew runIde
 ```
 
 插件 ZIP 生成在 `build/distributions/`。
+
+需要构造升级测试包时，可通过项目属性覆盖版本号：
+
+```bash
+./gradlew buildPlugin -PpluginVersion=0.1.1-SNAPSHOT
+```
 
 ## 项目资料
 
 - [交付阶段实施规划](交付阶段实施规划.md)
 - [首批开发任务卡](docs/首批任务卡.md)
 - [功能矩阵](docs/功能矩阵.md)
+- [交付功能行为矩阵](docs/交付功能行为矩阵.md)
+- [S0 产品基线与语料任务卡](docs/S0-产品基线与语料任务卡.md)
+- [S0 产品基线与语料验收记录](docs/S0-产品基线与语料验收记录.md)
+- [S1 插件骨架与流水线任务卡](docs/S1-插件骨架与流水线任务卡.md)
+- [S1 插件骨架与流水线验收记录](docs/S1-插件骨架与流水线验收记录.md)
 - [风险清单](docs/风险清单.md)
 - [首批验收记录](docs/首批验收记录.md)
+- [交付完成度审计](docs/交付完成度审计.md)
 - [安全策略](.github/SECURITY.md)
 
 ## 独立实现边界

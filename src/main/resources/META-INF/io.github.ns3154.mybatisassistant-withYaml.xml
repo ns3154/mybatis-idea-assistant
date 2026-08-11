@@ -1,0 +1,5 @@
+<idea-plugin>
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- YAML 配置能力在 S11 实现时只在本描述符中注册。 -->
+    </extensions>
+</idea-plugin>

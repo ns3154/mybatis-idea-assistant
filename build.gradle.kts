@@ -1,14 +1,20 @@
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
+import org.gradle.api.plugins.quality.Checkstyle
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
+import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
+import org.gradle.testing.jacoco.tasks.JacocoReport
 
 plugins {
     java
+    checkstyle
+    jacoco
     id("org.jetbrains.intellij.platform")
 }
 
 group = "io.github.ns3154.mybatisassistant"
-version = "0.1.0-SNAPSHOT"
+version = providers.gradleProperty("pluginVersion").orElse("0.1.0-SNAPSHOT").get()
 
 val pluginVerifierIdeVersion = providers.gradleProperty("pluginVerifierIdeVersion").orElse("2026.1")
 
@@ -16,6 +22,21 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
+}
+
+checkstyle {
+    toolVersion = "13.10.0"
+    configFile = file("config/checkstyle/checkstyle.xml")
+    isShowViolations = true
+    maxWarnings = 0
+}
+
+jacoco {
+    toolVersion = "0.8.15"
+}
+
+dependencyLocking {
+    lockAllConfigurations()
 }
 
 dependencies {
@@ -31,6 +52,8 @@ dependencies {
 
 intellijPlatform {
     buildSearchableOptions = false
+    // 开发实例使用独立、可清理的构建沙箱，避免继承本机 IDEA 与历史人工验收状态。
+    sandboxContainer = layout.buildDirectory.dir("idea-sandbox")
 
     pluginConfiguration {
         id = "io.github.ns3154.mybatis-idea-assistant"
@@ -69,6 +92,60 @@ tasks {
     test {
         maxHeapSize = "2g"
         systemProperty("java.awt.headless", "true")
+        extensions.configure<JacocoTaskExtension> {
+            isIncludeNoLocationClasses = true
+            excludes = listOf("jdk.internal.*")
+        }
+        finalizedBy("jacocoTestReport")
+    }
+
+    named<JacocoReport>("jacocoTestReport") {
+        dependsOn(test)
+        // 平台测试运行的是 IntelliJ 表单插桩后的插件 JAR，报告必须使用同一份 class。
+        classDirectories.setFrom(layout.buildDirectory.dir("instrumented/instrumentCode"))
+        reports {
+            xml.required = true
+            html.required = true
+            csv.required = false
+        }
+    }
+
+    named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+        dependsOn(test)
+        // 平台测试运行的是 IntelliJ 表单插桩后的插件 JAR，校验必须使用同一份 class。
+        classDirectories.setFrom(layout.buildDirectory.dir("instrumented/instrumentCode"))
+        violationRules {
+            rule {
+                limit {
+                    counter = "LINE"
+                    value = "COVEREDRATIO"
+                    minimum = "0.70".toBigDecimal()
+                }
+            }
+            rule {
+                includes = listOf(
+                    "io.github.ns3154.mybatisassistant.index.*",
+                    "io.github.ns3154.mybatisassistant.model.*",
+                    "io.github.ns3154.mybatisassistant.resolve.*",
+                )
+                limit {
+                    counter = "LINE"
+                    value = "COVEREDRATIO"
+                    minimum = "0.85".toBigDecimal()
+                }
+            }
+        }
+    }
+
+    check {
+        dependsOn("jacocoTestCoverageVerification")
+    }
+
+    withType<Checkstyle>().configureEach {
+        reports {
+            xml.required = true
+            html.required = true
+        }
     }
 
     named<PrepareSandboxTask>("prepareTestSandbox") {

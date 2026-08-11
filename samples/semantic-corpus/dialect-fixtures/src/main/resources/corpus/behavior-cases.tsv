@@ -1,0 +1,27 @@
+# capability	kind	input	expected
+P0-RECOGNITION	NORMAL	@MapperScan 加载跨模块 Java/Kotlin Mapper 与 XML	按 FQN、模块和来源建立统一模型
+P0-RECOGNITION	FAILURE	同简单类名、缺少可选框架依赖	不合并同名接口且主插件继续加载
+P0-NAVIGATION	NORMAL	唯一 namespace#statement 与注解 Provider	直达声明或展示全部候选
+P0-NAVIGATION	FAILURE	Dumb Mode、失效 PSI、重复目标	静默降级或展示候选，不选第一个
+P0-REFERENCES	NORMAL	refid=resultMap/property/column 的精确声明	解析到可见作用域声明
+P0-REFERENCES	FAILURE	跨不可见模块或错误 namespace	保持未解析且不猜测
+P0-INSPECTIONS	NORMAL	Mapper XML 已存在但抽象方法无 statement	只在方法名报告可证明问题
+P0-INSPECTIONS	FAILURE	动态 Map、数据源断开、不完整 PSI	降低或取消问题，不误报
+P0-QUICKFIX	NORMAL	用户选择 select 并确认目标 XML	预览后以单命令创建可撤销 statement
+P0-QUICKFIX	FAILURE	只读 XML、冲突 id、目标语义不确定	不写文件并显示原因
+P0-PARAMETERS	NORMAL	@Param、List、Map、泛型和嵌套属性	给出确定的名称、类型与作用域
+P0-PARAMETERS	FAILURE	动态 Map 键或无法替换的泛型	返回未知类型且不标红合法表达式
+P0-RESULTMAP	NORMAL	constructor/association/collection/columnPrefix	解析嵌套属性与列映射
+P0-RESULTMAP	FAILURE	循环 resultMap、缺少数据库元数据	停止展开且不误报列不存在
+P0-DYNAMICSQL	NORMAL	include+foreach+choose+trim+bind	生成符号化 SQL 和字符级 source map
+P0-DYNAMICSQL	FAILURE	include 循环、分支爆炸、不完整 XML	局部诊断、可取消且不指数展开
+P0-OGNL	NORMAL	_parameter、bind、foreach item 与嵌套属性	解析引用、类型和补全
+P0-OGNL	FAILURE	半个表达式、动态 Map、未知方法	错误恢复且只报告可证明错误
+P0-SQL	NORMAL	PostgreSQL 虚拟 SQL 与在线 schema	补全表列并回映射错误位置
+P0-SQL	FAILURE	数据源断开或 Database Tools 禁用	保留编辑导航且不在 EDT 做 IO
+P0-DATABASE-GENERATION	NORMAL	用户选择表、模板和文件后确认预览	原子生成可撤销代码
+P0-DATABASE-GENERATION	FAILURE	模板异常、只读文件或中途取消	回到生成前状态或给出恢复路径
+P0-SAFE-MERGE	NORMAL	生成标识完整且用户仅改手写区	更新生成区并保留全部手写内容
+P0-SAFE-MERGE	FAILURE	标识缺失或生成区双方冲突	停止覆盖并展示差异
+P0-PRODUCTIZATION	NORMAL	合法设置、签名凭证和发布版本	生成签名包、SBOM、文档与回滚说明
+P0-PRODUCTIZATION	FAILURE	损坏设置或缺少发布凭证	恢复默认或只阻止发布，不影响本地构建

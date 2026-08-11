@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: mybatis-assistant-semantic-corpus
+
+mybatis:
+  config-location: classpath:mybatis-config.xml
+  mapper-locations: classpath*:mappers/**/*.xml
+  type-aliases-package: io.github.mybatisideaassistant.corpus.java.domain
+  configuration:
+    map-underscore-to-camel-case: true
