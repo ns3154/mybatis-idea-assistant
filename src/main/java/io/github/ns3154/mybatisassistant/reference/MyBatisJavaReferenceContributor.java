@@ -5,11 +5,11 @@ import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
 import com.intellij.patterns.PlatformPatterns;
-import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiAnnotation;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiLiteralExpression;
 import com.intellij.psi.PsiNameValuePair;
+import com.intellij.psi.PsiNameHelper;
 import com.intellij.psi.PsiReference;
 import com.intellij.psi.PsiReferenceContributor;
 import com.intellij.psi.PsiReferenceProvider;
@@ -45,9 +45,7 @@ public final class MyBatisJavaReferenceContributor extends PsiReferenceContribut
                         || !(PsiTreeUtil.getParentOfType(pair, PsiAnnotation.class)
                                 instanceof PsiAnnotation annotation)
                         || !MyBatisAnnotationModel.isProviderAnnotation(annotation)
-                        || !JavaPsiFacade.getInstance(project)
-                                .getNameHelper()
-                                .isIdentifier(methodName)) {
+                        || !PsiNameHelper.getInstance(project).isIdentifier(methodName)) {
                     return PsiReference.EMPTY_ARRAY;
                 }
                 return new PsiReference[]{new MyBatisProviderMethodReference(literal, annotation)};

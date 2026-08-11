@@ -1,6 +1,9 @@
 package io.github.ns3154.mybatisassistant.model;
 
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.codeInspection.InspectionManager;
+import com.intellij.codeInspection.LocalInspectionTool;
+import com.intellij.codeInspection.ProblemsHolder;
 import com.intellij.openapi.module.JavaModuleType;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleUtilCore;
@@ -10,6 +13,7 @@ import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiJavaFile;
 import com.intellij.psi.PsiMethod;
@@ -20,6 +24,7 @@ import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.xml.XmlAttribute;
 import com.intellij.psi.xml.XmlAttributeValue;
 import com.intellij.psi.xml.XmlFile;
+import com.intellij.psi.xml.XmlTag;
 import com.intellij.psi.PsiManager;
 import com.intellij.testFramework.PsiTestUtil;
 import com.intellij.testFramework.VfsTestUtil;
@@ -28,6 +33,9 @@ import io.github.ns3154.mybatisassistant.resolve.MyBatisStatementResolution;
 import io.github.ns3154.mybatisassistant.resolve.MyBatisStatementResolver;
 import io.github.ns3154.mybatisassistant.resolve.MyBatisMapperMethodResolver;
 import io.github.ns3154.mybatisassistant.resolve.MyBatisProviderMethodResolver;
+import io.github.ns3154.mybatisassistant.inspection.MyBatisDuplicateStatementInspection;
+import io.github.ns3154.mybatisassistant.inspection.MyBatisInvalidNamespaceInspection;
+import io.github.ns3154.mybatisassistant.inspection.MyBatisUnusedStatementInspection;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -285,6 +293,47 @@ public final class MyBatisMultiModuleScopeTest extends HeavyPlatformTestCase {
                 providerMethods(mapperMethod).getFirst().getContainingClass().getQualifiedName());
     }
 
+    public void testXmlInspectionsFollowModuleDependenciesAndRootChanges() throws Exception {
+        Module app = addModule("app");
+        Module mapperModule = addModule("mapperModule");
+        XmlFile appXml = (XmlFile) addModuleFile(
+                "app",
+                "resources/mapper/AppMapper.xml",
+                """
+                        <mapper namespace="com.example.UserMapper">
+                            <select id="findAll">select 1</select>
+                        </mapper>
+                        """);
+        addModuleFile("mapperModule", "src/com/example/UserMapper.java", """
+                package com.example;
+                public interface UserMapper { Object findAll(); }
+                """);
+        addModuleFile("mapperModule", "resources/mapper/UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <select id="findAll">select 2</select>
+                </mapper>
+                """);
+        XmlTag root = appXml.getRootTag();
+        assertNotNull(root);
+        XmlTag statement = root.findFirstSubTag("select");
+        assertNotNull(statement);
+
+        assertSize(1, inspect(new MyBatisInvalidNamespaceInspection(), appXml, root)
+                .getResults());
+        assertEmpty(inspect(new MyBatisDuplicateStatementInspection(), appXml, statement)
+                .getResults());
+        assertEmpty(inspect(new MyBatisUnusedStatementInspection(), appXml, statement)
+                .getResults());
+
+        ModuleRootModificationUtil.addDependency(app, mapperModule);
+        assertEmpty(inspect(new MyBatisInvalidNamespaceInspection(), appXml, root)
+                .getResults());
+        assertSize(1, inspect(new MyBatisDuplicateStatementInspection(), appXml, statement)
+                .getResults());
+        assertEmpty(inspect(new MyBatisUnusedStatementInspection(), appXml, statement)
+                .getResults());
+    }
+
     private Module addModule(String name) throws Exception {
         VirtualFile root = VfsTestUtil.createDir(modulesRoot, name);
         moduleRoots.put(name, root);
@@ -354,6 +403,19 @@ public final class MyBatisMultiModuleScopeTest extends HeavyPlatformTestCase {
                 () -> MyBatisProjectConfigurationResolver.resolve(context));
         assertInstanceOf(resolution, MyBatisProjectConfigurationResolution.Found.class);
         return ((MyBatisProjectConfigurationResolution.Found) resolution).model();
+    }
+
+    private ProblemsHolder inspect(
+            LocalInspectionTool inspection,
+            XmlFile file,
+            XmlTag tag) {
+        ProblemsHolder holder = new ProblemsHolder(
+                InspectionManager.getInstance(getProject()),
+                file,
+                true);
+        PsiElementVisitor visitor = inspection.buildVisitor(holder, true);
+        ReadAction.run(() -> tag.accept(visitor));
+        return holder;
     }
 
     private PsiReference xmlReference(XmlFile file, String attributeName) {

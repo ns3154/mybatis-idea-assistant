@@ -41,6 +41,8 @@ wait_for_pattern() {
 for ((cycle = 1; cycle <= CYCLE_COUNT; cycle++)); do
     cycle_name="$(printf '%02d' "${cycle}")"
     cycle_output="${REPORT_DIR}/cycle-${cycle_name}.log"
+    # 每轮日志已单独归档；重置共享沙箱日志，避免 IDEA 日志滚动后累计行号失效。
+    : > "${SANDBOX_LOG}"
     start_line=$(( $(wc -l < "${SANDBOX_LOG}") + 1 ))
 
     ./gradlew runIde >"${cycle_output}" 2>&1 &

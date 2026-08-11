@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.inspection;
 
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
+import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.codeHighlighting.HighlightDisplayLevel;
 import com.intellij.codeInspection.InspectionManager;
 import com.intellij.codeInspection.InspectionProfileEntry;
@@ -9,9 +10,14 @@ import com.intellij.codeInspection.ProblemsHolder;
 import com.intellij.codeInspection.ex.InspectionToolWrapper;
 import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.command.undo.UndoManager;
+import com.intellij.openapi.fileEditor.FileEditor;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.ui.TestDialog;
+import com.intellij.openapi.ui.TestDialogManager;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiJavaFile;
@@ -21,6 +27,7 @@ import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.xml.XmlFile;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.testFramework.DumbModeTestUtils;
+import com.intellij.testFramework.EdtTestUtil;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import com.intellij.profile.codeInspection.InspectionProfileManager;
 
@@ -65,7 +72,7 @@ public final class MyBatisMissingStatementInspectionTest extends BasePlatformTes
         assertNotNull(description);
         assertTrue(description,
                 description.contains("只在确认对应 namespace 的 Mapper XML 已存在"));
-        assertTrue(description, description.contains("不会自动修改 XML"));
+        assertTrue(description, description.contains("单次 Undo"));
         assertTrue(description, description.contains("Flush"));
     }
 
@@ -335,6 +342,89 @@ public final class MyBatisMissingStatementInspectionTest extends BasePlatformTes
             fail("取消后的检查必须抛出 ProcessCanceledException");
         } catch (ProcessCanceledException expected) {
             // 取消是正常控制流，Inspection 不得吞掉。
+        }
+    }
+
+    public void testCreateStatementQuickFixHasPreviewAndSingleUndo() throws Throwable {
+        PsiFile xmlFile = addMapperXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <!-- 保留已有注释 -->
+                    <sql id="columns">id, name</sql>
+                </mapper>
+                """);
+        configureJava("""
+                package com.example;
+                public interface UserMapper {
+                    Object findBy<caret>Id(long id);
+                }
+                """);
+        myFixture.doHighlighting();
+
+        IntentionAction action = myFixture.findSingleIntention(
+                "创建 <select> statement（src/main/resources/mapper/UserMapper.xml）");
+        String preview = myFixture.getIntentionPreviewText(action);
+        assertNotNull(preview);
+        assertTrue(preview, preview.contains("<select id=\"findById\">"));
+        assertTrue(preview, preview.contains("TODO: 补充 SQL"));
+        assertFalse(xmlFile.getText().contains("<select id=\"findById\">"));
+
+        myFixture.launchAction(action);
+        PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
+
+        XmlTag root = ((XmlFile) xmlFile).getRootTag();
+        assertNotNull(root);
+        XmlTag added = root.findFirstSubTag("select");
+        assertNotNull(added);
+        assertEquals("findById", added.getAttributeValue("id"));
+        assertTrue(xmlFile.getText().contains("保留已有注释"));
+        assertNotNull(root.findFirstSubTag("sql"));
+
+        FileEditor editor = FileEditorManager.getInstance(getProject())
+                .getSelectedEditor(xmlFile.getVirtualFile());
+        assertNotNull(editor);
+        UndoManager undoManager = UndoManager.getInstance(getProject());
+        assertTrue(undoManager.isUndoAvailable(editor));
+        TestDialogManager.setTestDialog(TestDialog.OK, getTestRootDisposable());
+        EdtTestUtil.runInEdtAndWait(() -> undoManager.undo(editor));
+        PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
+
+        root = ((XmlFile) xmlFile).getRootTag();
+        assertNotNull(root);
+        assertNull(root.findFirstSubTag("select"));
+        assertNotNull(root.findFirstSubTag("sql"));
+        assertTrue(xmlFile.getText().contains("保留已有注释"));
+    }
+
+    public void testQuickFixesEnumerateStatementTagsAndTargetXmlFiles() {
+        myFixture.addFileToProject("src/main/resources/mapper/First.xml", """
+                <mapper namespace="com.example.UserMapper"/>
+                """);
+        myFixture.addFileToProject("src/main/resources/mapper/Second.xml", """
+                <mapper namespace="com.example.UserMapper"/>
+                """);
+        configureJava("""
+                package com.example;
+                public interface UserMapper {
+                    Object find<caret>All();
+                }
+                """);
+        myFixture.doHighlighting();
+
+        List<String> fixNames = myFixture.getAvailableIntentions().stream()
+                .map(IntentionAction::getText)
+                .filter(text -> text.startsWith("创建 <"))
+                .sorted()
+                .toList();
+
+        assertEquals(8, fixNames.size());
+        for (String fileName : List.of(
+                "src/main/resources/mapper/First.xml",
+                "src/main/resources/mapper/Second.xml")) {
+            for (String tag : List.of("select", "insert", "update", "delete")) {
+                assertContainsElements(
+                        fixNames,
+                        "创建 <" + tag + "> statement（" + fileName + "）");
+            }
         }
     }
 

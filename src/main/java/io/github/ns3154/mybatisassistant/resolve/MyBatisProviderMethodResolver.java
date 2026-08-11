@@ -16,6 +16,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiModifier;
+import com.intellij.psi.PsiNameHelper;
 import com.intellij.psi.PsiType;
 import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.util.PsiUtil;
@@ -162,8 +163,7 @@ public final class MyBatisProviderMethodResolver {
             return new ProviderMethodSelection(null, true);
         }
         String normalized = methodName.trim();
-        String explicitName = JavaPsiFacade.getInstance(annotation.getProject())
-                .getNameHelper()
+        String explicitName = PsiNameHelper.getInstance(annotation.getProject())
                 .isIdentifier(normalized)
                 ? normalized
                 : null;
