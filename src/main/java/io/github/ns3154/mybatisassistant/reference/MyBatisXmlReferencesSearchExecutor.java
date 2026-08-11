@@ -61,6 +61,11 @@ public final class MyBatisXmlReferencesSearchExecutor
                 .isParamLiteral(literal)) {
             return name;
         }
+        if (element instanceof XmlAttributeValue value
+                && isOgnlBindingDeclaration(value)) {
+            String name = value.getValue();
+            return name.isBlank() ? null : name;
+        }
         if (element instanceof PsiField field) {
             return field.getName();
         }
@@ -74,6 +79,18 @@ public final class MyBatisXmlReferencesSearchExecutor
         return name.startsWith("is") && name.length() > 2
                 ? decapitalize(name.substring(2))
                 : null;
+    }
+
+    private static boolean isOgnlBindingDeclaration(
+            @NotNull XmlAttributeValue value) {
+        if (!(value.getParent() instanceof XmlAttribute attribute)
+                || !(attribute.getParent() instanceof XmlTag tag)) {
+            return false;
+        }
+        return "bind".equals(tag.getName()) && "name".equals(attribute.getName())
+                || "foreach".equals(tag.getName())
+                && ("item".equals(attribute.getName())
+                || "index".equals(attribute.getName()));
     }
 
     private static @NotNull String decapitalize(@NotNull String name) {

@@ -5,7 +5,7 @@
 
     <description><![CDATA[
         <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
-        <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名，以及可增量失效的符号化动态 SQL 编译和字符级 source map。</p>
+        <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map，以及 OGNL 语法高亮、类型推导、引用、补全、查找使用、重命名与低误报检查。</p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
@@ -19,6 +19,14 @@
     <resource-bundle>messages.MyBatisAssistantBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
+        <lang.parserDefinition
+                language="MyBatisOGNL"
+                implementationClass="io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlParserDefinition"/>
+        <lang.syntaxHighlighterFactory
+                language="MyBatisOGNL"
+                implementationClass="io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlSyntaxHighlighterFactory"/>
+        <multiHostInjector
+                implementation="io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlXmlInjector"/>
         <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisXmlSymbolIndex"/>
         <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisConfigurationIndex"/>
         <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisBootConfigurationIndex"/>
@@ -28,6 +36,12 @@
         <psi.referenceContributor
                 language="JAVA"
                 implementation="io.github.ns3154.mybatisassistant.reference.MyBatisJavaReferenceContributor"/>
+        <psi.referenceContributor
+                language="MyBatisOGNL"
+                implementation="io.github.ns3154.mybatisassistant.reference.MyBatisOgnlReferenceContributor"/>
+        <completion.contributor
+                language="MyBatisOGNL"
+                implementationClass="io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlCompletionContributor"/>
         <referencesSearch
                 implementation="io.github.ns3154.mybatisassistant.reference.MyBatisXmlReferencesSearchExecutor"/>
         <renamePsiElementProcessor
@@ -36,6 +50,8 @@
                 implementation="io.github.ns3154.mybatisassistant.refactoring.MyBatisParamRenameHandler"/>
         <renamePsiElementProcessor
                 implementation="io.github.ns3154.mybatisassistant.refactoring.MyBatisXmlSymbolRenameProcessor"/>
+        <renamePsiElementProcessor
+                implementation="io.github.ns3154.mybatisassistant.refactoring.MyBatisOgnlBindingRenameProcessor"/>
         <codeInsight.lineMarkerProvider
                 language="JAVA"
                 implementationClass="io.github.ns3154.mybatisassistant.navigation.MyBatisMapperLineMarkerProvider"/>
@@ -114,6 +130,15 @@
                 enabledByDefault="true"
                 level="WARNING"
                 implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisInvalidResultMappingInspection"/>
+        <localInspection
+                language="MyBatisOGNL"
+                shortName="MyBatisOgnlUnresolvedSymbol"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.ognl.unresolved.symbol.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisOgnlUnresolvedSymbolInspection"/>
         <applicationService
                 serviceImplementation="io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettings"/>
         <applicationConfigurable
