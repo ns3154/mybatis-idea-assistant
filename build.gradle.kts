@@ -45,6 +45,7 @@ dependencies {
     intellijPlatform {
         intellijIdea("2026.1.4")
         bundledPlugin("com.intellij.java")
+        bundledPlugin("org.jetbrains.kotlin")
         testFramework(TestFrameworkType.Platform)
         pluginVerifier()
     }
@@ -60,8 +61,8 @@ intellijPlatform {
         name = "MyBatis Assistant"
         version = project.version.toString()
         description = """
-            <p>MyBatis Assistant connects Java mapper methods with MyBatis XML statements and conservatively reports missing statements.</p>
-            <p>当前开发预览版提供双向安全导航、类型化解析，以及已有 Mapper XML 中缺失 statement 的保守检查。</p>
+            <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
+            <p>当前开发预览版提供双向安全导航、缺失 statement 检查，以及 XML 符号、Java/Kotlin Mapper、配置、TypeAlias 和模块可见性的增量语义模型。</p>
         """.trimIndent()
 
         ideaVersion {

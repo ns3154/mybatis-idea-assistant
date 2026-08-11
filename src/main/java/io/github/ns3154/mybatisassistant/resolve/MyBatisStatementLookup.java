@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.resolve;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.xml.XmlTag;
 import org.jetbrains.annotations.NotNull;
 
@@ -13,7 +14,11 @@ interface MyBatisStatementLookup {
     @NotNull List<XmlTag> find(
             @NotNull Project project,
             @NotNull String namespace,
-            @NotNull String statementId);
+            @NotNull String statementId,
+            @NotNull GlobalSearchScope scope);
 
-    boolean hasMapperXml(@NotNull Project project, @NotNull String namespace);
+    boolean hasMapperXml(
+            @NotNull Project project,
+            @NotNull String namespace,
+            @NotNull GlobalSearchScope scope);
 }

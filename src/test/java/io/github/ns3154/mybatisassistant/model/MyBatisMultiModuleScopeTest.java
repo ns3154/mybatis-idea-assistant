@@ -1,0 +1,237 @@
+package io.github.ns3154.mybatisassistant.model;
+
+import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.module.JavaModuleType;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ModuleUtilCore;
+import com.intellij.openapi.roots.ContentEntry;
+import com.intellij.openapi.roots.ModuleRootModificationUtil;
+import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.openapi.vfs.LocalFileSystem;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiJavaFile;
+import com.intellij.psi.PsiMethod;
+import com.intellij.psi.PsiManager;
+import com.intellij.testFramework.PsiTestUtil;
+import com.intellij.testFramework.VfsTestUtil;
+import com.intellij.testFramework.HeavyPlatformTestCase;
+import io.github.ns3154.mybatisassistant.resolve.MyBatisStatementResolution;
+import io.github.ns3154.mybatisassistant.resolve.MyBatisStatementResolver;
+import io.github.ns3154.mybatisassistant.resolve.MyBatisMapperMethodResolver;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+
+public final class MyBatisMultiModuleScopeTest extends HeavyPlatformTestCase {
+    private final Map<String, VirtualFile> moduleRoots = new HashMap<>();
+    private Path modulesPath;
+    private VirtualFile modulesRoot;
+
+    @Override
+    protected void setUp() throws Exception {
+        super.setUp();
+        modulesPath = Files.createTempDirectory("mybatis-assistant-modules-");
+        modulesRoot = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(modulesPath);
+        assertNotNull(modulesRoot);
+        ModuleRootModificationUtil.updateModel(getModule(), model -> {
+            for (ContentEntry entry : model.getContentEntries()) {
+                model.removeContentEntry(entry);
+            }
+        });
+    }
+
+    @Override
+    protected void tearDown() throws Exception {
+        try {
+            super.tearDown();
+        } finally {
+            moduleRoots.clear();
+            if (modulesPath != null) {
+                FileUtil.delete(modulesPath.toFile());
+            }
+        }
+    }
+
+    public void testStatementResolutionFollowsModuleDependenciesAndInvalidatesOnRootChange()
+            throws Exception {
+        Module app = addModule("app");
+        Module visibleXml = addModule("visibleXml");
+        Module unrelatedXml = addModule("unrelatedXml");
+        PsiMethod method = addMapperMethod("app");
+        addMapperXml("visibleXml", "visible");
+        addMapperXml("unrelatedXml", "unrelated");
+        assertEquals(app, ModuleUtilCore.findModuleForPsiElement(method));
+
+        assertInstanceOf(resolve(method), MyBatisStatementResolution.NoMapperXml.class);
+
+        ModuleRootModificationUtil.addDependency(app, visibleXml);
+        assertInstanceOf(resolve(method), MyBatisStatementResolution.UniqueMatch.class);
+
+        ModuleRootModificationUtil.addDependency(app, unrelatedXml);
+        assertInstanceOf(resolve(method), MyBatisStatementResolution.MultipleMatches.class);
+    }
+
+    public void testConfigurationAndTypeAliasQueriesExcludeUnrelatedModules() throws Exception {
+        Module app = addModule("app");
+        Module configuration = addModule("configuration");
+        Module unrelated = addModule("unrelated");
+        PsiFile context = addModuleFile("app", "src/com/example/Context.java", """
+                package com.example;
+                public final class Context {}
+                """);
+        addModuleFile("configuration", "src/com/example/domain/User.java", """
+                package com.example.domain;
+                public final class User {}
+                """);
+        addModuleFile("configuration", "resources/application.properties", """
+                mybatis.type-aliases-package=com.example.domain
+                """);
+        addModuleFile("unrelated", "resources/application.properties", """
+                mybatis.type-aliases-package=com.unrelated.domain
+                """);
+        assertEquals(app, ModuleUtilCore.findModuleForPsiElement(context));
+
+        assertEmpty(configuration(context).typeAliasPackages());
+
+        ModuleRootModificationUtil.addDependency(app, configuration);
+        assertEquals(
+                java.util.List.of("com.example.domain"),
+                configuration(context).typeAliasPackages());
+
+        PsiClass contextClass = ((PsiJavaFile) context).getClasses()[0];
+        MyBatisTypeAliasResolution aliasResolution = ReadAction.compute(
+                () -> MyBatisTypeAliasResolver.resolve(contextClass, "user"));
+        assertInstanceOf(aliasResolution, MyBatisTypeAliasResolution.Unique.class);
+        assertEquals(
+                "com.example.domain.User",
+                ((MyBatisTypeAliasResolution.Unique) aliasResolution).canonicalType());
+        assertFalse(app.isDisposed());
+        assertFalse(unrelated.isDisposed());
+    }
+
+    public void testMapperScanEvidenceFollowsCallingModuleScope() throws Exception {
+        Module app = addModule("app");
+        Module scanConfiguration = addModule("scanConfiguration");
+        PsiFile mapperFile = addModuleFile("app", "src/com/example/UserMapper.java", """
+                package com.example;
+                public interface UserMapper {}
+                """);
+        addModuleFile(
+                "scanConfiguration",
+                "src/org/mybatis/spring/annotation/MapperScan.java",
+                """
+                        package org.mybatis.spring.annotation;
+                        public @interface MapperScan { String[] value() default {}; }
+                        """);
+        addModuleFile("scanConfiguration", "src/com/config/Application.java", """
+                package com.config;
+                import org.mybatis.spring.annotation.MapperScan;
+                @MapperScan("com.example")
+                public final class Application {}
+                """);
+        PsiClass mapper = ((PsiJavaFile) mapperFile).getClasses()[0];
+
+        assertInstanceOf(mapperModel(mapper), MyBatisMapperModelResolution.NotMapper.class);
+
+        ModuleRootModificationUtil.addDependency(app, scanConfiguration);
+        assertInstanceOf(mapperModel(mapper), MyBatisMapperModelResolution.Found.class);
+    }
+
+    public void testReverseNavigationFollowsXmlModuleDependencies() throws Exception {
+        Module app = addModule("app");
+        Module visibleMapper = addModule("visibleMapper");
+        Module unrelatedMapper = addModule("unrelatedMapper");
+        PsiFile xml = addModuleFile("app", "resources/mapper/UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <select id="findById">select 1</select>
+                </mapper>
+                """);
+        addModuleFile("visibleMapper", "src/com/example/UserMapper.java", """
+                package com.example;
+                public interface UserMapper { Object findById(Long id); }
+                """);
+        addModuleFile("unrelatedMapper", "src/com/example/UserMapper.java", """
+                package com.example;
+                public interface UserMapper { Object findById(Long id); }
+                """);
+
+        assertEmpty(mapperMethods(xml));
+
+        ModuleRootModificationUtil.addDependency(app, visibleMapper);
+        assertSize(1, mapperMethods(xml));
+
+        ModuleRootModificationUtil.addDependency(app, unrelatedMapper);
+        assertSize(2, mapperMethods(xml));
+    }
+
+    private Module addModule(String name) throws Exception {
+        VirtualFile root = VfsTestUtil.createDir(modulesRoot, name);
+        moduleRoots.put(name, root);
+        Module module = PsiTestUtil.addModule(
+                getProject(),
+                JavaModuleType.getModuleType(),
+                name,
+                root);
+        PsiTestUtil.addSourceRoot(
+                module,
+                VfsTestUtil.createDir(root, "src"));
+        PsiTestUtil.addResourceContentToRoots(
+                module,
+                VfsTestUtil.createDir(root, "resources"),
+                false);
+        return module;
+    }
+
+    private PsiMethod addMapperMethod(String moduleName) {
+        PsiFile file = addModuleFile(moduleName, "src/com/example/UserMapper.java", """
+                package com.example;
+                public interface UserMapper {
+                    Object findById(Long id);
+                }
+                """);
+        return ((PsiJavaFile) file).getClasses()[0].getMethods()[0];
+    }
+
+    private void addMapperXml(String moduleName, String marker) {
+        addModuleFile(moduleName, "resources/mapper/UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <select id="findById">select '%s'</select>
+                </mapper>
+                """.formatted(marker));
+    }
+
+    private PsiFile addModuleFile(String moduleName, String relativePath, String content) {
+        VirtualFile root = moduleRoots.get(moduleName);
+        assertNotNull(root);
+        VirtualFile file = VfsTestUtil.createFile(root, relativePath, content);
+        PsiFile psiFile = PsiManager.getInstance(getProject()).findFile(file);
+        assertNotNull(psiFile);
+        return psiFile;
+    }
+
+    private MyBatisStatementResolution resolve(PsiMethod method) {
+        return ReadAction.compute(() -> MyBatisStatementResolver.resolve(method));
+    }
+
+    private MyBatisMapperModelResolution mapperModel(PsiClass mapper) {
+        return ReadAction.compute(() -> MyBatisMapperModelResolver.resolve(mapper));
+    }
+
+    private java.util.List<PsiMethod> mapperMethods(PsiFile xml) {
+        return ReadAction.compute(() -> MyBatisMapperMethodResolver.find(
+                xml,
+                "com.example.UserMapper",
+                "findById"));
+    }
+
+    private MyBatisProjectConfigurationModel configuration(PsiFile context) {
+        MyBatisProjectConfigurationResolution resolution = ReadAction.compute(
+                () -> MyBatisProjectConfigurationResolver.resolve(context));
+        assertInstanceOf(resolution, MyBatisProjectConfigurationResolution.Found.class);
+        return ((MyBatisProjectConfigurationResolution.Found) resolution).model();
+    }
+}
