@@ -4,6 +4,7 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElementResolveResult;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiPolyVariantReferenceBase;
 import com.intellij.psi.ResolveResult;
@@ -47,5 +48,14 @@ final class MyBatisStatementIdReference extends PsiPolyVariantReferenceBase<XmlA
             results.add(new PsiElementResolveResult(target));
         }
         return results.toArray(ResolveResult.EMPTY_ARRAY);
+    }
+
+    @Override
+    public boolean isReferenceTo(@NotNull PsiElement element) {
+        ResolveResult[] results = multiResolve(false);
+        return results.length == 1
+                && element.getManager().areElementsEquivalent(
+                element,
+                results[0].getElement());
     }
 }

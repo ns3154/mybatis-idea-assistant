@@ -2,6 +2,10 @@ package io.github.ns3154.mybatisassistant.reference;
 
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiField;
+import com.intellij.psi.PsiLiteralExpression;
+import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiReference;
 import com.intellij.psi.search.UsageSearchContext;
 import com.intellij.psi.search.searches.ReferencesSearch;
@@ -24,16 +28,60 @@ public final class MyBatisXmlReferencesSearchExecutor
         ProgressManager.checkCanceled();
         XmlTag declaration = declarationTag(parameters.getElementToSearch());
         SymbolDescriptor descriptor = descriptor(declaration);
-        if (descriptor == null) {
+        if (descriptor != null) {
+            schedule(parameters, descriptor.id(), declaration);
             return true;
         }
+        String alternateName = alternateSearchName(parameters.getElementToSearch());
+        if (alternateName != null) {
+            schedule(parameters, alternateName, parameters.getElementToSearch());
+        }
+        return true;
+    }
+
+    private static void schedule(
+            @NotNull ReferencesSearch.SearchParameters parameters,
+            @NotNull String word,
+            @NotNull PsiElement target) {
         parameters.getOptimizer().searchWord(
-                descriptor.id(),
+                word,
                 parameters.getEffectiveSearchScope(),
                 UsageSearchContext.ANY,
                 true,
-                declaration);
-        return true;
+                target);
+    }
+
+    private static @Nullable String alternateSearchName(@NotNull PsiElement element) {
+        if (element instanceof PsiClass psiClass) {
+            return psiClass.getName();
+        }
+        if (element instanceof PsiLiteralExpression literal
+                && literal.getValue() instanceof String name
+                && io.github.ns3154.mybatisassistant.refactoring.MyBatisParamRenameProcessor
+                .isParamLiteral(literal)) {
+            return name;
+        }
+        if (element instanceof PsiField field) {
+            return field.getName();
+        }
+        if (!(element instanceof PsiMethod method)) {
+            return null;
+        }
+        String name = method.getName();
+        if ((name.startsWith("get") || name.startsWith("set")) && name.length() > 3) {
+            return decapitalize(name.substring(3));
+        }
+        return name.startsWith("is") && name.length() > 2
+                ? decapitalize(name.substring(2))
+                : null;
+    }
+
+    private static @NotNull String decapitalize(@NotNull String name) {
+        if (name.length() > 1 && Character.isUpperCase(name.charAt(0))
+                && Character.isUpperCase(name.charAt(1))) {
+            return name;
+        }
+        return Character.toLowerCase(name.charAt(0)) + name.substring(1);
     }
 
     private static @Nullable XmlTag declarationTag(@NotNull PsiElement element) {

@@ -101,6 +101,20 @@ public final class MyBatisAnnotationModel {
         return null;
     }
 
+    public static @Nullable PsiAnnotationMemberValue explicitParameterNameElement(
+            @NotNull PsiParameter parameter) {
+        ProgressManager.checkCanceled();
+        PsiAnnotation annotation = parameter.getAnnotation(PARAM_ANNOTATION);
+        if (annotation == null) {
+            return null;
+        }
+        PsiAnnotationMemberValue value = annotation.findDeclaredAttributeValue("value");
+        if (value == null) {
+            value = annotation.findDeclaredAttributeValue(null);
+        }
+        return value;
+    }
+
     private static @Nullable String myBatisAnnotationShortName(@NotNull PsiAnnotation annotation) {
         String qualifiedName = annotation.getQualifiedName();
         if (qualifiedName == null || !qualifiedName.startsWith(ANNOTATION_PACKAGE)) {

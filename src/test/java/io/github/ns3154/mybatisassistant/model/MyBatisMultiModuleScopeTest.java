@@ -13,6 +13,7 @@ import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiJavaFile;
@@ -29,6 +30,7 @@ import com.intellij.psi.PsiManager;
 import com.intellij.testFramework.PsiTestUtil;
 import com.intellij.testFramework.VfsTestUtil;
 import com.intellij.testFramework.HeavyPlatformTestCase;
+import com.intellij.refactoring.rename.RenameProcessor;
 import io.github.ns3154.mybatisassistant.resolve.MyBatisStatementResolution;
 import io.github.ns3154.mybatisassistant.resolve.MyBatisStatementResolver;
 import io.github.ns3154.mybatisassistant.resolve.MyBatisMapperMethodResolver;
@@ -332,6 +334,37 @@ public final class MyBatisMultiModuleScopeTest extends HeavyPlatformTestCase {
                 .getResults());
         assertEmpty(inspect(new MyBatisUnusedStatementInspection(), appXml, statement)
                 .getResults());
+    }
+
+    public void testMapperMethodRenameDoesNotCrossIntoUnrelatedModule() throws Exception {
+        addModule("app");
+        addModule("unrelated");
+        PsiFile mapperFile = addModuleFile("app", "src/com/example/UserMapper.java", """
+                package com.example;
+                public interface UserMapper { Object findById(Long id); }
+                """);
+        PsiFile appXml = addModuleFile("app", "resources/mapper/UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <select id="findById">select 1</select>
+                </mapper>
+                """);
+        PsiFile unrelatedXml = addModuleFile(
+                "unrelated",
+                "resources/mapper/UserMapper.xml",
+                """
+                        <mapper namespace="com.example.UserMapper">
+                            <select id="findById">select 2</select>
+                        </mapper>
+                        """);
+        PsiMethod method = ((PsiJavaFile) mapperFile).getClasses()[0].getMethods()[0];
+
+        new RenameProcessor(getProject(), method, "findRenamed", false, false).run();
+        PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
+
+        assertTrue(mapperFile.getText().contains("findRenamed("));
+        assertTrue(appXml.getText().contains("id=\"findRenamed\""));
+        assertTrue("无依赖模块中的同名 XML 不得被跨模块误写",
+                unrelatedXml.getText().contains("id=\"findById\""));
     }
 
     private Module addModule(String name) throws Exception {

@@ -9,11 +9,11 @@ import com.intellij.psi.PsiPolyVariantReferenceBase;
 import com.intellij.psi.ResolveResult;
 import org.jetbrains.annotations.NotNull;
 
-public final class MyBatisParameterReference extends PsiPolyVariantReferenceBase<PsiElement> {
+public final class MyBatisResultPropertyReference extends PsiPolyVariantReferenceBase<PsiElement> {
     private final MyBatisParameterExpressionParser.ParameterPath path;
     private final int segmentIndex;
 
-    MyBatisParameterReference(
+    MyBatisResultPropertyReference(
             @NotNull PsiElement element,
             @NotNull TextRange range,
             @NotNull MyBatisParameterExpressionParser.ParameterPath path,
@@ -43,7 +43,6 @@ public final class MyBatisParameterReference extends PsiPolyVariantReferenceBase
 
     @Override
     public Object @NotNull [] getVariants() {
-        ProgressManager.checkCanceled();
         return resolution().variants().stream()
                 .map(LookupElementBuilder::create)
                 .toArray();
@@ -51,30 +50,23 @@ public final class MyBatisParameterReference extends PsiPolyVariantReferenceBase
 
     @Override
     public PsiElement handleElementRename(@NotNull String newElementName) {
-        PsiElement target = resolve();
-        String replacement = target instanceof com.intellij.psi.PsiMethod
-                || target instanceof com.intellij.psi.PsiField
-                ? MyBatisReferenceRenameSupport.propertyName(this, newElementName)
-                : newElementName;
-        return MyBatisReferenceRenameSupport.renameRange(this, replacement);
+        return MyBatisReferenceRenameSupport.renameRange(
+                this,
+                MyBatisReferenceRenameSupport.propertyName(this, newElementName));
     }
 
     public boolean isDefinitelyMissing() {
         return resolution().status() == MyBatisParameterPathResolution.Status.DEFINITE_MISSING;
     }
 
-    public @NotNull String parameterPath() {
+    public @NotNull String propertyPath() {
         return path.segments().subList(0, segmentIndex + 1).stream()
                 .map(MyBatisParameterExpressionParser.PathSegment::name)
                 .reduce((left, right) -> left + '.' + right)
                 .orElse("");
     }
 
-    @NotNull MyBatisParameterPathResolution.Status resolutionStatus() {
-        return resolution().status();
-    }
-
     private @NotNull MyBatisParameterPathResolution resolution() {
-        return MyBatisParameterPathResolver.resolve(getElement(), path, segmentIndex);
+        return MyBatisResultPropertyPathResolver.resolve(getElement(), path, segmentIndex);
     }
 }

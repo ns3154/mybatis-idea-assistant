@@ -5,7 +5,7 @@
 
     <description><![CDATA[
         <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
-        <p>当前开发预览版提供双向精确导航、XML/Java 引用、保守检查、安全 Quick Fix，以及 XML 符号、Java/Kotlin Mapper、配置、TypeAlias 和模块可见性的增量语义模型。</p>
+        <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名，以及 XML 符号、Java/Kotlin Mapper、配置和模块可见性的增量语义模型。</p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
@@ -30,6 +30,12 @@
                 implementation="io.github.ns3154.mybatisassistant.reference.MyBatisJavaReferenceContributor"/>
         <referencesSearch
                 implementation="io.github.ns3154.mybatisassistant.reference.MyBatisXmlReferencesSearchExecutor"/>
+        <renamePsiElementProcessor
+                implementation="io.github.ns3154.mybatisassistant.refactoring.MyBatisParamRenameProcessor"/>
+        <renameHandler
+                implementation="io.github.ns3154.mybatisassistant.refactoring.MyBatisParamRenameHandler"/>
+        <renamePsiElementProcessor
+                implementation="io.github.ns3154.mybatisassistant.refactoring.MyBatisXmlSymbolRenameProcessor"/>
         <codeInsight.lineMarkerProvider
                 language="JAVA"
                 implementationClass="io.github.ns3154.mybatisassistant.navigation.MyBatisMapperLineMarkerProvider"/>
@@ -99,6 +105,15 @@
                 enabledByDefault="true"
                 level="WARNING"
                 implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisInvalidParameterPathInspection"/>
+        <localInspection
+                language="XML"
+                shortName="MyBatisInvalidResultMapping"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.invalid.result.mapping.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisInvalidResultMappingInspection"/>
         <applicationService
                 serviceImplementation="io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettings"/>
         <applicationConfigurable

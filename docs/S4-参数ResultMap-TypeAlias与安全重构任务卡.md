@@ -2,7 +2,7 @@
 
 > 阶段：S4 参数、ResultMap、TypeAlias 与安全重构
 > 日期：2026-08-11
-> 状态：开发中
+> 状态：开发完成，待最终统一质量门与副屏验收
 
 ## 目标
 
@@ -24,8 +24,8 @@
 |---|---|---|---|
 | S4-A | 参数命名、特殊参数、单参数、集合/数组、Map 与泛型上下文模型 | 开发完成，待 S4 统一验收 | 纯模型与平台 PSI 黄金测试；参数模型行覆盖率不低于 90% |
 | S4-B | `#{}`、`${}`、`keyProperty`、`property`、`collection` 的静态引用、补全与检查 | 开发完成，待 S4 统一验收 | 根名/嵌套属性/索引/未知 Map/不完整输入、Dumb/取消与真实编辑器测试 |
-| S4-C | ResultMap property/类型、TypeAlias 引用与补全 | 待实现 | association/collection/constructor/discriminator/extends/columnPrefix 与别名冲突测试 |
-| S4-D | statement、`@Param`、resultMap/refid、实体属性的安全重命名 | 待实现 | 原生预览、多文件、只读、冲突、模块隔离、单次 Undo 与副屏实机 |
+| S4-C | ResultMap property/类型、TypeAlias 引用与补全 | 开发完成，待 S4 统一验收 | association/collection/constructor/discriminator/extends 与别名冲突测试 |
+| S4-D | statement、`@Param`、resultMap/refid、实体属性的安全重命名 | 开发完成，待 S4 统一验收 | 原生预览、多文件、只读、冲突、模块隔离、单次 Undo 与副屏实机 |
 
 ## S4-A 验收矩阵
 
@@ -39,6 +39,36 @@
 | S4-A-06 | 继承泛型 | 在当前 Mapper 上替换后的参数/属性类型 | 无法替换的类型参数保持未知 |
 | S4-A-07 | 生命周期 | Dumb、项目关闭、失效 PSI 类型化降级；取消传播 | 不缓存瞬时失败，不持有裸 PSI 跨写动作 |
 
+## S4-B 验收矩阵
+
+| 编号 | 场景 | 必须输出 | 保守边界 |
+|---|---|---|---|
+| S4-B-01 | 占位符参数 | `#{}`、`${}` 中的根名、点路径与索引路径引用到参数或只读 Java 属性 | `${}` 只建立静态引用，不推断 SQL 标识符语义 |
+| S4-B-02 | Mapper 属性位置 | `keyProperty`、statement `property` 与 `foreach collection` 使用同一参数上下文 | 完整 OGNL、foreach item/index 和 bind 变量留到 S5/S6 |
+| S4-B-03 | 补全 | 根名或属性前缀明确时返回确定候选 | Map 动态键、原始集合和未知泛型不伪造候选 |
+| S4-B-04 | 检查 | 只在静态可证明路径不存在时标记最小范围 | 实际参数名不稳定、未知类型、Dumb Mode、失效源保持静默 |
+| S4-B-05 | 生命周期 | 未保存 XML 编辑、Dumb、取消与索引竞态安全失效 | 不扫描项目文件，不吞取消异常 |
+
+## S4-C 验收矩阵
+
+| 编号 | 场景 | 必须输出 | 保守边界 |
+|---|---|---|---|
+| S4-C-01 | ResultMap 属性 | 普通 `result`/`id`、association、collection、嵌套点路径解析到可写 setter/字段 | 只读属性不作为可写目标；未知 Map 键保持未知 |
+| S4-C-02 | 构造器映射 | `constructor/idArg/arg` 的 `name` 解析到匹配构造参数 | 缺失参数名或多构造器歧义时不猜目标 |
+| S4-C-03 | 类型继承与分支 | resultMap `type`、`extends`、association/collection `javaType/ofType` 与 discriminator `case/resultMap` 组合后得到当前类型 | 循环继承和未解析类型及时停止 |
+| S4-C-04 | TypeAlias | 内置、显式、默认、包扫描和 `@Alias` 可引用、查找使用和补全 | 冲突别名保留全部目标；不可见模块与占位符不参与 |
+| S4-C-05 | 检查 | 只报告可证明不存在的可写属性或类型 | `column` 无数据库元数据时不报告不存在 |
+
+## S4-D 验收矩阵
+
+| 编号 | 场景 | 必须输出 | 保守边界 |
+|---|---|---|---|
+| S4-D-01 | Mapper 方法与 XML 符号 | 原生 Rename 同步 statement `id`、resultMap/SQL fragment 声明及精确引用 | 多目标、空名称、Dumb、只读或失效目标在写入前停止 |
+| S4-D-02 | `@Param` | 从注解字符串进入原生 Rename，同步稳定参数引用并支持预览和单次 Undo | 注解 SQL、重载、完整 OGNL、无法解析 include 或非法标识符明确报冲突，不做半重命名 |
+| S4-D-03 | JavaBean 属性 | getter、setter 或字段重命名同步参数只读路径与 ResultMap 可写路径 | 访问器改成普通方法时不生成无效属性名 |
+| S4-D-04 | Java 类型 | 全限定类型和包扫描产生的稳定短别名随类名更新 | 显式 `@Alias`/配置别名保持稳定，不错误改写业务别名 |
+| S4-D-05 | 作用域与恢复 | 只更新当前模块及依赖可见引用；单次 Undo 恢复所有文件 | 不跨无依赖模块，不以全文文本替换兜底 |
+
 ## 阶段统一门禁
 
 ```bash
@@ -49,4 +79,4 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 ./scripts/verify-optional-dependency-isolation.sh
 ```
 
-只有 S4-A～S4-D 全部通过自动化、最低 261 Verifier 和副屏真实 IDEA 验收后，S4 才能标记为已验收。
+当前代码与自动化已经覆盖 S4-A～S4-D；只有最终统一 Gradle/Maven 门、最低 261 Verifier、20/20 生命周期、5/5 可选依赖隔离和副屏真实 IDEA 验收全部通过后，S4 才能标记为已验收。

@@ -68,6 +68,12 @@ public final class MyBatisXmlReferenceContributor extends PsiReferenceContributo
                     ? parent
                     : null;
             XmlTag tag = attribute == null ? null : MyBatisReferenceSupport.containingTag(attribute);
+            if (attribute != null
+                    && tag != null
+                    && isConfiguredTypeAliasTarget(attribute, tag)
+                    && MyBatisReferenceSupport.isStaticReferenceValue(value.getValue())) {
+                return new PsiReference[]{new MyBatisTypeReference(value)};
+            }
             XmlTag mapper = tag == null ? null : MyBatisReferenceSupport.mapperRoot(tag);
             String namespace = mapper == null ? null : MyBatisXmlModel.namespace(mapper);
             if (attribute == null || tag == null || namespace == null) {
@@ -76,6 +82,18 @@ public final class MyBatisXmlReferenceContributor extends PsiReferenceContributo
 
             if (isParameterPathAttribute(attribute, tag)) {
                 return directParameterReferences(value).toArray(PsiReference.EMPTY_ARRAY);
+            }
+            if (isTypeAttribute(attribute, tag)
+                    && MyBatisReferenceSupport.isStaticReferenceValue(value.getValue())) {
+                return new PsiReference[]{new MyBatisTypeReference(value)};
+            }
+            if (isResultPropertyAttribute(attribute, tag)
+                    && MyBatisReferenceSupport.isStaticReferenceValue(value.getValue())) {
+                return resultPropertyReferences(value).toArray(PsiReference.EMPTY_ARRAY);
+            }
+            if (isConstructorArgumentAttribute(attribute, tag)
+                    && MyBatisReferenceSupport.isStaticReferenceValue(value.getValue())) {
+                return new PsiReference[]{new MyBatisConstructorArgumentReference(value)};
             }
 
             if ("id".equals(attribute.getName())
@@ -115,6 +133,90 @@ public final class MyBatisXmlReferenceContributor extends PsiReferenceContributo
                     && ("insert".equals(tag.getName())
                     || "update".equals(tag.getName())
                     || "selectKey".equals(tag.getName()));
+        }
+
+        private static boolean isTypeAttribute(
+                @NotNull XmlAttribute attribute,
+                @NotNull XmlTag tag) {
+            String name = attribute.getName();
+            return "parameterType".equals(name) && MyBatisXmlModel.isStatement(tag)
+                    || "resultType".equals(name)
+                    && (MyBatisXmlModel.isStatement(tag) || "case".equals(tag.getName()))
+                    || "type".equals(name) && "resultMap".equals(tag.getName())
+                    || "javaType".equals(name)
+                    && Set.of(
+                    "id",
+                    "result",
+                    "association",
+                    "collection",
+                    "arg",
+                    "idArg",
+                    "discriminator").contains(tag.getName())
+                    || "ofType".equals(name) && "collection".equals(tag.getName());
+        }
+
+        private static boolean isConfiguredTypeAliasTarget(
+                @NotNull XmlAttribute attribute,
+                @NotNull XmlTag tag) {
+            XmlTag typeAliases = tag.getParentTag();
+            XmlTag configuration = typeAliases == null ? null : typeAliases.getParentTag();
+            return "type".equals(attribute.getName())
+                    && "typeAlias".equals(tag.getName())
+                    && typeAliases != null
+                    && "typeAliases".equals(typeAliases.getName())
+                    && configuration != null
+                    && "configuration".equals(configuration.getName());
+        }
+
+        private static boolean isResultPropertyAttribute(
+                @NotNull XmlAttribute attribute,
+                @NotNull XmlTag tag) {
+            return "property".equals(attribute.getName())
+                    && Set.of("id", "result", "association", "collection")
+                    .contains(tag.getName())
+                    && MapperAttributeReferenceProvider.resultMapRoot(tag) != null;
+        }
+
+        private static boolean isConstructorArgumentAttribute(
+                @NotNull XmlAttribute attribute,
+                @NotNull XmlTag tag) {
+            XmlTag parent = tag.getParentTag();
+            return "name".equals(attribute.getName())
+                    && ("arg".equals(tag.getName()) || "idArg".equals(tag.getName()))
+                    && parent != null
+                    && "constructor".equals(parent.getName())
+                    && MapperAttributeReferenceProvider.resultMapRoot(tag) != null;
+        }
+
+        private static @NotNull List<PsiReference> resultPropertyReferences(
+                @NotNull XmlAttributeValue value) {
+            List<MyBatisParameterExpressionParser.ParameterPath> paths =
+                    MyBatisParameterExpressionParser.parseCommaSeparatedPaths(value.getValue());
+            if (paths.size() != 1) {
+                return List.of();
+            }
+            List<PsiReference> references = new ArrayList<>();
+            MyBatisParameterExpressionParser.ParameterPath path = paths.getFirst();
+            TextRange valueRange = MyBatisReferenceSupport.valueRange(value);
+            for (int index = 0; index < path.segments().size(); index++) {
+                TextRange range = path.segments().get(index).range()
+                        .shiftRight(valueRange.getStartOffset());
+                references.add(new MyBatisResultPropertyReference(value, range, path, index));
+            }
+            return List.copyOf(references);
+        }
+
+        private static XmlTag resultMapRoot(@NotNull XmlTag tag) {
+            XmlTag current = tag;
+            while (current != null) {
+                ProgressManager.checkCanceled();
+                if ("resultMap".equals(current.getName())) {
+                    XmlTag parent = current.getParentTag();
+                    return parent != null && MyBatisXmlModel.isMapperRoot(parent) ? current : null;
+                }
+                current = current.getParentTag();
+            }
+            return null;
         }
 
         private static @NotNull List<PsiReference> directParameterReferences(

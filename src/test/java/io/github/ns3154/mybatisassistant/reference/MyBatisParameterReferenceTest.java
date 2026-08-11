@@ -5,11 +5,13 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiField;
+import com.intellij.psi.PsiLiteralExpression;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiParameter;
 import com.intellij.psi.PsiPolyVariantReference;
 import com.intellij.psi.PsiReference;
 import com.intellij.psi.ResolveResult;
+import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.testFramework.DumbModeTestUtils;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 
@@ -34,7 +36,7 @@ public final class MyBatisParameterReferenceTest extends BasePlatformTestCase {
                     <select id="find">select * from users where name = #{us<caret>er.name}</select>
                 </mapper>
                 """);
-        assertTrue(reference().resolve() instanceof PsiParameter);
+        assertTrue(reference().resolve() instanceof PsiLiteralExpression);
 
         moveCaretTo("name}");
         assertField(reference().resolve(), "name");
@@ -46,9 +48,13 @@ public final class MyBatisParameterReferenceTest extends BasePlatformTestCase {
                 """);
         moveCaretTo("items[0]");
         PsiElement indexedRoot = reference().resolve();
-        assertTrue(indexedRoot instanceof PsiParameter);
+        assertTrue(indexedRoot instanceof PsiLiteralExpression);
+        PsiParameter indexedParameter = PsiTreeUtil.getParentOfType(
+                indexedRoot,
+                PsiParameter.class);
+        assertNotNull(indexedParameter);
         assertEquals("java.util.List<Item>",
-                ((PsiParameter) indexedRoot).getType().getCanonicalText());
+                indexedParameter.getType().getCanonicalText());
         moveCaretTo("code}");
         PsiReference indexedReference = reference();
         assertEquals("code", indexedReference.getCanonicalText());
@@ -106,7 +112,7 @@ public final class MyBatisParameterReferenceTest extends BasePlatformTestCase {
                     </select>
                 </mapper>
                 """);
-        assertTrue(reference().resolve() instanceof PsiParameter);
+        assertTrue(reference().resolve() instanceof PsiLiteralExpression);
 
         configure("""
                 <mapper namespace="com.example.UserMapper">
@@ -115,7 +121,7 @@ public final class MyBatisParameterReferenceTest extends BasePlatformTestCase {
                     </insert>
                 </mapper>
                 """);
-        assertTrue(reference().resolve() instanceof PsiParameter);
+        assertTrue(reference().resolve() instanceof PsiLiteralExpression);
 
         moveCaretTo("id\"");
         assertField(reference().resolve(), "id");

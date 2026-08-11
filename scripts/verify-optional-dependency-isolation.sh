@@ -8,6 +8,7 @@ readonly SANDBOX_LOG="${SANDBOX_ROOT}/log/idea.log"
 readonly DISABLED_PLUGINS_FILE="${SANDBOX_ROOT}/config/disabled_plugins.txt"
 readonly REPORT_DIR="${PROJECT_ROOT}/build/reports/optional-dependency-isolation"
 readonly SUMMARY_FILE="${REPORT_DIR}/optional-dependency-isolation.tsv"
+readonly SECONDARY_SCREEN_GATE_DIR="${MYBATIS_ASSISTANT_SECONDARY_SCREEN_GATE_DIR:-}"
 
 readonly CASE_NAMES=(
     "kotlin"
@@ -25,6 +26,17 @@ readonly CASE_PLUGIN_IDS=(
 )
 
 mkdir -p "${REPORT_DIR}"
+
+if [[ -n "${SECONDARY_SCREEN_GATE_DIR}" ]]; then
+    case "${SECONDARY_SCREEN_GATE_DIR}" in
+        "${PROJECT_ROOT}"/build/*) ;;
+        *)
+            echo "副屏确认目录必须位于项目 build 目录：${SECONDARY_SCREEN_GATE_DIR}" >&2
+            exit 2
+            ;;
+    esac
+    mkdir -p "${SECONDARY_SCREEN_GATE_DIR}"
+fi
 
 cd "${PROJECT_ROOT}"
 ./gradlew prepareSandbox >/dev/null
@@ -78,6 +90,24 @@ for index in "${!CASE_NAMES[@]}"; do
         wait "${run_pid}" 2>/dev/null || true
         echo "可选依赖隔离场景 ${case_name} 未在 90 秒内加载插件，详见 ${case_output}" >&2
         exit 1
+    fi
+
+    if [[ -n "${SECONDARY_SCREEN_GATE_DIR}" ]]; then
+        ready_file="${SECONDARY_SCREEN_GATE_DIR}/${case_name}.ready"
+        moved_file="${SECONDARY_SCREEN_GATE_DIR}/${case_name}.moved"
+        rm -f "${ready_file}" "${moved_file}"
+        : > "${ready_file}"
+        elapsed=0
+        while [[ ! -f "${moved_file}" && ${elapsed} -lt 90 ]]; do
+            sleep 1
+            elapsed=$((elapsed + 1))
+        done
+        if [[ ! -f "${moved_file}" ]]; then
+            kill "${run_pid}" 2>/dev/null || true
+            wait "${run_pid}" 2>/dev/null || true
+            echo "可选依赖隔离场景 ${case_name} 未在 90 秒内完成副屏确认" >&2
+            exit 1
+        fi
     fi
 
     ./gradlew runIde --args=exit >>"${case_output}" 2>&1

@@ -4,22 +4,18 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
-import com.intellij.psi.PsiArrayType;
 import com.intellij.psi.PsiClass;
-import com.intellij.psi.PsiClassType;
 import com.intellij.psi.PsiElement;
-import com.intellij.psi.PsiField;
 import com.intellij.psi.PsiMethod;
-import com.intellij.psi.PsiModifier;
-import com.intellij.psi.PsiParameter;
-import com.intellij.psi.PsiSubstitutor;
 import com.intellij.psi.PsiType;
-import com.intellij.psi.PsiTypes;
-import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.util.PsiTreeUtil;
-import com.intellij.psi.util.TypeConversionUtil;
 import com.intellij.psi.xml.XmlTag;
+import io.github.ns3154.mybatisassistant.model.MyBatisJavaPropertyAccess;
+import io.github.ns3154.mybatisassistant.model.MyBatisJavaPropertyResolution;
+import io.github.ns3154.mybatisassistant.model.MyBatisJavaPropertyResolver;
+import io.github.ns3154.mybatisassistant.model.MyBatisAnnotationModel;
 import io.github.ns3154.mybatisassistant.model.MyBatisParameterBinding;
+import io.github.ns3154.mybatisassistant.model.MyBatisParameterBindingKind;
 import io.github.ns3154.mybatisassistant.model.MyBatisParameterContext;
 import io.github.ns3154.mybatisassistant.model.MyBatisParameterContextResolution;
 import io.github.ns3154.mybatisassistant.model.MyBatisParameterContextResolver;
@@ -191,7 +187,12 @@ final class MyBatisParameterPathResolver {
         List<MyBatisParameterBinding> bindings = context.findBindings(name);
         if (!bindings.isEmpty()) {
             List<PsiElement> targets = bindings.stream()
-                    .map(MyBatisParameterBinding::parameter)
+                    .map(binding -> binding.kind() == MyBatisParameterBindingKind.EXPLICIT
+                            ? java.util.Objects.requireNonNullElse(
+                            MyBatisAnnotationModel.explicitParameterNameElement(
+                                    binding.parameter()),
+                            binding.parameter())
+                            : binding.parameter())
                     .map(PsiElement.class::cast)
                     .toList();
             List<TypeBranch> branches = bindings.stream()
@@ -231,74 +232,17 @@ final class MyBatisParameterPathResolver {
     private static @NotNull PropertyResolution propertyResolution(
             @Nullable PsiType sourceType,
             @NotNull String name) {
-        if (sourceType == null || isDynamicContainer(sourceType)) {
-            return new PropertyResolution(List.of(), List.of(), true);
-        }
-        if (!(sourceType instanceof PsiClassType classType)) {
-            return new PropertyResolution(List.of(), List.of(), false);
-        }
-        PsiClassType.ClassResolveResult classResult = classType.resolveGenerics();
-        PsiClass psiClass = classResult.getElement();
-        if (psiClass == null || psiClass.getQualifiedName() == null) {
-            return new PropertyResolution(List.of(), List.of(), true);
-        }
-        Set<PsiElement> targets = new LinkedHashSet<>();
-        List<TypeBranch> branches = new ArrayList<>();
-        for (PsiMethod method : psiClass.getAllMethods()) {
-            ProgressManager.checkCanceled();
-            if (!isGetter(method, name)) {
-                continue;
-            }
-            PsiType returnType = method.getReturnType();
-            if (returnType != null) {
-                targets.add(method);
-                branches.add(new TypeBranch(substituteMemberType(
-                        psiClass,
-                        classResult.getSubstitutor(),
-                        method.getContainingClass(),
-                        returnType), false));
-            }
-        }
-        if (targets.isEmpty()) {
-            PsiField field = psiClass.findFieldByName(name, true);
-            if (field != null) {
-                targets.add(field);
-                branches.add(new TypeBranch(substituteMemberType(
-                        psiClass,
-                        classResult.getSubstitutor(),
-                        field.getContainingClass(),
-                        field.getType()), false));
-            }
-        }
-        return new PropertyResolution(List.copyOf(targets), List.copyOf(branches), false);
-    }
-
-    private static @NotNull PsiType substituteMemberType(
-            @NotNull PsiClass sourceClass,
-            @NotNull PsiSubstitutor sourceSubstitutor,
-            @Nullable PsiClass declaringClass,
-            @NotNull PsiType memberType) {
-        PsiSubstitutor substitutor = declaringClass == null || declaringClass.equals(sourceClass)
-                ? sourceSubstitutor
-                : TypeConversionUtil.getSuperClassSubstitutor(
-                        declaringClass,
-                        sourceClass,
-                        sourceSubstitutor);
-        PsiType substituted = substitutor.substitute(memberType);
-        return substituted == null ? memberType : substituted;
-    }
-
-    private static boolean isGetter(@NotNull PsiMethod method, @NotNull String propertyName) {
-        if (method.hasModifierProperty(PsiModifier.STATIC)
-                || method.getParameterList().getParametersCount() != 0
-                || PsiTypes.voidType().equals(method.getReturnType())
-                || "getClass".equals(method.getName())) {
-            return false;
-        }
-        String capitalized = Character.toUpperCase(propertyName.charAt(0))
-                + propertyName.substring(1);
-        return ("get" + capitalized).equals(method.getName())
-                || ("is" + capitalized).equals(method.getName());
+        MyBatisJavaPropertyResolution resolution = MyBatisJavaPropertyResolver.resolve(
+                sourceType,
+                name,
+                MyBatisJavaPropertyAccess.READ);
+        List<TypeBranch> branches = resolution.types().stream()
+                .map(type -> new TypeBranch(type, false))
+                .toList();
+        return new PropertyResolution(
+                resolution.targets(),
+                branches,
+                resolution.unknown());
     }
 
     private static @NotNull List<TypeBranch> applyIndexes(
@@ -309,7 +253,7 @@ final class MyBatisParameterPathResolver {
             ProgressManager.checkCanceled();
             List<TypeBranch> next = new ArrayList<>();
             for (TypeBranch branch : branches) {
-                PsiType elementType = indexedType(branch.type());
+                PsiType elementType = MyBatisJavaPropertyResolver.indexedType(branch.type());
                 next.add(elementType == null
                         ? new TypeBranch(branch.type(), true)
                         : new TypeBranch(elementType, branch.unknown()));
@@ -324,46 +268,14 @@ final class MyBatisParameterPathResolver {
         return List.copyOf(branches);
     }
 
-    private static @Nullable PsiType indexedType(@NotNull PsiType sourceType) {
-        if (sourceType instanceof PsiArrayType arrayType) {
-            return arrayType.getComponentType();
-        }
-        if (!(sourceType instanceof PsiClassType classType)) {
-            return null;
-        }
-        String rawType = classType.rawType().getCanonicalText();
-        PsiClass resolved = classType.resolve();
-        if (!("java.util.List".equals(rawType)
-                || "java.util.Collection".equals(rawType)
-                || "java.lang.Iterable".equals(rawType)
-                || resolved != null && (InheritanceUtil.isInheritor(resolved, "java.util.Collection")
-                || InheritanceUtil.isInheritor(resolved, "java.lang.Iterable")
-                || "java.util.List".equals(resolved.getQualifiedName())))) {
-            return null;
-        }
-        PsiType[] parameters = classType.getParameters();
-        return parameters.length == 1 ? parameters[0] : null;
-    }
-
-    private static boolean isDynamicContainer(@NotNull PsiType type) {
-        if (!(type instanceof PsiClassType classType)) {
-            return false;
-        }
-        if ("java.util.Map".equals(classType.rawType().getCanonicalText())) {
-            return true;
-        }
-        PsiClass resolved = classType.resolve();
-        return resolved != null
-                && ("java.util.Map".equals(resolved.getQualifiedName())
-                || InheritanceUtil.isInheritor(resolved, "java.util.Map"));
-    }
-
     private static @NotNull List<String> rootVariants(@NotNull MyBatisParameterContext context) {
         Set<String> names = new LinkedHashSet<>();
         context.bindings().forEach(binding -> names.add(binding.name()));
         if (context.rootMode() == MyBatisParameterRootMode.DIRECT
                 && !context.dynamicMapRoot()) {
-            names.addAll(propertyNames(context.directType()));
+            names.addAll(MyBatisJavaPropertyResolver.variants(
+                    context.directType(),
+                    MyBatisJavaPropertyAccess.READ));
         }
         return List.copyOf(names);
     }
@@ -373,58 +285,12 @@ final class MyBatisParameterPathResolver {
         for (TypeBranch branch : branches) {
             ProgressManager.checkCanceled();
             if (!branch.unknown()) {
-                names.addAll(propertyNames(branch.type()));
+                names.addAll(MyBatisJavaPropertyResolver.variants(
+                        branch.type(),
+                        MyBatisJavaPropertyAccess.READ));
             }
         }
         return List.copyOf(names);
-    }
-
-    private static @NotNull List<String> propertyNames(@Nullable PsiType type) {
-        if (!(type instanceof PsiClassType classType) || isDynamicContainer(type)) {
-            return List.of();
-        }
-        PsiClass psiClass = classType.resolve();
-        if (psiClass == null) {
-            return List.of();
-        }
-        Set<String> names = new LinkedHashSet<>();
-        for (PsiField field : psiClass.getAllFields()) {
-            ProgressManager.checkCanceled();
-            names.add(field.getName());
-        }
-        for (PsiMethod method : psiClass.getAllMethods()) {
-            ProgressManager.checkCanceled();
-            String property = propertyName(method);
-            if (property != null) {
-                names.add(property);
-            }
-        }
-        return List.copyOf(names);
-    }
-
-    private static @Nullable String propertyName(@NotNull PsiMethod method) {
-        if (method.hasModifierProperty(PsiModifier.STATIC)
-                || method.getParameterList().getParametersCount() != 0
-                || PsiTypes.voidType().equals(method.getReturnType())
-                || "getClass".equals(method.getName())) {
-            return null;
-        }
-        String name = method.getName();
-        if (name.startsWith("get") && name.length() > 3) {
-            return decapitalize(name.substring(3));
-        }
-        if (name.startsWith("is") && name.length() > 2) {
-            return decapitalize(name.substring(2));
-        }
-        return null;
-    }
-
-    private static @NotNull String decapitalize(@NotNull String name) {
-        if (name.length() > 1 && Character.isUpperCase(name.charAt(0))
-                && Character.isUpperCase(name.charAt(1))) {
-            return name;
-        }
-        return Character.toLowerCase(name.charAt(0)) + name.substring(1);
     }
 
     private static @Nullable StatementContext statementContext(@NotNull PsiElement source) {
