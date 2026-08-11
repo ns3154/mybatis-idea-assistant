@@ -1,5 +1,27 @@
 <idea-plugin>
+    <extensions defaultExtensionNs="io.github.ns3154.mybatis-idea-assistant">
+        <databaseMetadataProvider
+                implementation="io.github.ns3154.mybatisassistant.database.intellij.DatabaseToolsMetadataProvider"/>
+    </extensions>
     <extensions defaultExtensionNs="com.intellij">
-        <!-- Database Tools 能力在 S7 实现时只在本描述符中注册。 -->
+        <projectService
+                serviceImplementation="io.github.ns3154.mybatisassistant.sql.intellij.MyBatisSqlPsiService"/>
+        <projectService
+                serviceImplementation="io.github.ns3154.mybatisassistant.database.intellij.DatabaseToolsMetadataInvalidationService"/>
+        <multiHostInjector
+                implementation="io.github.ns3154.mybatisassistant.sql.intellij.MyBatisSqlXmlInjector"/>
+        <completion.contributor
+                language="XML"
+                order="first"
+                implementationClass="io.github.ns3154.mybatisassistant.sql.intellij.MyBatisSqlCompletionContributor"/>
+        <localInspection
+                language="XML"
+                shortName="MyBatisSqlSchema"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.sql.schema.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisSqlSchemaInspection"/>
     </extensions>
 </idea-plugin>

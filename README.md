@@ -2,7 +2,7 @@
 
 面向 IntelliJ IDEA 的 MyBatis 智能开发助手，采用独立实现路线开发。
 
-当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S3 已通过阶段验收，S4～S6 已完成开发并进入各自最终统一验收：
+当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S3 已通过阶段验收，S4～S7 已完成开发并进入各自最终统一验收：
 
 - 识别 Java Mapper 接口；
 - 识别 MyBatis XML 的 `namespace`；
@@ -24,6 +24,9 @@
 - 使用 IntelliJ 原生 Rename 同步更新 statement、resultMap/SQL fragment、`@Param`、JavaBean 属性与稳定类型引用；遇到动态 OGNL、include、多目标、只读或不完整语义时在写入前停止。
 - 将动态 statement 编译为不会组合爆炸的符号化 IR，覆盖 `if/choose/where/set/trim/foreach/bind/include`，并为普通文本、CDATA、entity 与 include property 建立双向字符级 source map；循环、重复目标、Dumb Mode、失效源与取消均保守停止。
 - 为 `test`、`when/test` 与 `bind/value` 注入自有 OGNL 语言，提供可恢复语法树、高亮、保守类型推导、引用、补全、Find Usages、作用域内 Rename 和可证明错误检查；分析过程不执行项目代码。
+- 把 S5 动态程序压成有界代表 SQL，并在 Database Tools 可用时接入真实 SQL PSI；`#{}`、`${}`、动态标签、entity 与跨片段位置均可回映射到原 XML；
+- 只在后台读取 Database Tools 已加载模型，统一处理超时、取消、模型失效和多数据源；编辑器线程不连接数据库、不等待 I/O；
+- 提供 SQL 关键字、常用函数、别名、表列补全，以及不存在/歧义表列、ResultMap 缺列和基础 Java/JDBC 类型不匹配检查；动态标识符、加载中、语法不完整和目标不唯一时保持静默。
 
 ## 开发环境
 
@@ -71,6 +74,8 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 - [S5 动态 SQL 编译器与源位置映射验收记录](docs/S5-动态SQL编译器与源位置映射验收记录.md)
 - [S6 OGNL 语言支持任务卡](docs/S6-OGNL语言支持任务卡.md)
 - [S6 OGNL 语言支持验收记录](docs/S6-OGNL语言支持验收记录.md)
+- [S7 类型安全 SQL 与数据库元数据任务卡](docs/S7-类型安全SQL与数据库元数据任务卡.md)
+- [S7 类型安全 SQL 与数据库元数据验收记录](docs/S7-类型安全SQL与数据库元数据验收记录.md)
 - [风险清单](docs/风险清单.md)
 - [首批验收记录](docs/首批验收记录.md)
 - [交付完成度审计](docs/交付完成度审计.md)

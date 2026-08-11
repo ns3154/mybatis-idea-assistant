@@ -45,6 +45,7 @@ dependencies {
     intellijPlatform {
         intellijIdea("2026.1.4")
         bundledPlugin("com.intellij.java")
+        bundledPlugin("com.intellij.database")
         bundledPlugin("org.jetbrains.kotlin")
         testFramework(TestFrameworkType.Platform)
         pluginVerifier()
@@ -62,7 +63,7 @@ intellijPlatform {
         version = project.version.toString()
         description = """
             <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
-            <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map，以及 OGNL 语法高亮、类型推导、引用、补全、查找使用、重命名与低误报检查。</p>
+            <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map、OGNL 语言支持，以及可选 SQL PSI、方言、异步数据库元数据、表列补全与低误报 schema 检查。</p>
         """.trimIndent()
 
         ideaVersion {
@@ -135,6 +136,28 @@ tasks {
                     counter = "LINE"
                     value = "COVEREDRATIO"
                     minimum = "0.85".toBigDecimal()
+                }
+            }
+            rule {
+                includes = listOf(
+                    "io.github.ns3154.mybatisassistant.sql.*",
+                    "io.github.ns3154.mybatisassistant.database.MyBatis*",
+                    "io.github.ns3154.mybatisassistant.inspection.MyBatisSqlSchemaInspection",
+                )
+                limit {
+                    counter = "LINE"
+                    value = "COVEREDRATIO"
+                    minimum = "0.85".toBigDecimal()
+                }
+            }
+            rule {
+                includes = listOf(
+                    "io.github.ns3154.mybatisassistant.database.intellij.*",
+                )
+                limit {
+                    counter = "LINE"
+                    value = "COVEREDRATIO"
+                    minimum = "0.70".toBigDecimal()
                 }
             }
         }
