@@ -5,7 +5,7 @@
 
     <description><![CDATA[
         <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
-        <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map、OGNL 语言支持、可选 SQL PSI、方言、异步数据库元数据、表列补全与低误报 schema 检查，以及带全量预览、稳定生成区和单次撤销的数据库代码生成。</p>
+        <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map、OGNL 语言支持、可选 SQL PSI、方言、异步数据库元数据、表列补全与低误报 schema 检查、带全量预览和稳定生成区的数据库代码生成，以及保守转换、幂等格式化、日志 SQL 还原、受控执行与 JUnit 测试骨架。</p>
     ]]></description>
 
     <extensionPoints>
@@ -177,6 +177,36 @@
                 class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisXmlFormatAction"
                 text="格式化 MyBatis XML…"
                 description="预览并以单个可撤销命令格式化当前 MyBatis Mapper XML">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+        <action
+                id="MyBatisAssistant.SqlTool.DdlToArtifacts"
+                class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisDdlToArtifactsAction"
+                text="CREATE TABLE 转 MyBatis 产物…"
+                description="在本地预览 DDL 转 Entity、Mapper 和 ResultMap XML">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action
+                id="MyBatisAssistant.SqlTool.SelectToArtifacts"
+                class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisSelectToArtifactsAction"
+                text="SELECT 转 MyBatis 产物…"
+                description="从显式投影 SELECT 预览 Mapper、XML、ResultMap 和 Java 行模型">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action
+                id="MyBatisAssistant.SqlTool.JavaToDdl"
+                class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisJavaToDdlAction"
+                text="Java 类生成 DDL…"
+                description="从当前 Java 实体类预览目标方言 DDL，不自动执行">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+        <action
+                id="MyBatisAssistant.SqlTool.MapperJUnitSkeleton"
+                class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisMapperJUnitSkeletonAction"
+                text="生成 Mapper JUnit 测试骨架…"
+                description="从当前 Mapper 方法生成 JUnit 4/5 只读测试骨架预览">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>

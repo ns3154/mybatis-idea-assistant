@@ -2,7 +2,7 @@
 
 面向 IntelliJ IDEA 的 MyBatis 智能开发助手，采用独立实现路线开发。
 
-当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S3 已通过阶段验收，S4～S9 已完成开发并进入各自最终统一验收：
+当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S3 已通过阶段验收，S4～S10 已完成开发并进入各自最终统一验收：
 
 - 识别 Java Mapper 接口；
 - 识别 MyBatis XML 的 `namespace`；
@@ -33,6 +33,11 @@
 - 以确定性方法语法生成 Mapper 方法和静态/动态 XML，覆盖投影、条件、排序、聚合、Top/分页及六类数据库方言；歧义或无条件写操作在生成前拒绝；
 - 显式选择框架与版本后预览可编译的 MyBatis-Plus/Flex Wrapper，不按类路径猜测，也不使用不安全 SQL 尾部拼接；
 - 从两张同数据源、已加载表中显式选择 FK↔PK、Join 类型和输出字段后预览 Join SQL，不按列名猜测业务关系。
+- 从单条 CREATE TABLE、显式投影 SELECT 或 Java PSI 预览 Entity/Mapper/ResultMap/Java 行模型/六方言 DDL；类型未知时使用明确占位并要求确认，不执行项目代码；
+- 本地还原 MyBatis `Preparing`/`Parameters` 日志，安全处理交错线程、null、JSON、枚举、时间和特殊字符；二进制、截断或错配时拒绝半成品；
+- 幂等格式化 MyBatis XML，保留动态标签、CDATA、注释和换行风格；先预览，再以一个命令写入并支持 Undo；
+- 通过显式参数面板受控执行单条 SQL：只读事务回滚，危险 SQL 两次确认后提交，结果有界、可取消且日志对象脱敏；数据库能力仅在 Database Tools 可选依赖存在时启用；
+- 从当前 Mapper 抽象方法生成 JUnit 5/Jupiter 或 JUnit 4 只读测试骨架，不写文件、不连接数据库。
 
 ## 开发环境
 
@@ -86,6 +91,8 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 - [S8 数据库代码生成与安全合并验收记录](docs/S8-数据库代码生成与安全合并验收记录.md)
 - [S9 方法名 SQL、Wrapper 与 Join 任务卡](docs/S9-方法名SQL-Wrapper与Join任务卡.md)
 - [S9 方法名 SQL、Wrapper 与 Join 验收记录](docs/S9-方法名SQL-Wrapper与Join验收记录.md)
+- [S10 转换、格式化、日志、执行与测试任务卡](docs/S10-转换格式化日志执行与测试任务卡.md)
+- [S10 转换、格式化、日志、执行与测试验收记录](docs/S10-转换格式化日志执行与测试验收记录.md)
 - [风险清单](docs/风险清单.md)
 - [首批验收记录](docs/首批验收记录.md)
 - [交付完成度审计](docs/交付完成度审计.md)

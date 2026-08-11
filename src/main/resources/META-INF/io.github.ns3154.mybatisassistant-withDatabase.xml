@@ -53,5 +53,12 @@
                 description="从两张已加载表显式选择外键关系和输出字段并预览 Join SQL">
             <add-to-group group-id="DatabaseViewPopupMenu" anchor="last"/>
         </action>
+        <action
+                id="MyBatisAssistant.Database.ExecuteSql"
+                class="io.github.ns3154.mybatisassistant.database.intellij.MyBatisDatabaseSqlExecuteAction"
+                text="受控执行 SQL…"
+                description="使用显式参数执行单条 SQL；写入和 DDL 必须完成两次确认">
+            <add-to-group group-id="DatabaseViewPopupMenu" anchor="last"/>
+        </action>
     </actions>
 </idea-plugin>

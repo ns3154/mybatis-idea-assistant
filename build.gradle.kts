@@ -63,7 +63,7 @@ intellijPlatform {
         version = project.version.toString()
         description = """
             <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
-            <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map、OGNL 语言支持、可选 SQL PSI、方言、异步数据库元数据、表列补全与低误报 schema 检查，以及带全量预览、稳定生成区和单次撤销的数据库代码生成。</p>
+            <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map、OGNL 语言支持、可选 SQL PSI、方言、异步数据库元数据、表列补全与低误报 schema 检查、带全量预览和稳定生成区的数据库代码生成，以及保守转换、幂等格式化、日志 SQL 还原、受控执行与 JUnit 测试骨架。</p>
         """.trimIndent()
 
         ideaVersion {
@@ -176,6 +176,7 @@ tasks {
         listOf(
             "io/github/ns3154/mybatisassistant/database/intellij/DatabaseToolsMetadataProvider*",
             "io/github/ns3154/mybatisassistant/database/intellij/DatabaseToolsMetadataInvalidationService*",
+            "io/github/ns3154/mybatisassistant/database/intellij/DatabaseToolsSqlExecutionBackend*",
         ),
         "0.70",
     )
@@ -194,6 +195,9 @@ tasks {
         listOf(
             "io/github/ns3154/mybatisassistant/sqltool/log/**",
             "io/github/ns3154/mybatisassistant/sqltool/format/**",
+            "io/github/ns3154/mybatisassistant/sqltool/conversion/**",
+            "io/github/ns3154/mybatisassistant/sqltool/execution/**",
+            "io/github/ns3154/mybatisassistant/sqltool/testgen/**",
         ),
         "0.85",
     )

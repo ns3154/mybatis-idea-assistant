@@ -11,6 +11,9 @@ import com.intellij.database.psi.DbPsiFacade;
 import com.intellij.database.types.DasBuiltinType;
 import com.intellij.database.types.DasBuiltinTypeClass;
 import com.intellij.database.types.DasTypeCategory;
+import com.intellij.openapi.actionSystem.ActionGroup;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.project.Project;
@@ -43,6 +46,17 @@ public final class DatabaseToolsMetadataProviderTest extends BasePlatformTestCas
 
         assertEquals(1, providers.size());
         assertInstanceOf(providers.getFirst(), DatabaseToolsMetadataProvider.class);
+    }
+
+    public void testOptionalDescriptorRegistersControlledSqlExecutionAction() {
+        ActionManager manager = ActionManager.getInstance();
+        AnAction action = manager.getAction(MyBatisDatabaseSqlExecuteAction.ID);
+
+        assertInstanceOf(action, MyBatisDatabaseSqlExecuteAction.class);
+        assertEquals("受控执行 SQL…", action.getTemplateText());
+        ActionGroup group = assertInstanceOf(
+                manager.getAction("DatabaseViewPopupMenu"), ActionGroup.class);
+        assertContainsElements(Arrays.asList(group.getChildren(null)), action);
     }
 
     public void testMapsPublicDbmsFamiliesWithoutGuessingUnknown() {
