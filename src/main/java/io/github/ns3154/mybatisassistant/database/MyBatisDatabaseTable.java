@@ -12,11 +12,21 @@ public record MyBatisDatabaseTable(
         @NotNull Optional<String> catalog,
         @NotNull Optional<String> schema,
         @NotNull String name,
+        @NotNull Optional<String> comment,
         @NotNull List<MyBatisDatabaseColumn> columns) {
     public MyBatisDatabaseTable {
         if (name.isBlank()) {
             throw new IllegalArgumentException("表名不能为空");
         }
+        comment = comment.filter(value -> !value.isBlank());
         columns = List.copyOf(columns);
+    }
+
+    public MyBatisDatabaseTable(
+            @NotNull Optional<String> catalog,
+            @NotNull Optional<String> schema,
+            @NotNull String name,
+            @NotNull List<MyBatisDatabaseColumn> columns) {
+        this(catalog, schema, name, Optional.empty(), columns);
     }
 }

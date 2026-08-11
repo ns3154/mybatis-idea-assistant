@@ -63,7 +63,7 @@ intellijPlatform {
         version = project.version.toString()
         description = """
             <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
-            <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map、OGNL 语言支持，以及可选 SQL PSI、方言、异步数据库元数据、表列补全与低误报 schema 检查。</p>
+            <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map、OGNL 语言支持、可选 SQL PSI、方言、异步数据库元数据、表列补全与低误报 schema 检查，以及带全量预览、稳定生成区和单次撤销的数据库代码生成。</p>
         """.trimIndent()
 
         ideaVersion {
@@ -124,47 +124,75 @@ tasks {
                     minimum = "0.70".toBigDecimal()
                 }
             }
-            rule {
-                includes = listOf(
-                    "io.github.ns3154.mybatisassistant.index.*",
-                    "io.github.ns3154.mybatisassistant.model.*",
-                    "io.github.ns3154.mybatisassistant.resolve.*",
-                    "io.github.ns3154.mybatisassistant.dynamic.*",
-                    "io.github.ns3154.mybatisassistant.ognl.*",
-                )
-                limit {
-                    counter = "LINE"
-                    value = "COVEREDRATIO"
-                    minimum = "0.85".toBigDecimal()
-                }
+        }
+    }
+
+    fun registerScopedCoverage(
+        taskName: String,
+        includes: List<String>,
+        minimum: String,
+    ) = register<JacocoCoverageVerification>(taskName) {
+        dependsOn(test)
+        executionData(layout.buildDirectory.file("jacoco/test.exec"))
+        classDirectories.setFrom(layout.buildDirectory.dir("instrumented/instrumentCode").map {
+            fileTree(it).apply {
+                includes.forEach(::include)
             }
+        })
+        sourceDirectories.setFrom(files("src/main/java"))
+        violationRules {
             rule {
-                includes = listOf(
-                    "io.github.ns3154.mybatisassistant.sql.*",
-                    "io.github.ns3154.mybatisassistant.database.MyBatis*",
-                    "io.github.ns3154.mybatisassistant.inspection.MyBatisSqlSchemaInspection",
-                )
                 limit {
                     counter = "LINE"
                     value = "COVEREDRATIO"
-                    minimum = "0.85".toBigDecimal()
-                }
-            }
-            rule {
-                includes = listOf(
-                    "io.github.ns3154.mybatisassistant.database.intellij.*",
-                )
-                limit {
-                    counter = "LINE"
-                    value = "COVEREDRATIO"
-                    minimum = "0.70".toBigDecimal()
+                    this.minimum = minimum.toBigDecimal()
                 }
             }
         }
     }
 
+    val coreCoverage = registerScopedCoverage(
+        "jacocoCoreCoverageVerification",
+        listOf(
+            "io/github/ns3154/mybatisassistant/index/**",
+            "io/github/ns3154/mybatisassistant/model/**",
+            "io/github/ns3154/mybatisassistant/resolve/**",
+            "io/github/ns3154/mybatisassistant/dynamic/**",
+            "io/github/ns3154/mybatisassistant/ognl/**",
+        ),
+        "0.85",
+    )
+    val sqlDatabaseCoverage = registerScopedCoverage(
+        "jacocoSqlDatabaseCoverageVerification",
+        listOf(
+            "io/github/ns3154/mybatisassistant/sql/**",
+            "io/github/ns3154/mybatisassistant/database/MyBatis*",
+            "io/github/ns3154/mybatisassistant/inspection/MyBatisSqlSchemaInspection*",
+        ),
+        "0.85",
+    )
+    val databaseAdapterCoverage = registerScopedCoverage(
+        "jacocoDatabaseAdapterCoverageVerification",
+        listOf(
+            "io/github/ns3154/mybatisassistant/database/intellij/DatabaseToolsMetadataProvider*",
+            "io/github/ns3154/mybatisassistant/database/intellij/DatabaseToolsMetadataInvalidationService*",
+        ),
+        "0.70",
+    )
+    val generatorCoverage = registerScopedCoverage(
+        "jacocoGeneratorCoverageVerification",
+        listOf("io/github/ns3154/mybatisassistant/generator/**"),
+        "0.85",
+    )
+
     check {
-        dependsOn("jacocoTestCoverageVerification")
+        dependsOn(
+            "jacocoTestCoverageVerification",
+            coreCoverage,
+            sqlDatabaseCoverage,
+            databaseAdapterCoverage,
+            generatorCoverage,
+        )
     }
 
     withType<Checkstyle>().configureEach {

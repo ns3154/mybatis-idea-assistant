@@ -51,11 +51,13 @@ public final class MyBatisDatabaseMetadataService {
     /**
      * 丢弃已完成快照并取消统一刷新；失效前启动的后台结果不得重新写回缓存。
      */
-    public synchronized void invalidate() {
-        cacheGeneration.incrementAndGet();
-        latest.set(null);
-        CompletableFuture<MyBatisDatabaseMetadataResult> inFlight =
-                refreshInFlight.getAndSet(null);
+    public void invalidate() {
+        CompletableFuture<MyBatisDatabaseMetadataResult> inFlight;
+        synchronized (this) {
+            cacheGeneration.incrementAndGet();
+            latest.set(null);
+            inFlight = refreshInFlight.getAndSet(null);
+        }
         if (inFlight != null && !inFlight.isDone()) {
             inFlight.cancel(false);
         }
@@ -87,14 +89,19 @@ public final class MyBatisDatabaseMetadataService {
         }
 
         EmptyProgressIndicator indicator = new EmptyProgressIndicator();
-        CompletableFuture<MyBatisDatabaseMetadataResult> result = new CompletableFuture<>();
+        CompletableFuture<MyBatisDatabaseMetadataResult> result = new MetadataFuture();
         long generation = cacheGeneration.get();
         Future<?> worker = AppExecutorUtil.getAppExecutorService().submit(() ->
                 loadInBackground(request, indicator, result, generation));
         ScheduledFuture<?> timeoutTask = AppExecutorUtil.getAppScheduledExecutorService().schedule(
                 () -> {
-                    if (result.complete(new MyBatisDatabaseMetadataResult.Unavailable(
-                            MyBatisDatabaseMetadataResult.Reason.TIMED_OUT))) {
+                    boolean completed;
+                    synchronized (result) {
+                        completed = result.complete(
+                                new MyBatisDatabaseMetadataResult.Unavailable(
+                                        MyBatisDatabaseMetadataResult.Reason.TIMED_OUT));
+                    }
+                    if (completed) {
                         indicator.cancel();
                         worker.cancel(true);
                     }
@@ -123,8 +130,12 @@ public final class MyBatisDatabaseMetadataService {
             List<MyBatisDatabaseMetadataProvider> providers =
                     MyBatisDatabaseMetadataProvider.EP_NAME.getExtensionList();
             if (providers.isEmpty()) {
-                result.complete(new MyBatisDatabaseMetadataResult.Unavailable(
-                        MyBatisDatabaseMetadataResult.Reason.NO_PROVIDER));
+                completeWithLatest(
+                        result,
+                        new MyBatisDatabaseMetadataResult.Unavailable(
+                                MyBatisDatabaseMetadataResult.Reason.NO_PROVIDER),
+                        generation,
+                        null);
                 return;
             }
             List<MyBatisDatabaseSnapshot> snapshots = new ArrayList<>();
@@ -149,28 +160,42 @@ public final class MyBatisDatabaseMetadataService {
             if (!filtered.isEmpty()) {
                 MyBatisDatabaseMetadataResult.Loaded loaded =
                         new MyBatisDatabaseMetadataResult.Loaded(filtered);
-                if (result.complete(loaded)) {
-                    updateLatestIfCurrent(generation, loaded);
-                }
+                completeWithLatest(result, loaded, generation, loaded);
             } else if (!failedProviders.isEmpty()) {
                 MyBatisDatabaseMetadataResult.Failed failed =
                         new MyBatisDatabaseMetadataResult.Failed(failedProviders);
-                if (result.complete(failed)) {
-                    updateLatestIfCurrent(generation, null);
-                }
+                completeWithLatest(result, failed, generation, null);
             } else {
                 MyBatisDatabaseMetadataResult.Unavailable unavailable =
                         new MyBatisDatabaseMetadataResult.Unavailable(
                                 MyBatisDatabaseMetadataResult.Reason.NO_DATA_SOURCE);
-                if (result.complete(unavailable)) {
-                    updateLatestIfCurrent(generation, null);
-                }
+                completeWithLatest(result, unavailable, generation, null);
             }
         } catch (CancellationException cancelled) {
             result.cancel(false);
         } catch (RuntimeException failure) {
-            result.complete(new MyBatisDatabaseMetadataResult.Failed(
-                    List.of("metadata-service")));
+            completeWithLatest(
+                    result,
+                    new MyBatisDatabaseMetadataResult.Failed(List.of("metadata-service")),
+                    generation,
+                    null);
+        }
+    }
+
+    /**
+     * 缓存写入必须先于 Future 完成，使等待方返回时可以立即读取同代快照。
+     */
+    private void completeWithLatest(
+            @NotNull CompletableFuture<MyBatisDatabaseMetadataResult> result,
+            @NotNull MyBatisDatabaseMetadataResult value,
+            long generation,
+            MyBatisDatabaseMetadataResult.Loaded loaded) {
+        synchronized (result) {
+            if (result.isDone()) {
+                return;
+            }
+            updateLatestIfCurrent(generation, loaded);
+            result.complete(value);
         }
     }
 
@@ -179,6 +204,27 @@ public final class MyBatisDatabaseMetadataService {
             MyBatisDatabaseMetadataResult.Loaded loaded) {
         if (cacheGeneration.get() == generation) {
             latest.set(loaded);
+        }
+    }
+
+    /**
+     * 调用方取消与后台完成共用同一监视器，避免取消后仍发布快照。
+     */
+    private static final class MetadataFuture
+            extends CompletableFuture<MyBatisDatabaseMetadataResult> {
+        @Override
+        public synchronized boolean complete(MyBatisDatabaseMetadataResult value) {
+            return super.complete(value);
+        }
+
+        @Override
+        public synchronized boolean completeExceptionally(Throwable failure) {
+            return super.completeExceptionally(failure);
+        }
+
+        @Override
+        public synchronized boolean cancel(boolean mayInterruptIfRunning) {
+            return super.cancel(mayInterruptIfRunning);
         }
     }
 

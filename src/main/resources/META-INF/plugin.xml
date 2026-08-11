@@ -5,7 +5,7 @@
 
     <description><![CDATA[
         <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
-        <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map、OGNL 语言支持，以及可选 SQL PSI、方言、异步数据库元数据、表列补全与低误报 schema 检查。</p>
+        <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map、OGNL 语言支持、可选 SQL PSI、方言、异步数据库元数据、表列补全与低误报 schema 检查，以及带全量预览、稳定生成区和单次撤销的数据库代码生成。</p>
     ]]></description>
 
     <extensionPoints>

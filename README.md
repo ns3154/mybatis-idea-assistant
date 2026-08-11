@@ -2,7 +2,7 @@
 
 面向 IntelliJ IDEA 的 MyBatis 智能开发助手，采用独立实现路线开发。
 
-当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S3 已通过阶段验收，S4～S7 已完成开发并进入各自最终统一验收：
+当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S3 已通过阶段验收，S4～S8 已完成开发并进入各自最终统一验收：
 
 - 识别 Java Mapper 接口；
 - 识别 MyBatis XML 的 `namespace`；
@@ -27,6 +27,9 @@
 - 把 S5 动态程序压成有界代表 SQL，并在 Database Tools 可用时接入真实 SQL PSI；`#{}`、`${}`、动态标签、entity 与跨片段位置均可回映射到原 XML；
 - 只在后台读取 Database Tools 已加载模型，统一处理超时、取消、模型失效和多数据源；编辑器线程不连接数据库、不等待 I/O；
 - 提供 SQL 关键字、常用函数、别名、表列补全，以及不存在/歧义表列、ResultMap 缺列和基础 Java/JDBC 类型不匹配检查；动态标识符、加载中、语法不完整和目标不唯一时保持静默。
+- 从 Database Tools 已加载且由用户明确选择的表生成 Entity、Mapper、Mapper XML 和 Service；支持 Standard/MyBatis-Plus 模板、命名、字段过滤、注释、类型/TypeHandler、自增键与关键字转义；
+- 所有数据库生成先形成全量计划，支持按文件选择、候选文本和原生差异；稳定生成区以 SHA-256 防止覆盖用户修改，区域外手写内容、未保存编辑和 LF/CRLF 均保留；
+- 批量创建与更新由单个命名 IDE Command 承载，执行前复核 TOCTOU 并创建 Local History 标签；写入异常自动回滚，冲突或失败不留半成品，整批支持一次 Undo/Redo。
 
 ## 开发环境
 
@@ -76,6 +79,8 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 - [S6 OGNL 语言支持验收记录](docs/S6-OGNL语言支持验收记录.md)
 - [S7 类型安全 SQL 与数据库元数据任务卡](docs/S7-类型安全SQL与数据库元数据任务卡.md)
 - [S7 类型安全 SQL 与数据库元数据验收记录](docs/S7-类型安全SQL与数据库元数据验收记录.md)
+- [S8 数据库代码生成与安全合并任务卡](docs/S8-数据库代码生成与安全合并任务卡.md)
+- [S8 数据库代码生成与安全合并验收记录](docs/S8-数据库代码生成与安全合并验收记录.md)
 - [风险清单](docs/风险清单.md)
 - [首批验收记录](docs/首批验收记录.md)
 - [交付完成度审计](docs/交付完成度审计.md)

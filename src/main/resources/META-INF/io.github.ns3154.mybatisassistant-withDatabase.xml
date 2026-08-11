@@ -24,4 +24,13 @@
                 level="WARNING"
                 implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisSqlSchemaInspection"/>
     </extensions>
+    <actions>
+        <action
+                id="MyBatisAssistant.Database.Generate"
+                class="io.github.ns3154.mybatisassistant.database.intellij.MyBatisDatabaseGenerateAction"
+                text="生成 MyBatis 代码…"
+                description="从已加载的数据库表预览并安全生成 MyBatis 代码">
+            <add-to-group group-id="DatabaseViewPopupMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>
