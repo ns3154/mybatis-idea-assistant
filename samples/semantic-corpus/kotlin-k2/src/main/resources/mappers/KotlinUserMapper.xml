@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.mybatisideaassistant.corpus.kotlin.KotlinUserMapper">
+    <resultMap id="kotlinUserMap" type="io.github.mybatisideaassistant.corpus.kotlin.KotlinUser">
+        <constructor>
+            <idArg column="id" javaType="long"/>
+            <arg column="name" javaType="string"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findById" resultMap="kotlinUserMap">
+        select id, name from users where id = #{id}
+    </select>
+
+    <select id="findByNames" resultMap="kotlinUserMap">
+        select id, name from users
+        where name in
+        <foreach collection="names" item="name" open="(" separator="," close=")">#{name}</foreach>
+    </select>
+
+    <select id="findByFilter" resultMap="kotlinUserMap">
+        select id, name from users
+        <where>
+            <if test="filter.profile != null and filter.profile.city != null">
+                city = #{filter.profile.city}
+            </if>
+            <if test="filter.tags != null and !filter.tags.isEmpty()">
+                and tag in
+                <foreach collection="filter.tags" item="tag" open="(" separator="," close=")">#{tag}</foreach>
+            </if>
+        </where>
+    </select>
+
+    <select id="findByState" resultMap="kotlinUserMap">
+        select id, name from users
+        <where>
+            <if test="state != null">state = #{state}</if>
+        </where>
+    </select>
+</mapper>

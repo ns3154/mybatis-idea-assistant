@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.github.mybatisideaassistant.samples</groupId>
+    <artifactId>semantic-corpus</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>MyBatis Assistant 语义语料</name>
+
+    <modules>
+        <module>contracts-java</module>
+        <module>spring-application</module>
+        <module>kotlin-k2</module>
+        <module>framework-adapters</module>
+        <module>dialect-fixtures</module>
+    </modules>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>21</maven.compiler.release>
+        <mybatis.version>3.5.19</mybatis.version>
+        <mybatis.spring.boot.version>4.1.0</mybatis.spring.boot.version>
+        <kotlin.version>2.3.20</kotlin.version>
+        <mybatis.plus.version>3.5.17</mybatis.plus.version>
+        <mybatis.flex.version>1.11.8</mybatis.flex.version>
+        <tk.mybatis.version>6.0.0</tk.mybatis.version>
+        <junit.version>4.13.2</junit.version>
+    </properties>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.14.1</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.5.3</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -77,10 +77,7 @@ public final class MyBatisMapperMethodResolver {
             if (byPath != 0) {
                 return byPath;
             }
-            int byOffset = Integer.compare(left.getTextOffset(), right.getTextOffset());
-            return byOffset != 0
-                    ? byOffset
-                    : methodSignature(left).compareTo(methodSignature(right));
+            return Integer.compare(left.getTextOffset(), right.getTextOffset());
         });
         ProgressManager.checkCanceled();
         return List.copyOf(targets);
@@ -95,17 +92,4 @@ public final class MyBatisMapperMethodResolver {
         return virtualFile == null ? containingFile.getName() : virtualFile.getPath();
     }
 
-    private static @NotNull String methodSignature(@NotNull PsiMethod method) {
-        StringBuilder signature = new StringBuilder(method.getName()).append('(');
-        for (int index = 0; index < method.getParameterList().getParametersCount(); index++) {
-            ProgressManager.checkCanceled();
-            if (index > 0) {
-                signature.append(',');
-            }
-            signature.append(method.getParameterList().getParameters()[index]
-                    .getType()
-                    .getCanonicalText());
-        }
-        return signature.append(')').toString();
-    }
 }

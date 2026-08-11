@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.mybatisideaassistant.corpus.java.mapper.UserMapper">
+    <cache/>
+
+    <resultMap id="baseUserMap" type="io.github.mybatisideaassistant.corpus.java.domain.User">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="state" column="state" javaType="io.github.mybatisideaassistant.corpus.java.domain.UserState"/>
+    </resultMap>
+
+    <resultMap id="disabledUserMap" type="io.github.mybatisideaassistant.corpus.java.domain.User" extends="baseUserMap"/>
+
+    <resultMap id="userMap" type="io.github.mybatisideaassistant.corpus.java.domain.User" extends="baseUserMap">
+        <association property="address"
+                     javaType="io.github.mybatisideaassistant.corpus.java.domain.Address"
+                     columnPrefix="address_">
+            <id property="id" column="id"/>
+            <result property="city" column="city"/>
+        </association>
+        <collection property="orders" ofType="io.github.mybatisideaassistant.corpus.java.domain.Order">
+            <id property="id" column="order_id"/>
+            <result property="total" column="order_total"/>
+        </collection>
+        <discriminator javaType="string" column="state">
+            <case value="DISABLED" resultMap="disabledUserMap"/>
+        </discriminator>
+    </resultMap>
+
+    <resultMap id="userSummaryMap" type="io.github.mybatisideaassistant.corpus.java.domain.UserSummary">
+        <constructor>
+            <idArg column="id" javaType="long" name="id"/>
+            <arg column="name" javaType="string" name="name"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="userColumns">
+        id, name, state, address_id, address_city, order_id, order_total
+    </sql>
+
+    <select id="findById" resultMap="userMap">
+        select <include refid="userColumns"/>
+        from users
+        where id = #{id}
+    </select>
+
+    <select id="findInheritedById" resultMap="userMap">
+        select <include refid="userColumns"/>
+        from users
+        where id = #{id}
+    </select>
+
+    <select id="findByNameAndState" resultMap="userMap">
+        select <include refid="userColumns"/>
+        from users
+        <where>
+            <if test="name != null and !name.isEmpty()">
+                and name like concat('%', #{name}, '%')
+            </if>
+            <if test="state != null">
+                and state = #{state}
+            </if>
+        </where>
+    </select>
+
+    <select id="findByIds" resultMap="userMap">
+        select <include refid="userColumns"/>
+        from users
+        where id in
+        <foreach collection="ids" item="id" index="index" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="findByAttributes" resultMap="userMap">
+        <bind name="escapedName" value="'%' + _parameter['name'] + '%'"/>
+        select <include refid="userColumns"/>
+        from users
+        <trim prefix="where" prefixOverrides="and |or ">
+            <if test="_parameter['name'] != null">and name like #{escapedName}</if>
+            <if test="_parameter['column'] != null">and ${column} = #{value}</if>
+        </trim>
+    </select>
+
+    <select id="findPage" resultMap="userMap">
+        select <include refid="userColumns"/>
+        from users
+        <where>
+            <choose>
+                <when test="criteria.keyword != null">name like concat('%', #{criteria.keyword}, '%')</when>
+                <when test="criteria.state != null">state = #{criteria.state}</when>
+                <otherwise>1 = 1</otherwise>
+            </choose>
+        </where>
+        limit #{limit} offset #{offset}
+    </select>
+
+    <insert id="insertUser" parameterType="io.github.mybatisideaassistant.corpus.java.domain.User"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into users(name, state) values(#{name}, #{state})
+    </insert>
+
+    <update id="updateUser">
+        update users
+        <set>
+            <if test="user.name != null">name = #{user.name},</if>
+            <if test="user.state != null">state = #{user.state},</if>
+        </set>
+        where id = #{user.id}
+    </update>
+
+    <delete id="deleteByIds">
+        delete from users where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+
+    <select id="findSummary" resultMap="userSummaryMap">
+        select id, name from users where id = #{id}
+    </select>
+</mapper>

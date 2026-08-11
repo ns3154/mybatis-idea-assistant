@@ -34,6 +34,9 @@ jobs:
       - name: 验证 Java + MyBatis 样例
         run: mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
 
+      - name: 验证完整语义语料
+        run: mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
+
       - name: 运行测试与插件验证
         run: ./gradlew check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin
 
@@ -50,6 +53,9 @@ jobs:
           name: verification-reports
           path: |
             build/reports/tests/
+            build/reports/checkstyle/
+            build/reports/jacoco/
             build/reports/pluginVerifier/
             build/reports/problems/
+            samples/**/target/surefire-reports/
           if-no-files-found: ignore

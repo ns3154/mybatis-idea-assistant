@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="io.github.mybatisideaassistant.corpus.wrong.UserMapper">
+    <select id="findById" resultType="map">select 1</select>
+</mapper>
