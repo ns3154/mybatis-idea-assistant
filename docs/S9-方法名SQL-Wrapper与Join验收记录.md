@@ -32,6 +32,7 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 - 最低 IDEA 2026.1 GA Plugin Verifier 最终结果为 Compatible，且无内部 API/实验 API 阻断；
 - 首轮 Verifier 曾因选择对话框误用内部 `MessagesService` 失败；实现已改为公开 `DialogWrapper`/Swing API 并复验通过，该失败不被删除或写成绿灯；
 - ZIP 已重新构建，SHA-256 为 `c67ae181e57c7ad1fc0c798d838c21a71eb8e39a334d5361c58275dd1937e78d`；三个 S9 动作的真实扩展注册、表数量/有效性/LOADING/同数据源守门和底层生成行为均有平台测试。
+- GitHub Actions [运行 #31541144714](https://github.com/ns3154/mybatis-idea-assistant/actions/runs/31541144714) 已在提交 `7b62bfd` 上通过，耗时 6 分 42 秒；远端重新执行了两个 Maven 语料、完整 Gradle 测试与覆盖率、项目/插件结构、最低 261 Plugin Verifier，并上传插件 ZIP 与验证报告。
 
 ## 尚未关闭的验收项
 
