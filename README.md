@@ -2,7 +2,7 @@
 
 面向 IntelliJ IDEA 的 MyBatis 智能开发助手，采用独立实现路线开发。
 
-当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S2 已通过阶段验收，已形成可验证的双向语义主链与增量语义底座：
+当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S3 已通过阶段验收，已形成可验证的双向语义主链、增量语义底座和首组安全编辑能力：
 
 - 识别 Java Mapper 接口；
 - 识别 MyBatis XML 的 `namespace`；
@@ -15,6 +15,10 @@
 - 识别 Java/Kotlin K2 Mapper、继承泛型方法、参数、返回实体、注解 SQL、`@Mapper` 与 `@MapperScan` 来源；
 - 增量解析 MyBatis XML、Spring Boot/MyBatis-Plus 配置与 TypeAlias，并按模块依赖边界限制结果；
 - 对未保存编辑、文件移动/删除、项目根变化、Dumb Mode 和取消请求做精确失效或保守降级。
+- 为 XML `namespace`、statement `id`、`refid`、`resultMap`、`extends` 与 Java 注解 SQL/Provider 建立精确引用，支持查找使用；
+- 支持继承 Mapper 方法、注解 SQL 与 Provider 方法的精确导航，唯一目标直达，多目标全部保留；
+- 提供缺失 Mapper XML、重复 statement 等默认检查，并将高误报风险的 namespace、未使用 statement、缺失 `@Param` 检查默认关闭；
+- 提供可预览、单次撤销、冲突停止的 Mapper XML、statement、`@Param` 修复；未使用 statement 仅提供定位，不自动删除代码。
 
 ## 开发环境
 
@@ -54,6 +58,8 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 - [S1 插件骨架与流水线验收记录](docs/S1-插件骨架与流水线验收记录.md)
 - [S2 统一语义模型与增量索引任务卡](docs/S2-统一语义模型与增量索引任务卡.md)
 - [S2 统一语义模型与增量索引验收记录](docs/S2-统一语义模型与增量索引验收记录.md)
+- [S3 精确引用、基础检查与安全修复任务卡](docs/S3-精确引用基础检查与安全修复任务卡.md)
+- [S3 精确引用、基础检查与安全修复验收记录](docs/S3-精确引用基础检查与安全修复验收记录.md)
 - [风险清单](docs/风险清单.md)
 - [首批验收记录](docs/首批验收记录.md)
 - [交付完成度审计](docs/交付完成度审计.md)

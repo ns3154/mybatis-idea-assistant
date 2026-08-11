@@ -66,6 +66,8 @@ for index in "${!CASE_NAMES[@]}"; do
     case_idea_log="${REPORT_DIR}/${case_name}-idea.log"
 
     tr ',' '\n' <<< "${plugin_ids}" > "${DISABLED_PLUGINS_FILE}"
+    # 每个场景日志已单独归档；重置共享沙箱日志，避免 IDEA 日志滚动后累计行号失效。
+    : > "${SANDBOX_LOG}"
     start_line=$(( $(wc -l < "${SANDBOX_LOG}") + 1 ))
 
     ./gradlew runIde >"${case_output}" 2>&1 &

@@ -5,7 +5,8 @@
     仅检查接口直接声明且没有同名重载的抽象实例方法；静态方法、默认方法、使用 MyBatis SQL 或 Provider 注解的方法，以及 <code>@Flush</code> 方法不会报告问题。
 </p>
 <p>
-    此检查只在确认对应 namespace 的 Mapper XML 已存在、但 statement 缺失时给出警告，不会自动修改 XML。
+    此检查只在确认对应 namespace 的 Mapper XML 已存在、但 statement 缺失时给出警告。
+    Quick Fix 由用户明确选择 statement 标签和目标 XML，执行前提供预览，并可通过单次 Undo 完整撤销。
 </p>
 </body>
 </html>

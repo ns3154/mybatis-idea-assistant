@@ -5,7 +5,7 @@
 
     <description><![CDATA[
         <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
-        <p>当前开发预览版提供双向安全导航、缺失 statement 检查，以及 XML 符号、Java/Kotlin Mapper、配置、TypeAlias 和模块可见性的增量语义模型。</p>
+        <p>当前开发预览版提供双向精确导航、XML/Java 引用、保守检查、安全 Quick Fix，以及 XML 符号、Java/Kotlin Mapper、配置、TypeAlias 和模块可见性的增量语义模型。</p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
@@ -22,6 +22,14 @@
         <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisXmlSymbolIndex"/>
         <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisConfigurationIndex"/>
         <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisBootConfigurationIndex"/>
+        <psi.referenceContributor
+                language="XML"
+                implementation="io.github.ns3154.mybatisassistant.reference.MyBatisXmlReferenceContributor"/>
+        <psi.referenceContributor
+                language="JAVA"
+                implementation="io.github.ns3154.mybatisassistant.reference.MyBatisJavaReferenceContributor"/>
+        <referencesSearch
+                implementation="io.github.ns3154.mybatisassistant.reference.MyBatisXmlReferencesSearchExecutor"/>
         <codeInsight.lineMarkerProvider
                 language="JAVA"
                 implementationClass="io.github.ns3154.mybatisassistant.navigation.MyBatisMapperLineMarkerProvider"/>
@@ -37,6 +45,51 @@
                 enabledByDefault="true"
                 level="WARNING"
                 implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisMissingStatementInspection"/>
+        <localInspection
+                language="JAVA"
+                shortName="MyBatisMissingMapperXml"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.missing.mapper.xml.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisMissingMapperXmlInspection"/>
+        <localInspection
+                language="JAVA"
+                shortName="MyBatisMissingParamAnnotation"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.missing.param.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="false"
+                level="WEAK WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisMissingParamAnnotationInspection"/>
+        <localInspection
+                language="XML"
+                shortName="MyBatisInvalidNamespace"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.invalid.namespace.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="false"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisInvalidNamespaceInspection"/>
+        <localInspection
+                language="XML"
+                shortName="MyBatisDuplicateStatement"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.duplicate.statement.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisDuplicateStatementInspection"/>
+        <localInspection
+                language="XML"
+                shortName="MyBatisUnusedStatement"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.unused.statement.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="false"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisUnusedStatementInspection"/>
         <applicationService
                 serviceImplementation="io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettings"/>
         <applicationConfigurable

@@ -8,6 +8,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectRootModificationTracker;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.ModificationTracker;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -28,7 +29,9 @@ import io.github.ns3154.mybatisassistant.model.MyBatisStatementSourceKind;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 public final class MyBatisStatementResolver {
     private static final Key<CachedValue<MyBatisStatementResolution>> RESOLUTION_CACHE_KEY =
@@ -109,7 +112,8 @@ public final class MyBatisStatementResolver {
             }
             MyBatisStatementResolution resolution = useCache
                     ? resolveCached(project, method, namespace, method.getName(), lookup)
-                    : resolveFromIndex(project, method, namespace, method.getName(), lookup);
+                    : resolveFromIndex(project, method, namespace, method.getName(), lookup)
+                            .resolution();
             if (!isSourceUsable(project, method)) {
                 return new MyBatisStatementResolution.SourceInvalid();
             }
@@ -131,8 +135,9 @@ public final class MyBatisStatementResolver {
             @NotNull String statementId,
             @NotNull MyBatisStatementLookup lookup) {
         return CachedValuesManager.getCachedValue(source, RESOLUTION_CACHE_KEY, () -> {
-            MyBatisStatementResolution resolution =
+            ResolutionComputation computation =
                     resolveFromIndex(project, source, namespace, statementId, lookup);
+            MyBatisStatementResolution resolution = computation.resolution();
             if (resolution instanceof MyBatisStatementResolution.IndexNotReady
                     || resolution instanceof MyBatisStatementResolution.SourceInvalid) {
                 throw new NonCacheableResolutionException(resolution);
@@ -153,17 +158,24 @@ public final class MyBatisStatementResolver {
                     : FileBasedIndex.getInstance().getIndexModificationStamp(
                             MyBatisXmlSymbolIndex.NAME,
                             project);
-            return CachedValueProvider.Result.create(
-                    resolution,
-                    sourceFileModificationTracker,
-                    psiModificationTracker.forLanguage(XMLLanguage.INSTANCE),
-                    indexModificationTracker,
-                    DumbService.getInstance(project).getModificationTracker(),
-                    ProjectRootModificationTracker.getInstance(project));
+            List<Object> dependencies = new ArrayList<>();
+            dependencies.add(sourceFileModificationTracker);
+            dependencies.add(psiModificationTracker.forLanguage(XMLLanguage.INSTANCE));
+            dependencies.add(indexModificationTracker);
+            dependencies.add(DumbService.getInstance(project).getModificationTracker());
+            dependencies.add(ProjectRootModificationTracker.getInstance(project));
+            if (computation.inheritanceConsulted()) {
+                PsiClass mapperInterface = source.getContainingClass();
+                if (mapperInterface != null) {
+                    dependencies.add(MyBatisInheritedMapperLocator.modificationTracker(
+                            mapperInterface));
+                }
+            }
+            return CachedValueProvider.Result.create(resolution, dependencies);
         });
     }
 
-    private static @NotNull MyBatisStatementResolution resolveFromIndex(
+    private static @NotNull ResolutionComputation resolveFromIndex(
             @NotNull Project project,
             @NotNull PsiMethod source,
             @NotNull String namespace,
@@ -173,17 +185,118 @@ public final class MyBatisStatementResolver {
         GlobalSearchScope scope = source.getResolveScope();
         List<XmlTag> tags = lookup.find(project, namespace, statementId, scope);
         if (!isSourceUsable(project, source)) {
-            return new MyBatisStatementResolution.SourceInvalid();
+            return new ResolutionComputation(
+                    new MyBatisStatementResolution.SourceInvalid(),
+                    false);
         }
         if (tags.isEmpty()) {
             boolean mapperXmlExists = lookup.hasMapperXml(project, namespace, scope);
             if (!isSourceUsable(project, source)) {
-                return new MyBatisStatementResolution.SourceInvalid();
+                return new ResolutionComputation(
+                        new MyBatisStatementResolution.SourceInvalid(),
+                        false);
             }
-            return mapperXmlExists
-                    ? new MyBatisStatementResolution.StatementMissing(namespace, statementId)
-                    : new MyBatisStatementResolution.NoMapperXml(namespace);
+            if (mapperXmlExists) {
+                return new ResolutionComputation(
+                        new MyBatisStatementResolution.StatementMissing(namespace, statementId),
+                        false);
+            }
+            PsiClass mapperInterface = source.getContainingClass();
+            List<XmlTag> inheritedTargets = mapperInterface == null
+                    ? List.of()
+                    : findInheritedTargets(
+                            project,
+                            source,
+                            mapperInterface,
+                            statementId,
+                            lookup);
+            if (inheritedTargets.isEmpty()) {
+                return new ResolutionComputation(
+                        new MyBatisStatementResolution.NoMapperXml(namespace),
+                        mapperInterface != null);
+            }
+            return new ResolutionComputation(
+                    materializeTargets(
+                            project,
+                            source,
+                            inheritedTargets,
+                            new MyBatisStatementResolution.NoMapperXml(namespace)),
+                    true);
         }
+
+        return new ResolutionComputation(
+                materializeTargets(
+                        project,
+                        source,
+                        tags,
+                        new MyBatisStatementResolution.StatementMissing(namespace, statementId)),
+                false);
+    }
+
+    private static @NotNull List<XmlTag> findInheritedTargets(
+            @NotNull Project project,
+            @NotNull PsiMethod source,
+            @NotNull PsiClass mapperInterface,
+            @NotNull String statementId,
+            @NotNull MyBatisStatementLookup lookup) {
+        List<XmlTag> targets = new ArrayList<>();
+        for (PsiClass inheritor : MyBatisInheritedMapperLocator.find(mapperInterface)) {
+            ProgressManager.checkCanceled();
+            String childNamespace = inheritor.getQualifiedName();
+            if (childNamespace == null || !hasUniqueVisibleMethod(inheritor, statementId)) {
+                continue;
+            }
+            targets.addAll(lookup.find(
+                    project,
+                    childNamespace,
+                    statementId,
+                    inheritor.getResolveScope()));
+            if (!isSourceUsable(project, source)) {
+                return List.of();
+            }
+        }
+        targets.sort((left, right) -> {
+            ProgressManager.checkCanceled();
+            int byPath = stablePath(left).compareTo(stablePath(right));
+            return byPath != 0
+                    ? byPath
+                    : Integer.compare(left.getTextOffset(), right.getTextOffset());
+        });
+        return List.copyOf(targets);
+    }
+
+    private static @NotNull String stablePath(@NotNull PsiElement element) {
+        PsiFile file = element.getContainingFile();
+        if (file == null) {
+            return "";
+        }
+        VirtualFile virtualFile = file.getVirtualFile();
+        return virtualFile == null ? file.getName() : virtualFile.getPath();
+    }
+
+    private static boolean hasUniqueVisibleMethod(
+            @NotNull PsiClass mapperInterface,
+            @NotNull String statementId) {
+        Set<PsiMethod> visibleMethods = new LinkedHashSet<>();
+        for (PsiMethod candidate : mapperInterface.findMethodsByName(statementId, true)) {
+            ProgressManager.checkCanceled();
+            PsiMethod visible = mapperInterface.findMethodBySignature(candidate, true);
+            if (visible != null
+                    && visible.hasModifierProperty(PsiModifier.ABSTRACT)
+                    && !visible.hasModifierProperty(PsiModifier.STATIC)
+                    && !visible.hasModifierProperty(PsiModifier.DEFAULT)
+                    && visible.getBody() == null) {
+                visibleMethods.add(visible);
+            }
+        }
+        return visibleMethods.size() == 1;
+    }
+
+    private static @NotNull MyBatisStatementResolution materializeTargets(
+            @NotNull Project project,
+            @NotNull PsiMethod source,
+            @NotNull List<XmlTag> tags,
+            @NotNull MyBatisStatementResolution emptyResolution) {
 
         SmartPointerManager pointerManager = SmartPointerManager.getInstance(project);
         List<SmartPsiElementPointer<XmlTag>> targets = new ArrayList<>(tags.size());
@@ -198,7 +311,7 @@ public final class MyBatisStatementResolver {
         }
 
         if (targets.isEmpty()) {
-            return new MyBatisStatementResolution.StatementMissing(namespace, statementId);
+            return emptyResolution;
         }
         if (targets.size() == 1) {
             return new MyBatisStatementResolution.UniqueMatch(targets.getFirst());
@@ -224,5 +337,10 @@ public final class MyBatisStatementResolver {
         private @NotNull MyBatisStatementResolution resolution() {
             return resolution;
         }
+    }
+
+    private record ResolutionComputation(
+            @NotNull MyBatisStatementResolution resolution,
+            boolean inheritanceConsulted) {
     }
 }

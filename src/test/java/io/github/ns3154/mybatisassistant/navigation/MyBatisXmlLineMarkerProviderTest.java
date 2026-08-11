@@ -11,8 +11,11 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiJavaFile;
+import com.intellij.psi.JavaPsiFacade;
+import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.util.PsiTreeUtil;
+import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.xml.XmlFile;
 import com.intellij.psi.xml.XmlToken;
 import com.intellij.psi.xml.XmlTokenType;
@@ -206,18 +209,23 @@ public final class MyBatisXmlLineMarkerProviderTest extends BasePlatformTestCase
                 () -> MyBatisXmlLineMarkerProvider.findTargets(idToken)));
     }
 
-    public void testInheritedMethodDoesNotMatchStatement() {
-        myFixture.addFileToProject("src/main/java/com/example/BaseMapper.java", """
-                package com.example;
-                public interface BaseMapper {
-                    Object findById(long id);
-                }
-                """);
+    public void testInheritedMethodMatchesStatement() {
         addMapperJava("""
                 package com.example;
                 public interface UserMapper extends BaseMapper {
                 }
+                interface BaseMapper {
+                    Object findById(long id);
+                }
                 """);
+        PsiClass mapper = ReadAction.compute(() -> JavaPsiFacade.getInstance(getProject())
+                .findClass("com.example.UserMapper", GlobalSearchScope.projectScope(getProject())));
+        assertNotNull(mapper);
+        PsiClass baseMapper = ReadAction.compute(
+                () -> mapper.getExtendsListTypes()[0].resolve());
+        assertNotNull(baseMapper);
+        assertEquals("com.example.BaseMapper", baseMapper.getQualifiedName());
+        assertSize(1, ReadAction.compute(() -> mapper.findMethodsByName("findById", true)));
         XmlFile xmlFile = configureMapperXml("""
                 <mapper namespace="com.example.UserMapper">
                     <select id="findById">select 1</select>
@@ -225,8 +233,13 @@ public final class MyBatisXmlLineMarkerProviderTest extends BasePlatformTestCase
                 """);
         XmlToken idToken = findIdValueToken(xmlFile, "findById");
 
-        assertEmpty(ReadAction.compute(
-                () -> MyBatisXmlLineMarkerProvider.findTargets(idToken)));
+        List<PsiMethod> targets = ReadAction.compute(
+                () -> MyBatisXmlLineMarkerProvider.findTargets(idToken));
+
+        assertSize(1, targets);
+        assertNotNull(targets.getFirst().getContainingClass());
+        assertEquals("com.example.BaseMapper",
+                targets.getFirst().getContainingClass().getQualifiedName());
     }
 
     public void testNonIdAttributeAndNestedStatementHaveNoTarget() {

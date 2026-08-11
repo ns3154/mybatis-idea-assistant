@@ -137,6 +137,95 @@ public final class MyBatisMapperLineMarkerProviderTest extends BasePlatformTestC
         assertEmpty(targets);
     }
 
+    public void testParentInterfaceMethodNavigatesToChildMapperStatement() {
+        addMapperXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <select id="findById">select 1</select>
+                </mapper>
+                """);
+        PsiMethod parentMethod = configureMapper("""
+                package com.example;
+                public interface UserMapper extends BaseMapper {
+                }
+                interface BaseMapper {
+                    Object findById(long id);
+                }
+                """, "findById");
+
+        List<XmlTag> targets = ReadAction.compute(
+                () -> MyBatisMapperLineMarkerProvider.findTargets(parentMethod));
+
+        assertSize(1, targets);
+        assertEquals("com.example.UserMapper",
+                targets.getFirst().getParentTag().getAttributeValue("namespace"));
+        List<RelatedItemLineMarkerInfo<?>> markers = new ArrayList<>();
+        new MyBatisMapperLineMarkerProvider().collectNavigationMarkers(
+                parentMethod.getNameIdentifier(),
+                markers);
+        assertSize(1, markers);
+    }
+
+    public void testParentInterfaceMethodPreservesMultipleChildMapperTargets() {
+        myFixture.addFileToProject("src/main/resources/mapper/UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <select id="findById">select 1</select>
+                </mapper>
+                """);
+        myFixture.addFileToProject("src/main/resources/mapper/AdminMapper.xml", """
+                <mapper namespace="com.example.AdminMapper">
+                    <select id="findById">select 2</select>
+                </mapper>
+                """);
+        PsiMethod parentMethod = configureMapper("""
+                package com.example;
+                public interface UserMapper extends BaseMapper {
+                }
+                interface AdminMapper extends BaseMapper {
+                }
+                interface BaseMapper {
+                    Object findById(long id);
+                }
+                """, "findById");
+
+        List<XmlTag> targets = ReadAction.compute(
+                () -> MyBatisMapperLineMarkerProvider.findTargets(parentMethod));
+
+        assertSize(2, targets);
+        assertEquals(
+                java.util.Set.of("com.example.AdminMapper", "com.example.UserMapper"),
+                targets.stream()
+                        .map(XmlTag::getParentTag)
+                        .map(tag -> tag.getAttributeValue("namespace"))
+                        .collect(java.util.stream.Collectors.toSet()));
+    }
+
+    public void testParentInterfaceNavigationSkipsChildWithSameNameOverload() {
+        addMapperXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <select id="findById">select 1</select>
+                </mapper>
+                """);
+        PsiMethod parentMethod = configureMapper("""
+                package com.example;
+                public interface UserMapper extends BaseMapper {
+                    Object findById(String id);
+                }
+                interface BaseMapper {
+                    Object findById(long id);
+                }
+                """, "findById");
+        PsiMethod actualParent = PsiTreeUtil.findChildrenOfType(myFixture.getFile(), PsiMethod.class)
+                .stream()
+                .filter(method -> method.getContainingClass() != null)
+                .filter(method -> "BaseMapper".equals(method.getContainingClass().getName()))
+                .findFirst()
+                .orElseThrow();
+
+        assertEmpty(ReadAction.compute(
+                () -> MyBatisMapperLineMarkerProvider.findTargets(actualParent)));
+        assertNotSame(parentMethod, actualParent);
+    }
+
     public void testSupportsAllFirstBatchStatementTags() {
         addMapperXml("""
                 <mapper namespace="com.example.UserMapper">

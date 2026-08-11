@@ -4,12 +4,15 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiAnnotation;
 import com.intellij.psi.PsiAnnotationMemberValue;
+import com.intellij.psi.PsiArrayInitializerMemberValue;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiParameter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 public final class MyBatisAnnotationModel {
@@ -61,6 +64,24 @@ public final class MyBatisAnnotationModel {
         return MyBatisStatementSourceKind.XML;
     }
 
+    public static @NotNull List<PsiAnnotation> statementAnnotations(
+            @NotNull PsiMethod method,
+            @NotNull MyBatisStatementSourceKind sourceKind) {
+        List<PsiAnnotation> result = new ArrayList<>();
+        for (PsiAnnotation annotation : method.getAnnotations()) {
+            ProgressManager.checkCanceled();
+            if (annotationSource(annotation) != sourceKind) {
+                continue;
+            }
+            collectDirectOrNestedAnnotations(annotation, result);
+        }
+        return List.copyOf(result);
+    }
+
+    public static boolean isProviderAnnotation(@NotNull PsiAnnotation annotation) {
+        return annotationSource(annotation) == MyBatisStatementSourceKind.PROVIDER;
+    }
+
     public static @Nullable String explicitParameterName(@NotNull PsiParameter parameter) {
         ProgressManager.checkCanceled();
         PsiAnnotation annotation = parameter.getAnnotation(PARAM_ANNOTATION);
@@ -92,5 +113,44 @@ public final class MyBatisAnnotationModel {
                 ? dollarSeparator
                 : dollarSeparator < 0 ? dotSeparator : Math.min(dotSeparator, dollarSeparator);
         return nestedTypeSeparator < 0 ? shortName : shortName.substring(0, nestedTypeSeparator);
+    }
+
+    private static @Nullable MyBatisStatementSourceKind annotationSource(
+            @NotNull PsiAnnotation annotation) {
+        String shortName = myBatisAnnotationShortName(annotation);
+        if (shortName == null) {
+            return null;
+        }
+        if (INLINE_SQL_ANNOTATIONS.contains(shortName)) {
+            return MyBatisStatementSourceKind.ANNOTATION_SQL;
+        }
+        if (PROVIDER_ANNOTATIONS.contains(shortName)) {
+            return MyBatisStatementSourceKind.PROVIDER;
+        }
+        return "Flush".equals(shortName) ? MyBatisStatementSourceKind.FLUSH : null;
+    }
+
+    private static void collectDirectOrNestedAnnotations(
+            @NotNull PsiAnnotation annotation,
+            @NotNull List<PsiAnnotation> result) {
+        String qualifiedName = annotation.getQualifiedName();
+        if (qualifiedName == null
+                || (!qualifiedName.endsWith(".List") && !qualifiedName.endsWith("$List"))) {
+            result.add(annotation);
+            return;
+        }
+        PsiAnnotationMemberValue value = annotation.findAttributeValue("value");
+        if (value instanceof PsiAnnotation nested) {
+            result.add(nested);
+            return;
+        }
+        if (value instanceof PsiArrayInitializerMemberValue array) {
+            for (PsiAnnotationMemberValue initializer : array.getInitializers()) {
+                ProgressManager.checkCanceled();
+                if (initializer instanceof PsiAnnotation nested) {
+                    result.add(nested);
+                }
+            }
+        }
     }
 }
