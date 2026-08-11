@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -70,6 +71,35 @@ class MyBatisAssociationTest {
 
             User saved = mapper.findById(user.getId());
             assertEquals("新增用户", saved.getUsername());
+        }
+    }
+
+    @Test
+    void 应执行S9生成的比较排序模糊与集合条件() {
+        try (SqlSession session = sqlSessionFactory.openSession()) {
+            UserMapper mapper = session.getMapper(UserMapper.class);
+
+            List<User> containing = mapper
+                    .findByUsernameContainingAndIdGreaterThanOrderByIdDesc("测试", 0L);
+            List<User> in = mapper.findByIdIn(List.of(1L));
+
+            assertEquals(1, containing.size());
+            assertEquals(1L, containing.getFirst().getId());
+            assertEquals(1, in.size());
+            assertEquals("测试用户", in.getFirst().getUsername());
+        }
+    }
+
+    @Test
+    void 应执行S9生成的动态条件更新与统计() {
+        try (SqlSession session = sqlSessionFactory.openSession()) {
+            UserMapper mapper = session.getMapper(UserMapper.class);
+
+            assertEquals(1, mapper.findByUsernameAndEmail(
+                    null, "test@example.com").size());
+            assertEquals(1L, mapper.countByUsername("测试用户"));
+            assertEquals(1, mapper.updateEmailById("updated@example.com", 1L));
+            assertEquals("updated@example.com", mapper.findById(1L).getEmail());
         }
     }
 }

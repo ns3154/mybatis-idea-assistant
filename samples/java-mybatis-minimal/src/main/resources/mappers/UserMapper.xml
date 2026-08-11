@@ -20,4 +20,42 @@
         INSERT INTO users (username, email)
         VALUES (#{username}, #{email})
     </insert>
+
+    <!-- 以下 statement 锁定 S9 方法名 SQL 生成器的真实 MyBatis/H2 行为。 -->
+    <select id="findByUsernameContainingAndIdGreaterThanOrderByIdDesc"
+            resultType="io.github.mybatisideaassistant.sample.domain.User">
+        <bind name="usernamePattern" value="'%' + username + '%'"/>
+        SELECT "id", "username", "email" FROM "users"
+        WHERE "username" LIKE #{usernamePattern}
+          AND "id" &gt; #{id,jdbcType=BIGINT}
+        ORDER BY "id" DESC
+    </select>
+
+    <select id="findByIdIn"
+            resultType="io.github.mybatisideaassistant.sample.domain.User">
+        SELECT "id", "username", "email" FROM "users"
+        WHERE "id" IN
+        <foreach collection="idValues" item="item" open="(" separator="," close=")">
+            #{item,jdbcType=BIGINT}
+        </foreach>
+    </select>
+
+    <select id="findByUsernameAndEmail"
+            resultType="io.github.mybatisideaassistant.sample.domain.User">
+        SELECT "id", "username", "email" FROM "users"
+        <where>
+            <if test="username != null">AND "username" = #{username,jdbcType=VARCHAR}</if>
+            <if test="email != null">AND "email" = #{email,jdbcType=VARCHAR}</if>
+        </where>
+    </select>
+
+    <update id="updateEmailById">
+        UPDATE "users" SET "email" = #{newEmail,jdbcType=VARCHAR}
+        WHERE "id" = #{id,jdbcType=BIGINT}
+    </update>
+
+    <select id="countByUsername" resultType="long">
+        SELECT COUNT(*) FROM "users"
+        WHERE "username" = #{username,jdbcType=VARCHAR}
+    </select>
 </mapper>

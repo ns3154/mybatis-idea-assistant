@@ -2,7 +2,7 @@
 
 面向 IntelliJ IDEA 的 MyBatis 智能开发助手，采用独立实现路线开发。
 
-当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S3 已通过阶段验收，S4～S8 已完成开发并进入各自最终统一验收：
+当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S3 已通过阶段验收，S4～S9 已完成开发并进入各自最终统一验收：
 
 - 识别 Java Mapper 接口；
 - 识别 MyBatis XML 的 `namespace`；
@@ -30,6 +30,9 @@
 - 从 Database Tools 已加载且由用户明确选择的表生成 Entity、Mapper、Mapper XML 和 Service；支持 Standard/MyBatis-Plus 模板、命名、字段过滤、注释、类型/TypeHandler、自增键与关键字转义；
 - 所有数据库生成先形成全量计划，支持按文件选择、候选文本和原生差异；稳定生成区以 SHA-256 防止覆盖用户修改，区域外手写内容、未保存编辑和 LF/CRLF 均保留；
 - 批量创建与更新由单个命名 IDE Command 承载，执行前复核 TOCTOU 并创建 Local History 标签；写入异常自动回滚，冲突或失败不留半成品，整批支持一次 Undo/Redo。
+- 以确定性方法语法生成 Mapper 方法和静态/动态 XML，覆盖投影、条件、排序、聚合、Top/分页及六类数据库方言；歧义或无条件写操作在生成前拒绝；
+- 显式选择框架与版本后预览可编译的 MyBatis-Plus/Flex Wrapper，不按类路径猜测，也不使用不安全 SQL 尾部拼接；
+- 从两张同数据源、已加载表中显式选择 FK↔PK、Join 类型和输出字段后预览 Join SQL，不按列名猜测业务关系。
 
 ## 开发环境
 
@@ -81,6 +84,8 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 - [S7 类型安全 SQL 与数据库元数据验收记录](docs/S7-类型安全SQL与数据库元数据验收记录.md)
 - [S8 数据库代码生成与安全合并任务卡](docs/S8-数据库代码生成与安全合并任务卡.md)
 - [S8 数据库代码生成与安全合并验收记录](docs/S8-数据库代码生成与安全合并验收记录.md)
+- [S9 方法名 SQL、Wrapper 与 Join 任务卡](docs/S9-方法名SQL-Wrapper与Join任务卡.md)
+- [S9 方法名 SQL、Wrapper 与 Join 验收记录](docs/S9-方法名SQL-Wrapper与Join验收记录.md)
 - [风险清单](docs/风险清单.md)
 - [首批验收记录](docs/首批验收记录.md)
 - [交付完成度审计](docs/交付完成度审计.md)

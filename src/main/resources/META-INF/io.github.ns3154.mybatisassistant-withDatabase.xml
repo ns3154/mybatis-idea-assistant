@@ -32,5 +32,26 @@
                 description="从已加载的数据库表预览并安全生成 MyBatis 代码">
             <add-to-group group-id="DatabaseViewPopupMenu" anchor="last"/>
         </action>
+        <action
+                id="MyBatisAssistant.Database.GenerateMethod"
+                class="io.github.ns3154.mybatisassistant.database.intellij.MyBatisDatabaseMethodGenerateAction"
+                text="按方法名生成 MyBatis SQL…"
+                description="从单张已加载表解析方法名并预览 Mapper 方法与 XML statement">
+            <add-to-group group-id="DatabaseViewPopupMenu" anchor="last"/>
+        </action>
+        <action
+                id="MyBatisAssistant.Database.GenerateWrapper"
+                class="io.github.ns3154.mybatisassistant.database.intellij.MyBatisDatabaseWrapperGenerateAction"
+                text="生成 MyBatis Wrapper…"
+                description="从单张已加载表和确定性方法名预览 Plus/Flex Wrapper">
+            <add-to-group group-id="DatabaseViewPopupMenu" anchor="last"/>
+        </action>
+        <action
+                id="MyBatisAssistant.Database.GenerateJoin"
+                class="io.github.ns3154.mybatisassistant.database.intellij.MyBatisDatabaseJoinGenerateAction"
+                text="生成显式 Join SQL…"
+                description="从两张已加载表显式选择外键关系和输出字段并预览 Join SQL">
+            <add-to-group group-id="DatabaseViewPopupMenu" anchor="last"/>
+        </action>
     </actions>
 </idea-plugin>
