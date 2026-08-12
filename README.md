@@ -93,6 +93,8 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 - [S9 方法名 SQL、Wrapper 与 Join 验收记录](docs/S9-方法名SQL-Wrapper与Join验收记录.md)
 - [S10 转换、格式化、日志、执行与测试任务卡](docs/S10-转换格式化日志执行与测试任务卡.md)
 - [S10 转换、格式化、日志、执行与测试验收记录](docs/S10-转换格式化日志执行与测试验收记录.md)
+- [S11 Spring、注解、Kotlin、框架与数据库扩展任务卡](docs/S11-Spring注解Kotlin框架与数据库扩展任务卡.md)
+- [S11 Spring、注解、Kotlin、框架与数据库扩展验收记录](docs/S11-Spring注解Kotlin框架与数据库扩展验收记录.md)
 - [风险清单](docs/风险清单.md)
 - [首批验收记录](docs/首批验收记录.md)
 - [交付完成度审计](docs/交付完成度审计.md)

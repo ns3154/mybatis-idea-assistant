@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
  * 在一个稳定的 IDE 命令中原子写入已预览的生成计划。
  */
 public final class MyBatisGenerationCommandExecutor {
-    private static final String COMMAND_NAME = "生成 MyBatis 代码";
+    private static final String DEFAULT_COMMAND_NAME = "生成 MyBatis 代码";
 
     private MyBatisGenerationCommandExecutor() {
     }
@@ -35,13 +35,33 @@ public final class MyBatisGenerationCommandExecutor {
             @NotNull Project project,
             @NotNull VirtualFile projectRoot,
             @NotNull MyBatisGenerationPlan plan) {
-        execute(project, projectRoot, plan, WriteHook.NONE);
+        execute(project, projectRoot, plan, DEFAULT_COMMAND_NAME, WriteHook.NONE);
+    }
+
+    public static void execute(
+            @NotNull Project project,
+            @NotNull VirtualFile projectRoot,
+            @NotNull MyBatisGenerationPlan plan,
+            @NotNull String commandName) {
+        if (commandName.isBlank()) {
+            throw new IllegalArgumentException("命令名称不能为空");
+        }
+        execute(project, projectRoot, plan, commandName, WriteHook.NONE);
     }
 
     static void execute(
             @NotNull Project project,
             @NotNull VirtualFile projectRoot,
             @NotNull MyBatisGenerationPlan plan,
+            @NotNull WriteHook writeHook) {
+        execute(project, projectRoot, plan, DEFAULT_COMMAND_NAME, writeHook);
+    }
+
+    private static void execute(
+            @NotNull Project project,
+            @NotNull VirtualFile projectRoot,
+            @NotNull MyBatisGenerationPlan plan,
+            @NotNull String commandName,
             @NotNull WriteHook writeHook) {
         Objects.requireNonNull(writeHook, "writeHook");
         rejectConflicts(plan);
@@ -65,7 +85,7 @@ public final class MyBatisGenerationCommandExecutor {
                         }
                     });
                 },
-                COMMAND_NAME,
+                commandName,
                 commandGroupId);
         FileDocumentManager documentManager = FileDocumentManager.getInstance();
         changedDocuments.stream().distinct().forEach(documentManager::saveDocument);

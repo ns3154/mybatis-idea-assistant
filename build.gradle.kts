@@ -47,6 +47,8 @@ dependencies {
         bundledPlugin("com.intellij.java")
         bundledPlugin("com.intellij.database")
         bundledPlugin("org.jetbrains.kotlin")
+        bundledPlugin("com.intellij.spring")
+        bundledPlugin("org.jetbrains.plugins.yaml")
         testFramework(TestFrameworkType.Platform)
         pluginVerifier()
     }
@@ -201,6 +203,20 @@ tasks {
         ),
         "0.85",
     )
+    val frameworkAnnotationsCoverage = registerScopedCoverage(
+        "jacocoFrameworkAnnotationsCoverageVerification",
+        listOf(
+            "io/github/ns3154/mybatisassistant/inspection/MyBatisInvalidAnnotationParameterInspection*",
+            "io/github/ns3154/mybatisassistant/reference/MyBatisAnnotationParameterReference*",
+            "io/github/ns3154/mybatisassistant/reference/MyBatisAnnotationSqlSupport*",
+            "io/github/ns3154/mybatisassistant/reference/MyBatisJavaReferenceContributor*",
+            "io/github/ns3154/mybatisassistant/reference/MyBatisParameterPathResolver*",
+            "io/github/ns3154/mybatisassistant/sql/intellij/MyBatisSqlCompletionContributor*",
+            "io/github/ns3154/mybatisassistant/sqltool/annotation/**",
+            "io/github/ns3154/mybatisassistant/spring/**",
+        ),
+        "0.85",
+    )
 
     check {
         dependsOn(
@@ -211,6 +227,7 @@ tasks {
             generatorCoverage,
             methodSqlCoverage,
             logSqlCoverage,
+            frameworkAnnotationsCoverage,
         )
     }
 

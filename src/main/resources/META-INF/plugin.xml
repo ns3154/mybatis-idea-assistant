@@ -219,5 +219,13 @@
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
+        <action
+                id="MyBatisAssistant.SqlTool.MigrateAnnotationSql"
+                class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisAnnotationSqlMigrateAction"
+                text="迁移注解 SQL 到 XML…"
+                description="预览并原子移除内联 MyBatis SQL 注解、写入唯一 Mapper XML">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
     </actions>
 </idea-plugin>
