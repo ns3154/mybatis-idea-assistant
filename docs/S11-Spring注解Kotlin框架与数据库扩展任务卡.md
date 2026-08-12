@@ -26,7 +26,7 @@
 | S11-B | 注解 SQL 到 XML 的安全迁移 | 代码与自动化完成，待副屏 | 四类注解、数组拼接、转义/resultType、冲突拒绝、TOCTOU、双文件一次 Undo、动作注册测试 |
 | S11-C | Spring 显式注入关系 | 代码与自动化完成，待隔离和副屏 | 真实可选描述符 gutter、字段/构造器/参数、多 XML 候选、误报静默、Dumb/PCE 测试 |
 | S11-D | Kotlin K2 编辑器能力 | 代码与自动化完成，待隔离和副屏 | XML/注解双向导航、参数引用/补全、缺失参数/statement 检查、默认/可空参数、data class、多目标、Dumb/PCE 测试 |
-| S11-E | Plus/Flex/TkMapper 统一模型适配 | 代码与自动化完成，待远端门 | 锁定基类 FQN/真实版本契约、Java/Kotlin 实体推导、内建/自定义方法隔离、Wrapper 绑定与不支持范围拒绝 |
+| S11-E | Plus/Flex/TkMapper 统一模型适配 | 代码与本地/远端自动门完成 | 锁定基类 FQN/真实版本契约、Java/Kotlin 实体推导、内建/自定义方法隔离、Wrapper 绑定与不支持范围拒绝 |
 | S11-F | 六数据库、Community JDBC 与 Android Studio | 待开发 | 方言矩阵、PasswordSafe、无 Database/Spring 模块降级和安装冒烟 |
 
 ## 当前切面验收矩阵

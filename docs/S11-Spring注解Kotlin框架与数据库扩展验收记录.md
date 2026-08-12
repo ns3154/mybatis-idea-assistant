@@ -30,10 +30,10 @@
 - Spring/YAML bundled plugin 已进入 Gradle 依赖和锁文件，运行时仍由 optional depends 控制。
 - 当前框架切面 ZIP 为 1,253,335 字节，SHA-256 为 `7256f457aec7b39deef24eb888adbcc0a255cd69a55a42318ce6fb912a01b2fc`。
 - 注解/Spring 父切面 GitHub Actions run `31550322961` 在 6 分 39 秒内通过；当前 Kotlin 切面 run `31551824306` 在 5 分 28 秒内通过两个 Maven 语料、完整 Gradle 门、ZIP 与报告上传。
+- 当前框架切面 GitHub Actions run `31553833658` 在 6 分 45 秒内通过两个 Maven 语料、601 个平台测试、全部覆盖率门、261 Verifier、ZIP 与报告上传。
 
 ## 尚未关闭的验收项
 
-- 当前框架分支远端 CI 最终结果；
 - 当前产物 20/20 生命周期与 Kotlin、Spring、YAML、Database Tools、全部禁用共 5/5 可选依赖隔离；
 - 在真实副屏 IDEA 2026.1 验证注解参数补全/检查、双文件迁移预览与一次 Undo、Spring 字段和构造器参数 gutter；
 - S11-F 六数据库/Community JDBC/Android Studio 降级尚未开发。
