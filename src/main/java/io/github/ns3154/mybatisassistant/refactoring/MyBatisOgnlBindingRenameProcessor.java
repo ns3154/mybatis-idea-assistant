@@ -35,7 +35,8 @@ public final class MyBatisOgnlBindingRenameProcessor extends RenamePsiElementPro
             RefactoringElementListener listener) throws IncorrectOperationException {
         Declaration declaration = declaration(element);
         if (declaration == null || !element.isValid()) {
-            throw new IncorrectOperationException("MyBatis OGNL 绑定声明已失效");
+            throw new IncorrectOperationException(MyBatisRefactoringMessages.message(
+                    "refactoring.error.ognl.binding.invalid"));
         }
         for (UsageInfo usage : usages) {
             ProgressManager.checkCanceled();
@@ -60,24 +61,28 @@ public final class MyBatisOgnlBindingRenameProcessor extends RenamePsiElementPro
         if (!element.isValid()
                 || element.getProject().isDisposed()
                 || !element.getProject().isOpen()) {
-            conflicts.putValue(element, "MyBatis OGNL 绑定声明已失效，不能安全重命名");
+            conflicts.putValue(element, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.ognl.binding.invalid"));
             return;
         }
         if (newName.isBlank()
                 || !PsiNameHelper.getInstance(element.getProject()).isIdentifier(newName)) {
-            conflicts.putValue(element, "MyBatis OGNL 绑定名称必须是合法标识符");
+            conflicts.putValue(element, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.ognl.binding.name"));
             return;
         }
         if (newName.equals(declaration.value().getValue())) {
             return;
         }
         if (DumbService.isDumb(element.getProject())) {
-            conflicts.putValue(element, "索引更新期间不能安全重命名 MyBatis OGNL 绑定");
+            conflicts.putValue(element, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.ognl.binding.indexing"));
             return;
         }
         XmlTag statement = containingStatement(declaration.tag());
         if (statement == null) {
-            conflicts.putValue(element, "绑定声明不在 MyBatis statement 中，不能安全重命名");
+            conflicts.putValue(element, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.ognl.binding.statement"));
             return;
         }
         for (XmlAttributeValue candidate : PsiTreeUtil.findChildrenOfType(
@@ -87,7 +92,8 @@ public final class MyBatisOgnlBindingRenameProcessor extends RenamePsiElementPro
             if (candidate != declaration.value()
                     && newName.equals(candidate.getValue())
                     && declaration(candidate) != null) {
-                conflicts.putValue(candidate, "同一 statement 已存在 OGNL 绑定：" + newName);
+                conflicts.putValue(candidate, MyBatisRefactoringMessages.message(
+                        "refactoring.conflict.ognl.binding.duplicate", newName));
             }
         }
     }

@@ -53,11 +53,13 @@ public final class MyBatisParamRenameProcessor extends RenamePsiElementProcessor
         PsiParameter current = PsiTreeUtil.getParentOfType(element, PsiParameter.class);
         PsiMethod method = current == null ? null : PsiTreeUtil.getParentOfType(current, PsiMethod.class);
         if (newName.isBlank()) {
-            conflicts.putValue(element, "MyBatis @Param 名称不能为空");
+            conflicts.putValue(element, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.param.empty"));
             return;
         }
         if (!PsiNameHelper.getInstance(element.getProject()).isIdentifier(newName)) {
-            conflicts.putValue(element, "MyBatis @Param 名称必须是合法的 Java/OGNL 标识符");
+            conflicts.putValue(element, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.param.identifier"));
             return;
         }
         if (method == null) {
@@ -66,7 +68,8 @@ public final class MyBatisParamRenameProcessor extends RenamePsiElementProcessor
         for (PsiParameter parameter : method.getParameterList().getParameters()) {
             if (parameter != current
                     && newName.equals(MyBatisAnnotationModel.explicitParameterName(parameter))) {
-                conflicts.putValue(parameter, "同一 Mapper 方法已存在 @Param(\"" + newName + "\")");
+                conflicts.putValue(parameter, MyBatisRefactoringMessages.message(
+                        "refactoring.conflict.param.duplicate", newName));
             }
         }
         if (!conflicts.isEmpty()
@@ -75,7 +78,8 @@ public final class MyBatisParamRenameProcessor extends RenamePsiElementProcessor
             return;
         }
         if (DumbService.isDumb(element.getProject())) {
-            conflicts.putValue(element, "索引更新期间不能安全重命名 MyBatis @Param");
+            conflicts.putValue(element, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.param.indexing"));
             return;
         }
         try {
@@ -86,7 +90,8 @@ public final class MyBatisParamRenameProcessor extends RenamePsiElementProcessor
                 conflicts.putValue(conflict.element(), conflict.message());
             }
         } catch (IndexNotReadyException ignored) {
-            conflicts.putValue(element, "索引状态已变化，不能安全重命名 MyBatis @Param");
+            conflicts.putValue(element, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.param.index.changed"));
         }
     }
 

@@ -49,20 +49,22 @@ final class MyBatisParamRenameSafety {
                 || !method.isValid()
                 || project.isDisposed()
                 || !project.isOpen()) {
-            return new Conflict(literal, "MyBatis @Param 声明已失效，不能安全重命名");
+            return new Conflict(literal, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.param.declaration.invalid"));
         }
         Object literalValue = literal.getValue();
         if (!(literalValue instanceof String currentName)) {
-            return new Conflict(literal, "MyBatis @Param 名称不是静态字符串，不能安全重命名");
+            return new Conflict(literal, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.param.not.constant"));
         }
         if (MyBatisAnnotationModel.statementSource(method) != MyBatisStatementSourceKind.XML) {
-            return new Conflict(
-                    literal,
-                    "当前方法使用注解 SQL、Provider 或 Flush；S4 不改写该来源，已停止 @Param 重命名");
+            return new Conflict(literal, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.param.source.unsupported"));
         }
         PsiClass declaringMapper = method.getContainingClass();
         if (declaringMapper == null || declaringMapper.getQualifiedName() == null) {
-            return new Conflict(literal, "Mapper 类型没有稳定限定名，不能安全重命名 @Param");
+            return new Conflict(literal, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.param.mapper.name"));
         }
 
         GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
@@ -70,9 +72,8 @@ final class MyBatisParamRenameSafety {
         for (PsiClass mapperType : mapperTypes) {
             ProgressManager.checkCanceled();
             if (mapperType.findMethodsByName(method.getName(), true).length > 1) {
-                return new Conflict(
-                        literal,
-                        "同名重载方法共享 MyBatis statement，无法证明 @Param 重命名唯一，已停止写入");
+                return new Conflict(literal, MyBatisRefactoringMessages.message(
+                        "refactoring.conflict.param.overloaded"));
             }
         }
 
@@ -152,14 +153,13 @@ final class MyBatisParamRenameSafety {
             }
             String path = expression.split(",", 2)[0].trim();
             if (!directStatement || !SIMPLE_PATH.matcher(path).matches()) {
-                return new Conflict(
-                        container,
-                        directStatement
-                                ? "XML 参数表达式超出 S4 点路径边界，已停止 @Param 重命名："
-                                + expression.trim()
-                                : "被 include 的 SQL 片段仍引用 @Param(\""
-                                + currentName
-                                + "\")；S4 不在片段中改写参数，已停止重命名");
+                return new Conflict(container, directStatement
+                        ? MyBatisRefactoringMessages.message(
+                                "refactoring.conflict.param.path.unsupported",
+                                expression.trim())
+                        : MyBatisRefactoringMessages.message(
+                                "refactoring.conflict.param.include.reference",
+                                currentName));
             }
         }
         return null;
@@ -177,18 +177,13 @@ final class MyBatisParamRenameSafety {
             String attributeName = attribute.getName();
             if ("test".equals(attributeName)
                     || "bind".equals(tag.getName()) && "value".equals(attributeName)) {
-                return new Conflict(
-                        attribute,
-                        "XML 动态表达式仍引用 @Param(\""
-                                + currentName
-                                + "\")；S4 不解析完整 OGNL，已停止重命名");
+                return new Conflict(attribute, MyBatisRefactoringMessages.message(
+                        "refactoring.conflict.param.ognl.reference", currentName));
             }
             if (isModeledParameterAttribute(tag, attributeName)
                     && !isSimplePathList(value)) {
-                return new Conflict(
-                        attribute,
-                        "XML 参数属性超出 S4 点路径边界，已停止 @Param 重命名："
-                                + value.trim());
+                return new Conflict(attribute, MyBatisRefactoringMessages.message(
+                        "refactoring.conflict.param.attribute.path", value.trim()));
             }
         }
         return null;
@@ -227,9 +222,8 @@ final class MyBatisParamRenameSafety {
                 || localNamespace == null
                 || refid.contains("${")
                 || refid.contains("#{")) {
-            return new Conflict(
-                    include,
-                    "statement 含无法静态解析的 <include>；不能证明 @Param 引用已全部更新，已停止重命名");
+            return new Conflict(include, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.param.include.unresolved"));
         }
         String normalized = refid.trim();
         int separator = normalized.lastIndexOf('.');
@@ -246,11 +240,8 @@ final class MyBatisParamRenameSafety {
                 id,
                 scope);
         if (fragments.size() != 1) {
-            return new Conflict(
-                    include,
-                    "<include refid=\""
-                            + normalized
-                            + "\"> 不能唯一解析；无法证明 @Param 引用已全部更新，已停止重命名");
+            return new Conflict(include, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.param.include.ambiguous", normalized));
         }
         XmlTag fragment = fragments.getFirst();
         String fragmentKey = fragment.getContainingFile().getVirtualFile().getPath()

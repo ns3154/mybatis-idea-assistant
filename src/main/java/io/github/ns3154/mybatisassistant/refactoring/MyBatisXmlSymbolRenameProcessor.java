@@ -34,7 +34,8 @@ public final class MyBatisXmlSymbolRenameProcessor extends RenamePsiElementProce
             RefactoringElementListener listener) throws IncorrectOperationException {
         XmlTag tag = declarationTag(element);
         if (tag == null) {
-            throw new IncorrectOperationException("MyBatis XML 声明已失效");
+            throw new IncorrectOperationException(MyBatisRefactoringMessages.message(
+                    "refactoring.error.xml.symbol.invalid"));
         }
         for (UsageInfo usage : usages) {
             RenameUtil.rename(usage, newName);
@@ -57,11 +58,13 @@ public final class MyBatisXmlSymbolRenameProcessor extends RenamePsiElementProce
         if (!element.isValid()
                 || element.getProject().isDisposed()
                 || !element.getProject().isOpen()) {
-            conflicts.putValue(element, "MyBatis XML 声明已失效，不能安全重命名");
+            conflicts.putValue(element, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.xml.symbol.invalid"));
             return;
         }
         if (newName.isBlank() || newName.chars().anyMatch(Character::isWhitespace)) {
-            conflicts.putValue(element, "MyBatis XML 符号名称不能为空或包含空白");
+            conflicts.putValue(element, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.xml.symbol.name"));
             return;
         }
         XmlTag mapper = descriptor.tag().getParentTag();
@@ -69,13 +72,15 @@ public final class MyBatisXmlSymbolRenameProcessor extends RenamePsiElementProce
             return;
         }
         if (DumbService.isDumb(element.getProject())) {
-            conflicts.putValue(element, "索引更新期间不能安全重命名 MyBatis XML 符号");
+            conflicts.putValue(element, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.xml.symbol.indexing"));
             return;
         }
         String namespace = MyBatisXmlModel.namespace(mapper);
         String currentName = MyBatisXmlModel.symbolId(descriptor.tag());
         if (namespace == null || currentName == null) {
-            conflicts.putValue(element, "MyBatis XML 声明不完整，不能安全重命名");
+            conflicts.putValue(element, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.xml.symbol.incomplete"));
             return;
         }
         try {
@@ -86,7 +91,8 @@ public final class MyBatisXmlSymbolRenameProcessor extends RenamePsiElementProce
                     currentName,
                     element.getResolveScope());
             if (currentDeclarations.size() != 1) {
-                conflicts.putValue(element, "当前 MyBatis XML 符号存在多个声明，已停止重命名");
+                conflicts.putValue(element, MyBatisRefactoringMessages.message(
+                        "refactoring.conflict.xml.symbol.multiple"));
                 return;
             }
             for (XmlTag conflict : MyBatisXmlSymbolLocator.find(
@@ -96,11 +102,13 @@ public final class MyBatisXmlSymbolRenameProcessor extends RenamePsiElementProce
                     newName,
                     element.getResolveScope())) {
                 if (conflict != descriptor.tag()) {
-                    conflicts.putValue(conflict, "同一 namespace 已存在 " + newName);
+                    conflicts.putValue(conflict, MyBatisRefactoringMessages.message(
+                            "refactoring.conflict.xml.symbol.duplicate", newName));
                 }
             }
         } catch (IndexNotReadyException ignored) {
-            conflicts.putValue(element, "索引状态已变化，不能安全重命名 MyBatis XML 符号");
+            conflicts.putValue(element, MyBatisRefactoringMessages.message(
+                    "refactoring.conflict.xml.symbol.index.changed"));
         }
     }
 

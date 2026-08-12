@@ -209,6 +209,7 @@ tasks {
             "src/main/java/io/github/ns3154/mybatisassistant/generator",
             "src/main/java/io/github/ns3154/mybatisassistant/methodsql",
             "src/main/java/io/github/ns3154/mybatisassistant/model",
+            "src/main/java/io/github/ns3154/mybatisassistant/refactoring",
             "src/main/java/io/github/ns3154/mybatisassistant/sql/intellij",
             "src/main/java/io/github/ns3154/mybatisassistant/sqltool",
         )
