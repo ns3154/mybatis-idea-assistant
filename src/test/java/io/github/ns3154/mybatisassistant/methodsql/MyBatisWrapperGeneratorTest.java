@@ -1,6 +1,10 @@
 package io.github.ns3154.mybatisassistant.methodsql;
 
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
+import io.github.ns3154.mybatisassistant.model.MyBatisEntityKind;
+import io.github.ns3154.mybatisassistant.model.MyBatisEntityModel;
+import io.github.ns3154.mybatisassistant.model.MyBatisFrameworkKind;
+import io.github.ns3154.mybatisassistant.model.MyBatisFrameworkMapperBinding;
 import org.junit.Test;
 
 import java.sql.Types;
@@ -198,6 +202,44 @@ public class MyBatisWrapperGeneratorTest {
                 .getMessage().contains("Java 全限定名"));
     }
 
+    @Test
+    public void createsWrapperRequestFromUnifiedFrameworkBinding() {
+        MyBatisMethodParseResult.Success parsed = (MyBatisMethodParseResult.Success)
+                MyBatisMethodNameParser.parse("findById", SCHEMA);
+        MyBatisMethodGeneration method = MyBatisMethodSqlGenerator.generate(
+                new MyBatisMethodGenerationRequest(
+                        SCHEMA,
+                        parsed.query(),
+                        MyBatisSqlDialect.GENERIC,
+                        "com.example.User",
+                        true,
+                        Set.of()));
+
+        MyBatisWrapperGenerationRequest request =
+                MyBatisWrapperGenerationRequest.fromFrameworkBinding(
+                        SCHEMA,
+                        parsed.query(),
+                        method,
+                        binding(MyBatisFrameworkKind.MYBATIS_PLUS),
+                        "3.5.17",
+                        Set.of());
+
+        assertEquals(MyBatisWrapperFramework.MYBATIS_PLUS, request.framework());
+        assertEquals("com.example.User", request.entityType());
+        assertTrue(MyBatisWrapperGenerator.generate(request).code()
+                .contains("QueryWrapper<com.example.User>"));
+        assertTrue(assertThrows(
+                IllegalArgumentException.class,
+                () -> MyBatisWrapperGenerationRequest.fromFrameworkBinding(
+                        SCHEMA,
+                        parsed.query(),
+                        method,
+                        binding(MyBatisFrameworkKind.TK_MAPPER),
+                        "6.0.0",
+                        Set.of()))
+                .getMessage().contains("暂不支持 Wrapper"));
+    }
+
     private static MyBatisWrapperGeneration generate(
             String methodName,
             MyBatisWrapperFramework framework,
@@ -222,6 +264,18 @@ public class MyBatisWrapperGeneratorTest {
                 version,
                 "com.example.User",
                 optionalConditions));
+    }
+
+    private static MyBatisFrameworkMapperBinding binding(MyBatisFrameworkKind framework) {
+        return new MyBatisFrameworkMapperBinding(
+                framework,
+                new MyBatisEntityModel(
+                        "com.example.User",
+                        MyBatisEntityKind.CLASS,
+                        "com.example.User",
+                        List.of(),
+                        false),
+                List.of());
     }
 
     private static MyBatisMethodField field(

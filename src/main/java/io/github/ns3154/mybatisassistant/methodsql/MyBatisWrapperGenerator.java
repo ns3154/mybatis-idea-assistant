@@ -71,15 +71,7 @@ public final class MyBatisWrapperGenerator {
     private static void validateVersion(
             @NotNull MyBatisWrapperFramework framework,
             @NotNull String version) {
-        Version parsed = Version.parse(version);
-        boolean supported = switch (framework) {
-            case MYBATIS_PLUS -> parsed.major() == 3 && parsed.minor() >= 5;
-            case MYBATIS_FLEX -> parsed.major() == 1
-                    && (parsed.minor() > 7 || parsed.minor() == 7 && parsed.patch() >= 2);
-        };
-        if (!supported) {
-            throw new IllegalArgumentException("不支持的 " + framework + " 版本：" + version);
-        }
+        framework.frameworkKind().requireSupportedVersion(version);
     }
 
     private static @NotNull String wrapperType(
@@ -379,23 +371,6 @@ public final class MyBatisWrapperGenerator {
     private static @NotNull String javaString(@NotNull String value) {
         return value.replace("\\", "\\\\").replace("\"", "\\\"")
                 .replace("\n", "\\n").replace("\r", "\\r");
-    }
-
-    private record Version(int major, int minor, int patch) {
-        private static @NotNull Version parse(@NotNull String value) {
-            if (!value.matches("[0-9]+\\.[0-9]+(?:\\.[0-9]+)?")) {
-                throw new IllegalArgumentException("框架版本格式必须为 major.minor[.patch]：" + value);
-            }
-            String[] parts = value.split("\\.");
-            try {
-                return new Version(
-                        Integer.parseInt(parts[0]),
-                        Integer.parseInt(parts[1]),
-                        parts.length == 3 ? Integer.parseInt(parts[2]) : 0);
-            } catch (NumberFormatException invalid) {
-                throw new IllegalArgumentException("框架版本数字过大：" + value, invalid);
-            }
-        }
     }
 
     private static final class Counter {

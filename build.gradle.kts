@@ -210,6 +210,8 @@ tasks {
             "io/github/ns3154/mybatisassistant/inspection/MyBatisInvalidKotlinAnnotationParameterInspection*",
             "io/github/ns3154/mybatisassistant/inspection/MyBatisMissingKotlinStatementInspection*",
             "io/github/ns3154/mybatisassistant/kotlin/**",
+            "io/github/ns3154/mybatisassistant/model/MyBatisFramework*",
+            "io/github/ns3154/mybatisassistant/model/MyBatisMapperModel*",
             "io/github/ns3154/mybatisassistant/navigation/MyBatisKotlinMapperLineMarkerProvider*",
             "io/github/ns3154/mybatisassistant/reference/MyBatisAnnotationParameterReference*",
             "io/github/ns3154/mybatisassistant/reference/MyBatisAnnotationSqlSupport*",

@@ -2,7 +2,7 @@
 
 面向 IntelliJ IDEA 的 MyBatis 智能开发助手，采用独立实现路线开发。
 
-当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S3 已通过阶段验收，S4～S10 已完成开发并进入各自最终统一验收：
+当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S3 已通过阶段验收，S4～S10 已完成开发并进入各自最终统一验收，S11 正在扩展兼容矩阵：
 
 - 识别 Java Mapper 接口；
 - 识别 MyBatis XML 的 `namespace`；
@@ -14,6 +14,7 @@
 - 统一索引 Mapper namespace、四类 statement、`resultMap` 与 SQL fragment，重复声明保留全部候选；
 - 识别 Java/Kotlin K2 Mapper、继承泛型方法、参数、返回实体、注解 SQL、`@Mapper` 与 `@MapperScan` 来源；
 - 为 Kotlin K2 Mapper 提供 XML/注解双向导航、注解参数引用与补全、缺失参数/statement 保守检查；
+- 通过锁定基类 FQN 识别 MyBatis-Plus、MyBatis-Flex 与 TkMapper，推导唯一具体实体，隔离框架内建方法与自定义 XML 方法，并把 Plus/Flex 绑定安全传递给 Wrapper 生成；
 - 增量解析 MyBatis XML、Spring Boot/MyBatis-Plus 配置与 TypeAlias，并按模块依赖边界限制结果；
 - 对未保存编辑、文件移动/删除、项目根变化、Dumb Mode 和取消请求做精确失效或保守降级。
 - 为 XML `namespace`、statement `id`、`refid`、`resultMap`、`extends` 与 Java 注解 SQL/Provider 建立精确引用，支持查找使用；
