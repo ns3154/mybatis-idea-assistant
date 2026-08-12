@@ -10,6 +10,7 @@ public final class MyBatisSqlRiskClassifierTest extends BasePlatformTestCase {
         assertRisk(MyBatisSqlRisk.DDL, true, "DROP TABLE audit_log");
         assertRisk(MyBatisSqlRisk.UNKNOWN, true,
                 "WITH recent AS (SELECT * FROM users) SELECT * FROM recent");
+        assertRisk(MyBatisSqlRisk.UNKNOWN, true, "SELECT1 FROM users");
         assertRisk(MyBatisSqlRisk.UNKNOWN, true, "EXPLAIN ANALYZE SELECT * FROM users");
         assertRisk(MyBatisSqlRisk.UNKNOWN, true, "CALL rebuild_index()");
     }
@@ -45,6 +46,35 @@ public final class MyBatisSqlRiskClassifierTest extends BasePlatformTestCase {
         assertTrue(malformed.confirmationRequired());
         assertEquals(MyBatisSqlRisk.UNKNOWN, empty.risk());
         assertEquals(0, empty.statementCount());
+    }
+
+    public void testFindsKeywordOutsideStringsIdentifiersAndComments() {
+        assertEquals(
+                MyBatisSqlRiskClassifier.SqlKeywordResult.PRESENT,
+                MyBatisSqlRiskClassifier.findWhereKeyword(
+                        "UPDATE users SET active = 0 WHERE id = 1", "update"));
+        assertEquals(
+                MyBatisSqlRiskClassifier.SqlKeywordResult.ABSENT,
+                MyBatisSqlRiskClassifier.findWhereKeyword(
+                        "UPDATE users SET note = 'where', `where` = 1 /* WHERE id = 1 */",
+                        "update"));
+        assertEquals(
+                MyBatisSqlRiskClassifier.SqlKeywordResult.ABSENT,
+                MyBatisSqlRiskClassifier.findWhereKeyword(
+                        "UPDATE users SET somewhere = 1, where1 = 2, _where = 3, 中文where = 4",
+                        "update"));
+        assertEquals(
+                MyBatisSqlRiskClassifier.SqlKeywordResult.UNCERTAIN,
+                MyBatisSqlRiskClassifier.findWhereKeyword(
+                        "UPDATE users SET note = 'unterminated", "update"));
+        assertEquals(
+                MyBatisSqlRiskClassifier.SqlKeywordResult.UNCERTAIN,
+                MyBatisSqlRiskClassifier.findWhereKeyword(
+                        "UPDATE users SET active = 0; DELETE FROM users", "update"));
+        assertEquals(
+                MyBatisSqlRiskClassifier.SqlKeywordResult.UNCERTAIN,
+                MyBatisSqlRiskClassifier.findWhereKeyword(
+                        "SELECT * FROM users", "update"));
     }
 
     private void assertRisk(MyBatisSqlRisk expected, boolean confirmation, String sql) {

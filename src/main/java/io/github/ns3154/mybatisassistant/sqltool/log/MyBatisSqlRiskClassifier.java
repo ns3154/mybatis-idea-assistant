@@ -12,7 +12,9 @@ import java.util.regex.Pattern;
  * 不执行语义猜测的保守 SQL 风险分类器。
  */
 public final class MyBatisSqlRiskClassifier {
-    private static final Pattern FIRST_WORD = Pattern.compile("[A-Za-z]+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SQL_WORD = Pattern.compile(
+            "(?<![\\p{L}\\p{N}_$])[A-Za-z]+(?![\\p{L}\\p{N}_$])",
+            Pattern.CASE_INSENSITIVE);
     private static final Set<String> READ_ONLY = Set.of(
             "SELECT", "SHOW", "DESCRIBE", "DESC", "VALUES");
     private static final Set<String> WRITE = Set.of(
@@ -40,6 +42,46 @@ public final class MyBatisSqlRiskClassifier {
         }
     }
 
+    /**
+     * 判断 SQL 在字符串、引号标识符和注释之外是否包含 WHERE 关键字。
+     * 词法结构不完整或包含多条语句时返回 UNCERTAIN，由调用方保守放弃确定性判断。
+     */
+    public static @NotNull SqlKeywordResult findWhereKeyword(
+            @NotNull String sql,
+            @NotNull String expectedStatementKeyword) {
+        String expected = "WHERE";
+        try {
+            List<String> statements = MyBatisSqlLexicalScanner.scan(sql, List.of()).statements();
+            if (statements.size() != 1) {
+                return SqlKeywordResult.UNCERTAIN;
+            }
+            for (String statement : statements) {
+                Matcher matcher = SQL_WORD.matcher(statement);
+                if (!matcher.find()
+                        || !expectedStatementKeyword.equalsIgnoreCase(matcher.group())) {
+                    return SqlKeywordResult.UNCERTAIN;
+                }
+                while (matcher.find()) {
+                    if (expected.equals(matcher.group().toUpperCase(Locale.ROOT))) {
+                        return SqlKeywordResult.PRESENT;
+                    }
+                }
+            }
+            return SqlKeywordResult.ABSENT;
+        } catch (MyBatisSqlLexicalScanner.MalformedSqlException malformed) {
+            return SqlKeywordResult.UNCERTAIN;
+        }
+    }
+
+    /**
+     * 词法关键字检测结果；不完整或多语句输入必须与确定缺失区分。
+     */
+    public enum SqlKeywordResult {
+        PRESENT,
+        ABSENT,
+        UNCERTAIN
+    }
+
     private static MyBatisSqlRisk aggregate(List<String> statements) {
         if (statements.isEmpty()) {
             return MyBatisSqlRisk.UNKNOWN;
@@ -63,7 +105,7 @@ public final class MyBatisSqlRiskClassifier {
     }
 
     private static String firstWord(String statement) {
-        Matcher matcher = FIRST_WORD.matcher(statement);
+        Matcher matcher = SQL_WORD.matcher(statement);
         return matcher.find() ? matcher.group().toUpperCase(Locale.ROOT) : "";
     }
 }

@@ -136,6 +136,15 @@
                 implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisUnusedStatementInspection"/>
         <localInspection
                 language="XML"
+                shortName="MyBatisDangerousStatement"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.dangerous.statement.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="false"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisDangerousStatementInspection"/>
+        <localInspection
+                language="XML"
                 shortName="MyBatisInvalidParameterPath"
                 bundle="messages.MyBatisAssistantBundle"
                 key="inspection.invalid.parameter.path.display.name"

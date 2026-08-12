@@ -1,0 +1,13 @@
+<html>
+<body>
+报告代表 SQL 中可证明没有 <code>WHERE</code> 的 MyBatis <code>update</code> 或
+<code>delete</code> statement，帮助发现可能影响整表的写操作。
+<p>
+检查默认关闭。动态标识符、无法唯一展开的 include、结构不完整或索引不可用时保持静默；
+检测字符串、引号标识符和注释之外的 SQL 关键字，不把其中的 <code>where</code> 文本当作条件。
+</p>
+<p>
+代表 SQL 不覆盖全部运行期分支，因此检查不会声称证明所有动态路径都安全。
+</p>
+</body>
+</html>

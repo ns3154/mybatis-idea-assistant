@@ -18,6 +18,11 @@
                 language="GenericSQL"
                 order="first"
                 implementationClass="io.github.ns3154.mybatisassistant.sql.intellij.MyBatisSqlCompletionContributor"/>
+        <psi.referenceContributor
+                language="XML"
+                implementation="io.github.ns3154.mybatisassistant.database.intellij.MyBatisDatabaseObjectReferenceContributor"/>
+        <referencesSearch
+                implementation="io.github.ns3154.mybatisassistant.database.intellij.MyBatisDatabaseObjectReferencesSearchExecutor"/>
         <localInspection
                 language="XML"
                 shortName="MyBatisSqlSchema"
