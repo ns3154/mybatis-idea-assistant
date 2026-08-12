@@ -17,12 +17,15 @@ public record MyBatisMethodGenerationRequest(
         @NotNull Set<Integer> optionalConditionIndexes) {
     public MyBatisMethodGenerationRequest {
         if (entityType.isBlank()) {
-            throw new IllegalArgumentException("实体类型不能为空");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.entity.type.empty"));
         }
-        MyBatisJavaTypeValidator.requireQualifiedName(entityType, "实体类型");
+        MyBatisJavaTypeValidator.requireQualifiedName(entityType,
+                MyBatisMethodSqlMessages.message("methodsql.role.entity"));
         optionalConditionIndexes = Set.copyOf(optionalConditionIndexes);
         if (optionalConditionIndexes.stream().anyMatch(index -> index < 0)) {
-            throw new IllegalArgumentException("动态条件序号不能为负数");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.optional.condition.negative"));
         }
     }
 }

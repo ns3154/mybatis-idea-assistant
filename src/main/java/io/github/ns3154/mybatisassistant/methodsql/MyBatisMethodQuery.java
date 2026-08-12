@@ -23,7 +23,8 @@ public record MyBatisMethodQuery(
         subjectFields = List.copyOf(subjectFields);
         orders = List.copyOf(orders);
         if (limit.isPresent() && limit.getAsInt() <= 0) {
-            throw new IllegalArgumentException("方法查询条数必须大于零");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.query.limit"));
         }
     }
 }

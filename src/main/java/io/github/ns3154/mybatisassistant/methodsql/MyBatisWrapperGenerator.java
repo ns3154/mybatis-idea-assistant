@@ -26,7 +26,8 @@ public final class MyBatisWrapperGenerator {
         if (!request.optionalConditionIndexes().isEmpty()
                 && request.query().predicate().filter(MyBatisWrapperGenerator::containsOr)
                         .isPresent()) {
-            throw new IllegalArgumentException("动态可选 Wrapper 条件暂不支持 OR 组合");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.wrapper.error.optional.or"));
         }
         Map<MyBatisMethodCondition, List<MyBatisMethodParameter>> parameters =
                 conditionParameters(request, conditions);
@@ -55,16 +56,18 @@ public final class MyBatisWrapperGenerator {
                 || operation == MyBatisMethodOperation.AVERAGE
                 || operation == MyBatisMethodOperation.MINIMUM
                 || operation == MyBatisMethodOperation.MAXIMUM) {
-            throw new IllegalArgumentException("聚合投影暂不生成 Wrapper，请使用已生成 XML");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.wrapper.error.aggregate"));
         }
         if (request.framework() == MyBatisWrapperFramework.MYBATIS_FLEX
                 && operation == MyBatisMethodOperation.UPDATE) {
-            throw new IllegalArgumentException("MyBatis-Flex 更新暂不生成 QueryWrapper");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.wrapper.error.flex.update"));
         }
         if (request.framework() == MyBatisWrapperFramework.MYBATIS_PLUS
                 && (request.query().limit().isPresent() || request.query().paged())) {
-            throw new IllegalArgumentException(
-                    "MyBatis-Plus 分页必须由调用方显式传入 Page，禁止使用 last 拼接");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.wrapper.error.plus.page"));
         }
     }
 
@@ -302,7 +305,8 @@ public final class MyBatisWrapperGenerator {
             cursor += count;
         }
         if (cursor != values.size()) {
-            throw new IllegalArgumentException("方法参数与条件 AST 不一致");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.wrapper.error.parameters.mismatch"));
         }
         return result;
     }
@@ -312,10 +316,12 @@ public final class MyBatisWrapperGenerator {
             @NotNull List<MyBatisMethodCondition> conditions) {
         for (int index : indexes) {
             if (index < 0 || index >= conditions.size()) {
-                throw new IllegalArgumentException("Wrapper 动态条件序号超出范围：" + index);
+                throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                        "methodsql.wrapper.error.optional.index", index));
             }
             if (conditions.get(index).comparison().parameterCount() == 0) {
-                throw new IllegalArgumentException("无参数 Wrapper 条件不能动态忽略：" + index);
+                throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                        "methodsql.wrapper.error.optional.parameterless", index));
             }
         }
     }

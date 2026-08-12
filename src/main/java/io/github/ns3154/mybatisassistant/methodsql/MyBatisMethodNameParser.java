@@ -71,20 +71,21 @@ public final class MyBatisMethodNameParser {
             @NotNull MyBatisMethodSchema schema) {
         if (methodName.isBlank()) {
             return failure(MyBatisMethodDiagnosticCode.EMPTY_NAME, 0, methodName.length(),
-                    "方法名不能为空");
+                    MyBatisMethodSqlMessages.message("methodsql.parser.error.name.empty"));
         }
         if (methodName.length() > MAX_METHOD_NAME_LENGTH) {
             return failure(
                     MyBatisMethodDiagnosticCode.METHOD_NAME_TOO_LONG,
                     MAX_METHOD_NAME_LENGTH,
                     methodName.length() - MAX_METHOD_NAME_LENGTH,
-                    "方法名超过 " + MAX_METHOD_NAME_LENGTH + " 个字符");
+                    MyBatisMethodSqlMessages.message(
+                            "methodsql.parser.error.name.too.long", MAX_METHOD_NAME_LENGTH));
         }
         OperationPrefix operation = operation(methodName);
         if (operation == null) {
             return failure(MyBatisMethodDiagnosticCode.UNKNOWN_OPERATION, 0, methodName.length(),
-                    "方法名必须以 select/get/find/query、update/modify、delete/remove、"
-                            + "count/exists 或聚合操作开头");
+                    MyBatisMethodSqlMessages.message(
+                            "methodsql.parser.error.operation.prefix"));
         }
         String remainder = methodName.substring(operation.text().length());
         MyBatisMethodParseResult invalidLimit = invalidLimit(
@@ -103,7 +104,8 @@ public final class MyBatisMethodNameParser {
                     MyBatisMethodDiagnosticCode.AMBIGUOUS_SYNTAX,
                     operation.text().length(),
                     remainder.length(),
-                    "方法名可按多种字段或操作符组合解析，请改用无歧义字段组合");
+                    MyBatisMethodSqlMessages.message(
+                            "methodsql.parser.error.syntax.ambiguous"));
         }
         if ((operation.operation() == MyBatisMethodOperation.UPDATE
                 || operation.operation() == MyBatisMethodOperation.DELETE)
@@ -112,20 +114,23 @@ public final class MyBatisMethodNameParser {
                     MyBatisMethodDiagnosticCode.PREDICATE_REQUIRED,
                     methodName.length(),
                     0,
-                    "更新和删除必须包含 By 条件，禁止生成无条件写 SQL");
+                    MyBatisMethodSqlMessages.message(
+                            "methodsql.parser.error.predicate.required"));
         }
         if (remainder.contains("OrderBy")) {
             return failure(
                     MyBatisMethodDiagnosticCode.INVALID_ORDER,
                     operation.text().length() + remainder.indexOf("OrderBy"),
                     "OrderBy".length(),
-                    "排序字段或方向无法唯一解析");
+                    MyBatisMethodSqlMessages.message(
+                            "methodsql.parser.error.order.invalid"));
         }
         return failure(
                 MyBatisMethodDiagnosticCode.UNKNOWN_FIELD,
                 operation.text().length(),
                 remainder.length(),
-                "方法名包含未知字段、非法条件或不受支持的操作组合");
+                MyBatisMethodSqlMessages.message(
+                        "methodsql.parser.error.combination.unsupported"));
     }
 
     private static List<MyBatisMethodQuery> queryCandidates(
@@ -231,7 +236,8 @@ public final class MyBatisMethodNameParser {
                     return null;
                 }
             }
-            default -> throw new IllegalStateException("未知方法操作：" + operation);
+            default -> throw new IllegalStateException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.operation.unknown", operation));
         }
         Optional<MyBatisMethodPredicate> predicate = conditions.conditions().isEmpty()
                 ? Optional.empty()
@@ -491,7 +497,8 @@ public final class MyBatisMethodNameParser {
                 MyBatisMethodDiagnosticCode.INVALID_LIMIT,
                 absoluteOffset + digitsStart,
                 end - digitsStart,
-                "First/Top 条数必须在 1 到 " + MAX_LIMIT + " 之间");
+                MyBatisMethodSqlMessages.message(
+                        "methodsql.parser.error.limit.range", MAX_LIMIT));
     }
 
     private static OperationPrefix operation(@NotNull String methodName) {

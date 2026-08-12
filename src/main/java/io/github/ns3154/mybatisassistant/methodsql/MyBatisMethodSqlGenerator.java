@@ -49,15 +49,18 @@ public final class MyBatisMethodSqlGenerator {
             @NotNull List<MyBatisMethodCondition> conditions) {
         for (int index : request.optionalConditionIndexes()) {
             if (index >= conditions.size()) {
-                throw new IllegalArgumentException("动态条件序号超出条件数量：" + index);
+                throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                        "methodsql.generator.error.optional.index", index));
             }
             if (conditions.get(index).comparison().parameterCount() == 0) {
-                throw new IllegalArgumentException("无参数条件不能标记为动态条件：" + index);
+                throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                        "methodsql.generator.error.optional.parameterless", index));
             }
         }
         if (!request.optionalConditionIndexes().isEmpty()
                 && containsOr(request.query().predicate().orElse(null))) {
-            throw new IllegalArgumentException("含 OR 的条件树暂不允许省略单个条件，请改用静态 SQL");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.generator.error.optional.or"));
         }
     }
 
@@ -148,8 +151,8 @@ public final class MyBatisMethodSqlGenerator {
                     appendAggregate(body, request, conditions, parameters);
             case UPDATE -> appendUpdate(body, request, conditions, parameters);
             case DELETE -> appendDelete(body, request, conditions, parameters);
-            default -> throw new IllegalStateException(
-                    "未知方法操作：" + request.query().operation());
+            default -> throw new IllegalStateException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.operation.unknown", request.query().operation()));
         }
         return body.toString();
     }
@@ -218,7 +221,8 @@ public final class MyBatisMethodSqlGenerator {
                 body.append(identifier(
                         query.subjectFields().get(0).columnName(), request)).append(')');
             }
-            default -> throw new IllegalStateException("不是聚合操作：" + query.operation());
+            default -> throw new IllegalStateException(MyBatisMethodSqlMessages.message(
+                    "methodsql.generator.error.aggregate.operation", query.operation()));
         }
         body.append(" FROM ").append(identifier(request.schema().tableName(), request));
         appendWhere(body, request, conditions, parameters);
@@ -345,8 +349,8 @@ public final class MyBatisMethodSqlGenerator {
                 case STARTING_WITH -> name + " + '%'";
                 case ENDING_WITH -> "'%' + " + name;
                 case CONTAINING -> "'%' + " + name + " + '%'";
-                default -> throw new IllegalStateException(
-                        "条件不需要 bind：" + condition.comparison());
+                default -> throw new IllegalStateException(MyBatisMethodSqlMessages.message(
+                        "methodsql.generator.error.bind.unneeded", condition.comparison()));
             };
             body.append("<bind name=\"").append(xmlAttribute(values.bindName().orElseThrow()))
                     .append("\" value=\"").append(xmlAttribute(expression)).append("\"/>\n");
@@ -373,7 +377,8 @@ public final class MyBatisMethodSqlGenerator {
         if (request.query().paged()) {
             if (request.dialect() == MyBatisSqlDialect.SQL_SERVER
                     && request.query().orders().isEmpty()) {
-                throw new IllegalArgumentException("SQL Server 分页必须显式指定 OrderBy");
+                throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                        "methodsql.generator.error.sqlserver.order.required"));
             }
             String offset = "#{" + parameters.offset().orElseThrow().name() + '}';
             String size = "#{" + parameters.pageSize().orElseThrow().name() + '}';
@@ -395,7 +400,8 @@ public final class MyBatisMethodSqlGenerator {
             case MYSQL, POSTGRESQL, SQLITE, DAMENG, H2 -> body.append(" LIMIT ").append(limit);
             case GENERIC, ORACLE -> body.append(" FETCH FIRST ")
                     .append(limit).append(" ROWS ONLY");
-            case SQL_SERVER -> throw new IllegalStateException("SQL Server 已使用 TOP");
+            case SQL_SERVER -> throw new IllegalStateException(MyBatisMethodSqlMessages.message(
+                    "methodsql.generator.error.sqlserver.top.used"));
         }
     }
 
@@ -459,7 +465,9 @@ public final class MyBatisMethodSqlGenerator {
             case MINIMUM, MAXIMUM -> request.query().subjectFields().get(0).javaType();
             case SELECT -> request.query().subjectFields().size() > 1
                     ? "map" : selectElementType(request);
-            case UPDATE, DELETE -> throw new IllegalStateException("写操作没有 resultType");
+            case UPDATE, DELETE -> throw new IllegalStateException(
+                    MyBatisMethodSqlMessages.message(
+                            "methodsql.generator.error.write.result.type"));
         };
     }
 
@@ -648,7 +656,8 @@ public final class MyBatisMethodSqlGenerator {
 
         private @NotNull MyBatisMethodParameter only() {
             if (values.size() != 1) {
-                throw new IllegalStateException("条件参数数量不是 1：" + values.size());
+                throw new IllegalStateException(MyBatisMethodSqlMessages.message(
+                        "methodsql.generator.error.condition.parameter.count", values.size()));
             }
             return values.get(0);
         }

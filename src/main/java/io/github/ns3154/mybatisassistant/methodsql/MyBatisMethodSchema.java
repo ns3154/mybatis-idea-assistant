@@ -23,20 +23,24 @@ public record MyBatisMethodSchema(
         @NotNull List<MyBatisMethodField> fields) {
     public MyBatisMethodSchema {
         if (tableName.isBlank()) {
-            throw new IllegalArgumentException("方法语法的表名不能为空");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.schema.table.empty"));
         }
         fields = List.copyOf(fields);
         if (fields.isEmpty()) {
-            throw new IllegalArgumentException("方法语法至少需要一个字段");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.schema.fields.empty"));
         }
         Set<String> properties = new HashSet<>();
         Set<String> tokens = new HashSet<>();
         for (MyBatisMethodField field : fields) {
             if (!properties.add(field.propertyName())) {
-                throw new IllegalArgumentException("方法字段属性名重复：" + field.propertyName());
+                throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                        "methodsql.error.schema.property.duplicate", field.propertyName()));
             }
             if (!tokens.add(field.methodToken())) {
-                throw new IllegalArgumentException("方法字段词元重复：" + field.methodToken());
+                throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                        "methodsql.error.schema.token.duplicate", field.methodToken()));
             }
         }
     }

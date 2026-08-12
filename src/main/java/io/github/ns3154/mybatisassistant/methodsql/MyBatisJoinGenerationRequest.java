@@ -19,7 +19,8 @@ public record MyBatisJoinGenerationRequest(
         joins = List.copyOf(joins);
         selections = List.copyOf(selections);
         if (baseAlias.isBlank() || joins.isEmpty() || selections.isEmpty()) {
-            throw new IllegalArgumentException("Join 基表别名、关系和输出列不能为空");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.join.request.incomplete"));
         }
     }
 }

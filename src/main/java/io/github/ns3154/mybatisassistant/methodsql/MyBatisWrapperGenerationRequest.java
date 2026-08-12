@@ -18,9 +18,11 @@ public record MyBatisWrapperGenerationRequest(
         @NotNull Set<Integer> optionalConditionIndexes) {
     public MyBatisWrapperGenerationRequest {
         if (frameworkVersion.isBlank() || entityType.isBlank()) {
-            throw new IllegalArgumentException("Wrapper 框架版本与实体类型不能为空");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.wrapper.identity.empty"));
         }
-        MyBatisJavaTypeValidator.requireQualifiedName(entityType, "Wrapper 实体类型");
+        MyBatisJavaTypeValidator.requireQualifiedName(entityType,
+                MyBatisMethodSqlMessages.message("methodsql.role.wrapper.entity"));
         optionalConditionIndexes = Set.copyOf(optionalConditionIndexes);
     }
 
@@ -37,7 +39,9 @@ public record MyBatisWrapperGenerationRequest(
         MyBatisWrapperFramework framework = MyBatisWrapperFramework
                 .fromFrameworkKind(binding.framework())
                 .orElseThrow(() -> new IllegalArgumentException(
-                        binding.framework().displayName() + " 暂不支持 Wrapper 生成"));
+                        MyBatisMethodSqlMessages.message(
+                                "methodsql.error.wrapper.framework.unsupported",
+                                binding.framework().displayName())));
         return new MyBatisWrapperGenerationRequest(
                 schema,
                 query,

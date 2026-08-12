@@ -12,7 +12,8 @@ public record MyBatisMethodDiagnostic(
         @NotNull String message) {
     public MyBatisMethodDiagnostic {
         if (offset < 0 || length < 0 || message.isBlank()) {
-            throw new IllegalArgumentException("方法名诊断范围或文案不合法");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.diagnostic.invalid"));
         }
     }
 }

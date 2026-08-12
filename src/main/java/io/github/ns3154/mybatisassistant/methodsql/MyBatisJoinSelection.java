@@ -13,7 +13,8 @@ public record MyBatisJoinSelection(
         @NotNull Optional<String> outputAlias) {
     public MyBatisJoinSelection {
         if (tableAlias.isBlank()) {
-            throw new IllegalArgumentException("Join 输出表别名不能为空");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.join.output.alias.empty"));
         }
         outputAlias = outputAlias.map(String::trim).filter(value -> !value.isEmpty());
     }

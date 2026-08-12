@@ -20,10 +20,12 @@ public record MyBatisMethodField(
     public MyBatisMethodField {
         if (propertyName.isBlank() || methodToken.isBlank() || columnName.isBlank()
                 || javaType.isBlank()) {
-            throw new IllegalArgumentException("方法字段名称与类型不能为空");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.field.identity.empty"));
         }
         if (!Character.isUpperCase(methodToken.codePointAt(0))) {
-            throw new IllegalArgumentException("方法字段词元必须以大写字母开头：" + methodToken);
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.field.token.case", methodToken));
         }
     }
 }

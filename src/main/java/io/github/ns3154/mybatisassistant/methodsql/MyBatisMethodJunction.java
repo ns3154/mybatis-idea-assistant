@@ -13,7 +13,8 @@ public record MyBatisMethodJunction(
     public MyBatisMethodJunction {
         children = List.copyOf(children);
         if (children.size() < 2) {
-            throw new IllegalArgumentException("条件连接至少需要两个子节点");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.junction.children"));
         }
     }
 }

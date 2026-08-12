@@ -11,7 +11,8 @@ public record MyBatisJoinRelation(
         @NotNull MyBatisMethodField targetField) {
     public MyBatisJoinRelation {
         if (sourceAlias.isBlank()) {
-            throw new IllegalArgumentException("Join 来源别名不能为空");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.join.source.alias.empty"));
         }
     }
 }

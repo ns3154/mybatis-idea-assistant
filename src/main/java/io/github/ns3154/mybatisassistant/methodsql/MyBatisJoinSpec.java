@@ -15,7 +15,8 @@ public record MyBatisJoinSpec(
     public MyBatisJoinSpec {
         relations = List.copyOf(relations);
         if (targetAlias.isBlank() || relations.isEmpty()) {
-            throw new IllegalArgumentException("Join 目标别名和关联条件不能为空");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.join.spec.incomplete"));
         }
     }
 }

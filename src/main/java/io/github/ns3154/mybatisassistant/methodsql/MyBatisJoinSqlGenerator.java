@@ -21,31 +21,34 @@ public final class MyBatisJoinSqlGenerator {
 
     public static @NotNull MyBatisJoinGeneration generate(
             @NotNull MyBatisJoinGenerationRequest request) {
-        requireAlias(request.baseAlias(), "基表");
+        requireAlias(request.baseAlias(), MyBatisMethodSqlMessages.message(
+                "methodsql.role.join.base.table"));
         Map<String, MyBatisMethodSchema> schemas = new LinkedHashMap<>();
         schemas.put(request.baseAlias(), request.baseSchema());
         for (MyBatisJoinSpec join : request.joins()) {
             ProgressManager.checkCanceled();
             validateDialectJoin(request.dialect(), join.type());
-            requireAlias(join.targetAlias(), "Join 目标");
+            requireAlias(join.targetAlias(), MyBatisMethodSqlMessages.message(
+                    "methodsql.role.join.target"));
             if (schemas.containsKey(join.targetAlias())) {
-                throw new IllegalArgumentException("Join 表别名重复：" + join.targetAlias());
+                throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                        "methodsql.join.error.alias.duplicate", join.targetAlias()));
             }
             for (MyBatisJoinRelation relation : join.relations()) {
                 MyBatisMethodSchema source = schemas.get(relation.sourceAlias());
                 if (source == null) {
-                    throw new IllegalArgumentException(
-                            "Join 来源别名尚未注册：" + relation.sourceAlias());
+                    throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                            "methodsql.join.error.source.unregistered",
+                            relation.sourceAlias()));
                 }
                 requireField(source, relation.sourceField(), relation.sourceAlias());
                 requireField(join.targetSchema(), relation.targetField(), join.targetAlias());
                 if (!isForeignKeyToPrimaryKey(
                         relation.sourceField(), relation.targetField())) {
-                    throw new IllegalArgumentException(
-                            "Join 关系缺少外键到主键证据：" + relation.sourceAlias()
-                                    + "." + relation.sourceField().propertyName() + " -> "
-                                    + join.targetAlias() + "."
-                                    + relation.targetField().propertyName());
+                    throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                            "methodsql.join.error.relation.unverified",
+                            relation.sourceAlias(), relation.sourceField().propertyName(),
+                            join.targetAlias(), relation.targetField().propertyName()));
                 }
             }
             schemas.put(join.targetAlias(), join.targetSchema());
@@ -54,18 +57,20 @@ public final class MyBatisJoinSqlGenerator {
         Set<String> uniqueLabels = new LinkedHashSet<>();
         for (MyBatisJoinSelection selection : request.selections()) {
             ProgressManager.checkCanceled();
-            requireAlias(selection.tableAlias(), "输出表");
+            requireAlias(selection.tableAlias(), MyBatisMethodSqlMessages.message(
+                    "methodsql.role.join.output.table"));
             MyBatisMethodSchema schema = schemas.get(selection.tableAlias());
             if (schema == null) {
-                throw new IllegalArgumentException(
-                        "Join 输出引用未知表别名：" + selection.tableAlias());
+                throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                        "methodsql.join.error.output.alias.unknown", selection.tableAlias()));
             }
             requireField(schema, selection.field(), selection.tableAlias());
-            selection.outputAlias().ifPresent(alias -> requireAlias(alias, "输出列"));
+            selection.outputAlias().ifPresent(alias -> requireAlias(alias,
+                    MyBatisMethodSqlMessages.message("methodsql.role.join.output.column")));
             String label = selection.outputAlias().orElse(selection.field().columnName());
             if (!uniqueLabels.add(label)) {
-                throw new IllegalArgumentException(
-                        "Join 输出列标签重复，请显式设置别名：" + label);
+                throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                        "methodsql.join.error.output.label.duplicate", label));
             }
             labels.add(label);
         }
@@ -129,8 +134,8 @@ public final class MyBatisJoinSqlGenerator {
             @NotNull MyBatisMethodField field,
             @NotNull String alias) {
         if (schema.fields().stream().noneMatch(candidate -> candidate == field)) {
-            throw new IllegalArgumentException(
-                    "字段不属于 Join 表 " + alias + "：" + field.propertyName());
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.join.error.field.not.member", alias, field.propertyName()));
         }
     }
 
@@ -143,7 +148,8 @@ public final class MyBatisJoinSqlGenerator {
 
     private static void requireAlias(@NotNull String value, @NotNull String role) {
         if (!value.matches("[A-Za-z_][A-Za-z0-9_]*")) {
-            throw new IllegalArgumentException(role + "别名不是安全标识符：" + value);
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.join.error.alias.invalid", role, value));
         }
     }
 
@@ -160,12 +166,13 @@ public final class MyBatisJoinSqlGenerator {
             @NotNull MyBatisSqlDialect dialect,
             @NotNull MyBatisJoinType type) {
         if (dialect == MyBatisSqlDialect.MYSQL && type == MyBatisJoinType.FULL) {
-            throw new IllegalArgumentException("MySQL 不支持 FULL JOIN");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.join.error.mysql.full"));
         }
         if (dialect == MyBatisSqlDialect.SQLITE
                 && (type == MyBatisJoinType.RIGHT || type == MyBatisJoinType.FULL)) {
-            throw new IllegalArgumentException(
-                    "SQLite 版本差异可能不支持 RIGHT/FULL JOIN，请改用 LEFT/INNER JOIN");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.join.error.sqlite.right.full"));
         }
     }
 

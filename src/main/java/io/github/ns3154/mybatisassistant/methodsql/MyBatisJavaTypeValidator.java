@@ -13,7 +13,8 @@ final class MyBatisJavaTypeValidator {
 
     static void requireQualifiedName(@NotNull String value, @NotNull String role) {
         if (!value.contains(".") || !SourceVersion.isName(value)) {
-            throw new IllegalArgumentException(role + "必须是安全的 Java 全限定名：" + value);
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.java.type.invalid", role, value));
         }
     }
 }

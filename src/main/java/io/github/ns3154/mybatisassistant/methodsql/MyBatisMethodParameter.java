@@ -14,7 +14,8 @@ public record MyBatisMethodParameter(
         @NotNull Optional<MyBatisMethodField> field) {
     public MyBatisMethodParameter {
         if (name.isBlank() || javaType.isBlank()) {
-            throw new IllegalArgumentException("方法参数名称与类型不能为空");
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.error.parameter.identity.empty"));
         }
     }
 
