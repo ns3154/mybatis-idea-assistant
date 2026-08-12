@@ -166,6 +166,10 @@
                 serviceImplementation="io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataService"/>
         <projectService
                 serviceImplementation="io.github.ns3154.mybatisassistant.database.jdbc.MyBatisJdbcDataSourceManager"/>
+        <projectService
+                serviceImplementation="io.github.ns3154.mybatisassistant.mcp.MyBatisMcpProjectService"/>
+        <postStartupActivity
+                implementation="io.github.ns3154.mybatisassistant.mcp.MyBatisMcpStartupActivity"/>
         <applicationConfigurable
                 parentId="tools"
                 id="io.github.ns3154.mybatisassistant.settings"
@@ -187,6 +191,11 @@
         <supportsKotlinPluginMode supportsK2="true"/>
     </extensions>
     <actions>
+        <action
+                id="MyBatisAssistant.Mcp.CopyConnection"
+                class="io.github.ns3154.mybatisassistant.mcp.MyBatisMcpCopyConnectionAction">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
         <action
                 id="MyBatisAssistant.SqlTool.RestoreLogSql"
                 class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisLogSqlRestoreAction"
