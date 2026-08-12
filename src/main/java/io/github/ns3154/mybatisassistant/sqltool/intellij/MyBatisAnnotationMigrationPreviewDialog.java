@@ -8,6 +8,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBUI;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationPlan;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationPlanEntry;
 import org.jetbrains.annotations.NotNull;
@@ -29,9 +30,9 @@ final class MyBatisAnnotationMigrationPreviewDialog extends DialogWrapper {
             @NotNull MyBatisGenerationPlan plan) {
         super(project, true);
         this.plan = plan;
-        setTitle("预览注解 SQL 迁移");
-        setOKButtonText("同时更新 Java 与 XML");
-        setCancelButtonText("取消");
+        setTitle(MyBatisAssistantBundle.message("sqltool.annotation.preview.title"));
+        setOKButtonText(MyBatisAssistantBundle.message("sqltool.annotation.button.update"));
+        setCancelButtonText(MyBatisAssistantBundle.message("dialog.button.cancel"));
         setResizable(true);
         init();
     }
@@ -42,10 +43,10 @@ final class MyBatisAnnotationMigrationPreviewDialog extends DialogWrapper {
         for (MyBatisGenerationPlanEntry entry : plan.entries()) {
             JBSplitter splitter = new JBSplitter(false, 0.5f);
             splitter.setFirstComponent(textPanel(
-                    "当前文件",
+                    MyBatisAssistantBundle.message("sqltool.annotation.current.file"),
                     entry.existingText().orElse("")));
             splitter.setSecondComponent(textPanel(
-                    "迁移候选",
+                    MyBatisAssistantBundle.message("sqltool.annotation.migration.candidate"),
                     entry.proposedText().orElse("")));
             tabs.addTab(entry.artifact().relativePath(), splitter);
         }

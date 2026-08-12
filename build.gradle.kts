@@ -1,7 +1,13 @@
+import org.cyclonedx.gradle.BaseCyclonedxTask
+import org.cyclonedx.gradle.CyclonedxDirectTask
+import org.cyclonedx.model.ExternalReference
+import org.cyclonedx.model.License
+import org.cyclonedx.model.LicenseChoice
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
 import org.gradle.api.plugins.quality.Checkstyle
+import org.gradle.jvm.tasks.Jar
 import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
 import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
 import org.gradle.testing.jacoco.tasks.JacocoReport
@@ -10,6 +16,7 @@ plugins {
     java
     checkstyle
     jacoco
+    id("org.cyclonedx.bom")
     id("org.jetbrains.intellij.platform")
 }
 
@@ -66,8 +73,9 @@ intellijPlatform {
         name = "MyBatis Assistant"
         version = project.version.toString()
         description = """
-            <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
-            <p>当前开发预览版提供双向精确导航、XML/Java/Kotlin K2 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map、OGNL 语言支持、Spring 显式注入导航、Plus/Flex/TkMapper 统一模型、六数据库方言、可选 Database Tools 与 Community JDBC 元数据、表列补全与低误报 schema 检查、带全量预览和稳定生成区的数据库代码生成，以及保守转换、幂等格式化、日志 SQL 还原、受控执行与 JUnit 测试骨架。</p>
+            <p>MyBatis Assistant provides conservative MyBatis navigation, inspections, references, refactoring, dynamic SQL analysis, database metadata, code generation, and local SQL tools for IntelliJ IDEA.</p>
+            <p>支持 Java、Kotlin K2、XML、OGNL、Spring、MyBatis-Plus/Flex/TkMapper、六类数据库方言、可选 Database Tools 与 Community JDBC。所有数据库生成与 MCP 写操作都先预览，再复核冲突并使用可撤销 IDE Command。</p>
+            <p>默认离线；本地 MCP 默认关闭且只绑定 127.0.0.1，使用随机内存令牌和工具白名单。插件不包含遥测，不会把项目源码、SQL、数据库结构或凭据上传给维护者。</p>
         """.trimIndent()
 
         ideaVersion {
@@ -93,9 +101,104 @@ intellijPlatform {
             create(type, pluginVerifierIdeVersion)
         }
     }
+
+    signing {
+        certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN")
+        privateKey = providers.environmentVariable("PRIVATE_KEY")
+        password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
+    }
+
+    publishing {
+        token = providers.environmentVariable("PUBLISH_TOKEN")
+        channels = providers.gradleProperty("pluginChannel")
+            .map { listOf(it) }
+            .orElse(listOf("default"))
+        hidden = providers.gradleProperty("pluginHidden")
+            .map(String::toBoolean)
+            .orElse(false)
+    }
 }
 
 tasks {
+    named<Jar>("jar") {
+        from(rootProject.file("LICENSE")) {
+            into("META-INF")
+        }
+        from(rootProject.file("NOTICE")) {
+            into("META-INF")
+        }
+    }
+
+    withType<BaseCyclonedxTask>().configureEach {
+        // 去掉随机序列号和 CI 地址，并固定 VCS，保证同一版本与依赖锁下的 SBOM 可复现。
+        includeBomSerialNumber.set(false)
+        includeBuildSystem.set(false)
+        externalReferences.set(listOf(ExternalReference().apply {
+            type = ExternalReference.Type.VCS
+            url = "https://github.com/ns3154/mybatis-idea-assistant"
+        }))
+        licenseChoice.set(LicenseChoice().apply {
+            addLicense(License().apply {
+                id = "Apache-2.0"
+            })
+        })
+        doLast {
+            // CycloneDX 的 timestamp 为可选字段；插件默认填当前时间，会破坏字节级可复现性。
+            jsonOutput.orNull?.asFile?.takeIf(File::exists)?.let { output ->
+                output.writeText(
+                    output.readText(Charsets.UTF_8).replace(
+                        Regex("""(?m)^\s*"timestamp"\s*:\s*"[^"]+",\R"""),
+                        "",
+                    ),
+                    Charsets.UTF_8,
+                )
+            }
+            xmlOutput.orNull?.asFile?.takeIf(File::exists)?.let { output ->
+                output.writeText(
+                    output.readText(Charsets.UTF_8).replace(
+                        Regex("""(?m)^\s*<timestamp>[^<]*</timestamp>\R"""),
+                        "",
+                    ),
+                    Charsets.UTF_8,
+                )
+            }
+        }
+    }
+
+    named<CyclonedxDirectTask>("cyclonedxDirectBom") {
+        // 插件 ZIP 不捆绑 IntelliJ SDK、测试依赖或 JDBC 驱动，只审计实际运行时依赖。
+        includeConfigs.set(listOf("runtimeClasspath"))
+        includeBuildEnvironment.set(false)
+    }
+
+    val verifyCyclonedxBom = register("verifyCyclonedxBom") {
+        group = "verification"
+        description = "验证可复现 CycloneDX SBOM 的版本、许可证和敏感字段边界"
+        dependsOn("cyclonedxBom")
+        val json = layout.buildDirectory.file("reports/cyclonedx/bom.json")
+        val xml = layout.buildDirectory.file("reports/cyclonedx/bom.xml")
+        val expectedPluginVersion = project.version.toString()
+        inputs.files(json, xml)
+        doLast {
+            val jsonText = json.get().asFile.readText(Charsets.UTF_8)
+            val xmlText = xml.get().asFile.readText(Charsets.UTF_8)
+            check("\"bomFormat\" : \"CycloneDX\"" in jsonText) { "SBOM JSON 格式不正确" }
+            check("\"version\" : \"$expectedPluginVersion\"" in jsonText) { "SBOM 插件版本不正确" }
+            check("\"id\" : \"Apache-2.0\"" in jsonText) { "SBOM 未声明 Apache-2.0" }
+            check("<id>Apache-2.0</id>" in xmlText) { "SBOM XML 未声明 Apache-2.0" }
+            check("timestamp" !in jsonText && "<timestamp>" !in xmlText) {
+                "SBOM 仍包含不可复现的生成时间"
+            }
+            check("serialNumber" !in jsonText && "serialNumber=" !in xmlText) {
+                "SBOM 仍包含随机序列号"
+            }
+            val sensitiveNames = listOf("PRIVATE_KEY", "PRIVATE_KEY_PASSWORD", "PUBLISH_TOKEN")
+            check(sensitiveNames.none { it in jsonText || it in xmlText }) {
+                "SBOM 包含发布密钥字段"
+            }
+        }
+    }
+
     withType<JavaCompile>().configureEach {
         options.encoding = "UTF-8"
         options.release = 21
@@ -238,9 +341,21 @@ tasks {
         listOf("io/github/ns3154/mybatisassistant/database/jdbc/**"),
         "0.85",
     )
+    val productizationCoverage = registerScopedCoverage(
+        "jacocoProductizationCoverageVerification",
+        listOf(
+            "io/github/ns3154/mybatisassistant/mcp/**",
+            "io/github/ns3154/mybatisassistant/settings/MyBatisAssistantSettings.class",
+            "io/github/ns3154/mybatisassistant/settings/MyBatisAssistantSettings\$*.class",
+            "io/github/ns3154/mybatisassistant/settings/MyBatisAssistantSettingsCodec.class",
+            "io/github/ns3154/mybatisassistant/settings/MyBatisAssistantSettingsListener.class",
+        ),
+        "0.85",
+    )
 
     check {
         dependsOn(
+            verifyCyclonedxBom,
             "jacocoTestCoverageVerification",
             coreCoverage,
             sqlDatabaseCoverage,
@@ -248,6 +363,7 @@ tasks {
             generatorCoverage,
             methodSqlCoverage,
             databaseCompatibilityCoverage,
+            productizationCoverage,
             logSqlCoverage,
             frameworkAnnotationsCoverage,
         )

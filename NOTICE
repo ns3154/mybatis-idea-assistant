@@ -1,0 +1,9 @@
+MyBatis Assistant
+Copyright 2026 ns3154
+
+This product is licensed under the Apache License, Version 2.0.
+The complete license text is available in the LICENSE file.
+
+The plugin distribution does not bundle IntelliJ Platform, MyBatis, database
+drivers, or the build and test tools used by this source repository. Their
+names and marks remain the property of their respective owners.

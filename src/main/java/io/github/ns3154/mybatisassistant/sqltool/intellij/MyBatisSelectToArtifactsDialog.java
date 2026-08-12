@@ -8,6 +8,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -30,7 +31,8 @@ final class MyBatisSelectToArtifactsDialog extends DialogWrapper {
     private final JBTextField basePackage = new JBTextField("com.example");
     private final JBTextField mapperName = new JBTextField("UserQueryMapper");
     private final JBTextField methodName = new JBTextField("findUsers");
-    private final Action convertAction = new AbstractAction("生成预览") {
+    private final Action convertAction = new AbstractAction(MyBatisAssistantBundle.message(
+            "dialog.button.generate.preview")) {
         @Override
         public void actionPerformed(ActionEvent event) {
             convert();
@@ -43,8 +45,8 @@ final class MyBatisSelectToArtifactsDialog extends DialogWrapper {
         input.setLineWrap(false);
         output.setEditable(false);
         output.setLineWrap(false);
-        setTitle("SELECT 转 Mapper / XML / ResultMap / Java 类");
-        setCancelButtonText("关闭");
+        setTitle(MyBatisAssistantBundle.message("sqltool.select.dialog.title"));
+        setCancelButtonText(MyBatisAssistantBundle.message("dialog.button.close"));
         setResizable(true);
         init();
     }
@@ -52,15 +54,15 @@ final class MyBatisSelectToArtifactsDialog extends DialogWrapper {
     @Override
     protected @Nullable JComponent createCenterPanel() {
         JPanel options = new JPanel(new GridLayout(1, 6, JBUI.scale(6), 0));
-        options.add(new JBLabel("基础包："));
+        options.add(new JBLabel(MyBatisAssistantBundle.message("sqltool.label.base.package")));
         options.add(basePackage);
         options.add(new JBLabel("Mapper："));
         options.add(mapperName);
-        options.add(new JBLabel("方法："));
+        options.add(new JBLabel(MyBatisAssistantBundle.message("sqltool.label.method")));
         options.add(methodName);
         JPanel content = new JPanel(new GridLayout(2, 1, 0, JBUI.scale(8)));
-        content.add(section("单条 SELECT（复杂投影必须 AS 别名）", input));
-        content.add(section("只读产物预览", output));
+        content.add(section(MyBatisAssistantBundle.message("sqltool.select.section.input"), input));
+        content.add(section(MyBatisAssistantBundle.message("sqltool.section.readonly.preview"), output));
         JPanel root = new JPanel(new BorderLayout(0, JBUI.scale(8)));
         root.setBorder(JBUI.Borders.empty(6));
         root.add(options, BorderLayout.NORTH);
@@ -88,7 +90,7 @@ final class MyBatisSelectToArtifactsDialog extends DialogWrapper {
                         basePackage.getText().strip(),
                         mapperName.getText().strip(),
                         methodName.getText().strip()),
-                "在本地转换 SELECT",
+                MyBatisAssistantBundle.message("sqltool.select.progress"),
                 true,
                 project);
         output.setText(rendered);

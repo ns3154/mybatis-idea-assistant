@@ -5,6 +5,10 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
+import com.intellij.ide.plugins.IdeaPluginDescriptor;
+import com.intellij.ide.plugins.PluginManagerCore;
+import com.intellij.openapi.extensions.PluginId;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -18,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 有界 JSON-RPC MCP 协议处理器；不持有访问令牌。
  */
 final class MyBatisMcpProtocolHandler implements AutoCloseable {
+    private static final String PLUGIN_ID = "io.github.ns3154.mybatis-idea-assistant";
     static final String PROTOCOL_VERSION = "2025-06-18";
     private static final Duration SESSION_TTL = Duration.ofMinutes(30);
     private static final int MAX_SESSIONS = 64;
@@ -94,9 +99,14 @@ final class MyBatisMcpProtocolHandler implements AutoCloseable {
         result.add("capabilities", capabilities);
         JsonObject serverInfo = new JsonObject();
         serverInfo.addProperty("name", "mybatis-idea-assistant");
-        serverInfo.addProperty("version", "0.1.0-SNAPSHOT");
+        serverInfo.addProperty("version", pluginVersion());
         result.add("serverInfo", serverInfo);
         return rpcResult(id, result, sessionId);
+    }
+
+    private static @NotNull String pluginVersion() {
+        IdeaPluginDescriptor descriptor = PluginManagerCore.getPlugin(PluginId.getId(PLUGIN_ID));
+        return descriptor == null ? "unknown" : descriptor.getVersion();
     }
 
     private @NotNull MyBatisMcpHttpResponse toolsList(@Nullable JsonElement id) {
@@ -128,7 +138,8 @@ final class MyBatisMcpProtocolHandler implements AutoCloseable {
         } catch (MyBatisMcpToolException failure) {
             return toolError(id, failure.getMessage());
         } catch (RuntimeException failure) {
-            return toolError(id, "工具执行安全停止");
+            return toolError(id, MyBatisAssistantBundle.message(
+                    "mcp.error.tool.stopped"));
         }
     }
 
@@ -166,7 +177,8 @@ final class MyBatisMcpProtocolHandler implements AutoCloseable {
 
     static @NotNull String randomToken(int bytes) {
         if (bytes < 24) {
-            throw new IllegalArgumentException("MCP token 熵不得低于 192 bit");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "mcp.error.token.entropy"));
         }
         byte[] value = new byte[bytes];
         new SecureRandom().nextBytes(value);

@@ -1,0 +1,158 @@
+name: 签名发布候选
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 不带 v 的唯一插件版本
+        required: true
+        type: string
+      channel:
+        description: JetBrains Marketplace 渠道
+        required: true
+        default: rc
+        type: choice
+        options:
+          - alpha
+          - beta
+          - rc
+          - default
+      publish_marketplace:
+        description: 签名验证后发布到 JetBrains Marketplace
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sign-release:
+    name: 完整验证、签名与发布候选
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: 配置 Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: zulu
+          java-version: 21
+
+      - name: 配置 Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+
+      - name: 解析并校验版本
+        id: release
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_CHANNEL: ${{ inputs.channel }}
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            channel="default"
+          else
+            version="${INPUT_VERSION}"
+            channel="${INPUT_CHANNEL}"
+          fi
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "版本号不符合发布格式" >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "channel=${channel}" >> "${GITHUB_OUTPUT}"
+
+      - name: 验证 Java + MyBatis 样例
+        run: mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
+
+      - name: 验证完整语义语料
+        run: mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
+
+      - name: 运行完整质量门
+        run: >-
+          ./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin
+          -PpluginVersion=${{ steps.release.outputs.version }}
+
+      - name: 检查签名密钥
+        env:
+          CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+          PUBLISH_REQUESTED: ${{ inputs.publish_marketplace }}
+        run: |
+          if [[ -z "${CERTIFICATE_CHAIN}" || -z "${PRIVATE_KEY}" || -z "${PRIVATE_KEY_PASSWORD}" ]]; then
+            echo "缺少插件签名 secret，停止发布" >&2
+            exit 1
+          fi
+          if [[ "${PUBLISH_REQUESTED}" == "true" && -z "${PUBLISH_TOKEN}" ]]; then
+            echo "缺少 Marketplace 发布 token，停止发布" >&2
+            exit 1
+          fi
+
+      - name: 签名并验证签名
+        env:
+          CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
+        run: >-
+          ./gradlew signPlugin verifyPluginSignature
+          -PpluginVersion=${{ steps.release.outputs.version }}
+
+      - name: 生成发布校验文件
+        run: |
+          signed_zip="$(find build/distributions -maxdepth 1 -type f -name '*-signed.zip' -print -quit)"
+          if [[ -z "${signed_zip}" ]]; then
+            echo "未找到签名 ZIP" >&2
+            exit 1
+          fi
+          sha256sum "${signed_zip}" build/reports/cyclonedx/bom.json build/reports/cyclonedx/bom.xml \
+            > build/reports/SHA256SUMS
+          echo "SIGNED_ZIP=${signed_zip}" >> "${GITHUB_ENV}"
+
+      - name: 上传签名候选与 SBOM
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: mybatis-idea-assistant-${{ steps.release.outputs.version }}-signed
+          path: |
+            ${{ env.SIGNED_ZIP }}
+            build/reports/cyclonedx/bom.json
+            build/reports/cyclonedx/bom.xml
+            build/reports/SHA256SUMS
+
+      - name: 发布到 JetBrains Marketplace
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_marketplace }}
+        env:
+          CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+        run: >-
+          ./gradlew publishPlugin
+          -PpluginVersion=${{ steps.release.outputs.version }}
+          -PpluginChannel=${{ steps.release.outputs.channel }}
+
+      - name: 创建 GitHub 草稿 Release
+        if: ${{ github.ref_type == 'tag' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "${SIGNED_ZIP}" \
+            build/reports/cyclonedx/bom.json \
+            build/reports/cyclonedx/bom.xml \
+            build/reports/SHA256SUMS \
+            --draft \
+            --verify-tag \
+            --title "MyBatis Assistant ${{ steps.release.outputs.version }}" \
+            --notes-file CHANGELOG.md

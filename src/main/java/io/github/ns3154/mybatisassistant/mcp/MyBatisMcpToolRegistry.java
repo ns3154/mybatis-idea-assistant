@@ -3,6 +3,7 @@ package io.github.ns3154.mybatisassistant.mcp;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.intellij.openapi.project.Project;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettings;
 import org.jetbrains.annotations.NotNull;
 
@@ -23,7 +24,8 @@ final class MyBatisMcpToolRegistry {
                 .sorted(java.util.Comparator.comparing(MyBatisMcpTool::name))
                 .toList()) {
             if (byName.putIfAbsent(tool.name(), tool) != null) {
-                throw new IllegalArgumentException("MCP 工具名称重复：" + tool.name());
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "mcp.error.duplicate.tool", tool.name()));
             }
         }
         this.tools = Map.copyOf(byName);
@@ -55,10 +57,12 @@ final class MyBatisMcpToolRegistry {
         MyBatisMcpTool tool = tools.get(name);
         MyBatisAssistantSettings settings = MyBatisAssistantSettings.getInstance();
         if (tool == null || !isAllowed(tool, settings)) {
-            throw new MyBatisMcpToolException("工具未授权或不存在：" + name);
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.tool.not.allowed", name));
         }
         if (project.isDisposed() || !project.isOpen()) {
-            throw new MyBatisMcpToolException("项目已关闭");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.project.closed"));
         }
         validateArguments(tool.inputSchema(), arguments);
         return tool.invoke(project, arguments);
@@ -73,7 +77,8 @@ final class MyBatisMcpToolRegistry {
                 .collect(Collectors.toUnmodifiableSet());
         for (String requiredName : required) {
             if (!arguments.has(requiredName) || arguments.get(requiredName).isJsonNull()) {
-                throw new MyBatisMcpToolException("缺少参数：" + requiredName);
+                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                        "mcp.error.argument.missing", requiredName));
             }
         }
         for (Map.Entry<String, com.google.gson.JsonElement> entry : arguments.entrySet()) {
@@ -81,7 +86,8 @@ final class MyBatisMcpToolRegistry {
                     ? properties.getAsJsonObject(entry.getKey())
                     : null;
             if (property == null) {
-                throw new MyBatisMcpToolException("不支持的参数：" + entry.getKey());
+                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                        "mcp.error.argument.unknown", entry.getKey()));
             }
             validateValue(entry.getKey(), entry.getValue(), property);
         }
@@ -94,35 +100,40 @@ final class MyBatisMcpToolRegistry {
         String type = property.get("type").getAsString();
         if ("string".equals(type)) {
             if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()) {
-                throw new MyBatisMcpToolException("参数必须为字符串：" + name);
+                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                        "mcp.error.argument.string", name));
             }
             int maximum = property.has("maxLength")
                     ? property.get("maxLength").getAsInt()
                     : Integer.MAX_VALUE;
             if (value.getAsString().length() > maximum) {
-                throw new MyBatisMcpToolException("参数超过长度上限：" + name);
+                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                        "mcp.error.argument.too.long", name));
             }
             return;
         }
         if ("integer".equals(type)) {
             if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()
                     || !value.getAsString().matches("-?(?:0|[1-9][0-9]*)")) {
-                throw new MyBatisMcpToolException("参数必须为整数：" + name);
+                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                        "mcp.error.argument.integer", name));
             }
             try {
                 int integer = new java.math.BigDecimal(value.getAsString()).intValueExact();
                 int minimum = property.get("minimum").getAsInt();
                 int maximum = property.get("maximum").getAsInt();
                 if (integer < minimum || integer > maximum) {
-                    throw new MyBatisMcpToolException(
-                            "参数超出允许范围：" + name);
+                    throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                            "mcp.error.argument.range", name));
                 }
             } catch (ArithmeticException failure) {
-                throw new MyBatisMcpToolException("参数必须为整数：" + name);
+                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                        "mcp.error.argument.integer", name));
             }
             return;
         }
-        throw new MyBatisMcpToolException("不支持的参数类型：" + name);
+        throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                "mcp.error.argument.type.unsupported", name));
     }
 
     private static boolean isAllowed(

@@ -83,7 +83,8 @@ final class MyBatisAssistantSettingsTransferDialog extends DialogWrapper {
 
     @NotNull MyBatisAssistantSettings.SettingsState importedState() {
         if (!importMode || importedState == null) {
-            throw new IllegalStateException("导入设置尚未通过校验");
+            throw new IllegalStateException(MyBatisAssistantBundle.message(
+                    "settings.import.error.not.validated"));
         }
         return importedState.copyAndNormalize();
     }

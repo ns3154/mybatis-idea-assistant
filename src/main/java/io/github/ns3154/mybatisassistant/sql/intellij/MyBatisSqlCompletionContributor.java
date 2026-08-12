@@ -17,6 +17,7 @@ import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.psi.xml.XmlText;
 import com.intellij.sql.psi.SqlAsExpression;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataService;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseSnapshot;
@@ -67,10 +68,12 @@ public final class MyBatisSqlCompletionContributor extends CompletionContributor
         Map<String, LookupElementBuilder> candidates = new LinkedHashMap<>();
         COMMON_KEYWORDS.forEach(keyword -> candidates.put(
                 "keyword:" + keyword,
-                LookupElementBuilder.create(keyword).withTypeText("SQL 关键字", true)));
+                LookupElementBuilder.create(keyword).withTypeText(MyBatisAssistantBundle.message(
+                        "completion.sql.keyword"), true)));
         COMMON_FUNCTIONS.forEach(function -> candidates.put(
                 "function:" + function,
-                LookupElementBuilder.create(function).withTypeText("SQL 函数", true)));
+                LookupElementBuilder.create(function).withTypeText(MyBatisAssistantBundle.message(
+                        "completion.sql.function"), true)));
         if (statement != null) {
             addAliases(statement, candidates);
         } else {
@@ -92,8 +95,9 @@ public final class MyBatisSqlCompletionContributor extends CompletionContributor
             }
             for (MyBatisDatabaseTable table : snapshot.tables()) {
                 ProgressManager.checkCanceled();
-                String tableContext = table.schema().map(schema -> "表 · " + schema)
-                        .orElse("表");
+                String tableContext = table.schema().map(schema -> MyBatisAssistantBundle.message(
+                                "completion.sql.table.schema", schema))
+                        .orElseGet(() -> MyBatisAssistantBundle.message("completion.sql.table"));
                 candidates.putIfAbsent(
                         "table:" + table.name().toLowerCase(java.util.Locale.ROOT),
                         LookupElementBuilder.create(table.name())
@@ -103,7 +107,8 @@ public final class MyBatisSqlCompletionContributor extends CompletionContributor
                     candidates.putIfAbsent(
                             "column:" + column.name().toLowerCase(java.util.Locale.ROOT),
                             LookupElementBuilder.create(column.name())
-                                    .withTypeText("列 · " + table.name(), true));
+                                    .withTypeText(MyBatisAssistantBundle.message(
+                                            "completion.sql.column.table", table.name()), true));
                 }
             }
         }
@@ -136,7 +141,8 @@ public final class MyBatisSqlCompletionContributor extends CompletionContributor
             String alias = expression.getNameElement().getName();
             candidates.putIfAbsent(
                     "alias:" + alias,
-                    LookupElementBuilder.create(alias).withTypeText("SQL 别名", true));
+                    LookupElementBuilder.create(alias).withTypeText(MyBatisAssistantBundle.message(
+                            "completion.sql.alias"), true));
         }
     }
 
@@ -150,7 +156,8 @@ public final class MyBatisSqlCompletionContributor extends CompletionContributor
             candidates.putIfAbsent(
                     "parameter:" + variant,
                     LookupElementBuilder.create(variant)
-                            .withTypeText("MyBatis 参数", true));
+                            .withTypeText(MyBatisAssistantBundle.message(
+                                    "completion.mybatis.parameter"), true));
         }
     }
 

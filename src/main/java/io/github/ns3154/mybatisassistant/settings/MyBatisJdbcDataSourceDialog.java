@@ -9,6 +9,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import io.github.ns3154.mybatisassistant.database.jdbc.MyBatisJdbcDataSourceConfig;
 import org.jetbrains.annotations.NotNull;
@@ -28,7 +29,8 @@ final class MyBatisJdbcDataSourceDialog extends DialogWrapper {
     private final String id;
     private final boolean newSource;
     private final String originalUsername;
-    private final JBCheckBox enabled = new JBCheckBox("启用此数据源", true);
+    private final JBCheckBox enabled = new JBCheckBox(MyBatisAssistantBundle.message(
+            "settings.jdbc.source.enabled"), true);
     private final JBTextField displayName = new JBTextField();
     private final JComboBox<MyBatisSqlDialect> dialect = new JComboBox<>(Arrays.stream(
             MyBatisSqlDialect.values())
@@ -38,7 +40,8 @@ final class MyBatisJdbcDataSourceDialog extends DialogWrapper {
     private final JBTextField driverClass = new JBTextField();
     private final JBTextArea driverJars = new JBTextArea(3, 40);
     private final JBTextField username = new JBTextField();
-    private final JBCheckBox passwordRequired = new JBCheckBox("使用 PasswordSafe 密码", true);
+    private final JBCheckBox passwordRequired = new JBCheckBox(MyBatisAssistantBundle.message(
+            "settings.jdbc.source.password.safe"), true);
     private final JBPasswordField password = new JBPasswordField();
     private final JBTextField catalog = new JBTextField();
     private final JBTextField schema = new JBTextField();
@@ -51,7 +54,9 @@ final class MyBatisJdbcDataSourceDialog extends DialogWrapper {
         newSource = original == null;
         id = newSource ? UUID.randomUUID().toString() : original.config.id();
         originalUsername = newSource ? "" : original.config.username();
-        setTitle(newSource ? "新增 MyBatis JDBC 数据源" : "编辑 MyBatis JDBC 数据源");
+        setTitle(MyBatisAssistantBundle.message(newSource
+                ? "settings.jdbc.source.title.add"
+                : "settings.jdbc.source.title.edit"));
         if (original != null) {
             MyBatisJdbcDataSourceConfig config = original.config;
             enabled.setSelected(config.enabled());
@@ -65,7 +70,9 @@ final class MyBatisJdbcDataSourceDialog extends DialogWrapper {
             catalog.setText(config.catalog().orElse(""));
             schema.setText(config.schema().orElse(""));
         }
-        password.setToolTipText(newSource ? "密码只保存到 PasswordSafe" : "留空表示保持现有密码");
+        password.setToolTipText(MyBatisAssistantBundle.message(newSource
+                ? "settings.jdbc.source.password.tip.new"
+                : "settings.jdbc.source.password.tip.edit"));
         init();
     }
 
@@ -73,17 +80,27 @@ final class MyBatisJdbcDataSourceDialog extends DialogWrapper {
     protected @Nullable JComponent createCenterPanel() {
         return FormBuilder.createFormBuilder()
                 .addComponent(enabled)
-                .addLabeledComponent("名称：", displayName)
-                .addLabeledComponent("方言：", dialect)
-                .addLabeledComponent("JDBC URL：", jdbcUrl)
-                .addLabeledComponent("驱动类：", driverClass)
-                .addLabeledComponent("驱动 JAR（每行一个绝对路径）：",
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "settings.jdbc.source.label.name"), displayName)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "settings.jdbc.source.label.dialect"), dialect)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "settings.jdbc.source.label.url"), jdbcUrl)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "settings.jdbc.source.label.driver.class"), driverClass)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "settings.jdbc.source.label.driver.jars"),
                         new JBScrollPane(driverJars))
-                .addLabeledComponent("用户名：", username)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "settings.jdbc.source.label.username"), username)
                 .addComponent(passwordRequired)
-                .addLabeledComponent(newSource ? "密码：" : "新密码（留空不修改）：", password)
-                .addLabeledComponent("Catalog（可选）：", catalog)
-                .addLabeledComponent("Schema（可选）：", schema)
+                .addLabeledComponent(MyBatisAssistantBundle.message(newSource
+                        ? "settings.jdbc.source.label.password"
+                        : "settings.jdbc.source.label.password.new"), password)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "settings.jdbc.source.label.catalog"), catalog)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "settings.jdbc.source.label.schema"), schema)
                 .getPanel();
     }
 
@@ -97,13 +114,15 @@ final class MyBatisJdbcDataSourceDialog extends DialogWrapper {
         try {
             MyBatisJdbcDataSourceConfig config = createConfig();
             if (config.driverJarPaths().isEmpty()) {
-                return new ValidationInfo("请至少选择一个 JDBC 驱动 JAR", driverJars);
+                return new ValidationInfo(MyBatisAssistantBundle.message(
+                        "settings.jdbc.source.validation.driver.jar"), driverJars);
             }
             if (config.passwordRequired()
                     && (newSource || !originalUsername.equals(config.username()))
                     && !hasEnteredPassword()) {
                 return new ValidationInfo(
-                        "新增数据源或修改用户名时需要输入 PasswordSafe 密码", password);
+                        MyBatisAssistantBundle.message(
+                                "settings.jdbc.source.validation.password"), password);
             }
             return null;
         } catch (IllegalArgumentException failure) {
@@ -129,7 +148,8 @@ final class MyBatisJdbcDataSourceDialog extends DialogWrapper {
 
     @NotNull MyBatisJdbcDataSourcesPanel.Entry entry() {
         if (result == null) {
-            throw new IllegalStateException("数据源对话框尚未确认");
+            throw new IllegalStateException(MyBatisAssistantBundle.message(
+                    "settings.jdbc.source.error.not.confirmed"));
         }
         return result;
     }

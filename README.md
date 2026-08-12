@@ -2,7 +2,7 @@
 
 面向 IntelliJ IDEA 的 MyBatis 智能开发助手，采用独立实现路线开发。
 
-当前处于 `0.1.0-SNAPSHOT` 开发预览阶段，S0～S3 已通过阶段验收，S4～S10 已完成开发并进入各自最终统一验收，S11 正在扩展兼容矩阵：
+当前处于 `0.1.0-SNAPSHOT` 发布候选开发阶段：S0～S11 已形成阶段实现与验收记录，S12 正在收口设置、默认关闭的本地 MCP、国际化、隐私、SBOM、签名和发布链路。正式交付仍以统一质量门、支持矩阵及副屏实机安装/升级/卸载证据为准。
 
 - 识别 Java Mapper 接口；
 - 识别 MyBatis XML 的 `namespace`；
@@ -41,6 +41,9 @@
 - 幂等格式化 MyBatis XML，保留动态标签、CDATA、注释和换行风格；先预览，再以一个命令写入并支持 Undo；
 - 通过显式参数面板受控执行单条 SQL：只读事务回滚，危险 SQL 两次确认后提交，结果有界、可取消且日志对象脱敏；数据库能力仅在 Database Tools 可选依赖存在时启用；
 - 从当前 Mapper 抽象方法生成 JUnit 5/Jupiter 或 JUnit 4 只读测试骨架，不写文件、不连接数据库。
+- 提供 schema v2 的非敏感设置迁移、确定性导入导出、恢复默认和中英文界面语言覆盖；损坏、未来版本和敏感键整体拒绝。
+- 提供默认关闭、只绑定 `127.0.0.1` 的项目级 MCP；随机内存令牌、会话、Host/Origin、请求体上限和白名单共同守门，写工具仍须 preview→confirm 并支持 Undo/失败回滚。
+- 生成可复现 CycloneDX 1.6 SBOM；正式发布只从 CI secret 注入签名材料和 Marketplace token，仓库不保存私钥或运行期凭据。
 
 ## 开发环境
 
@@ -55,6 +58,7 @@
 mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
 mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 ./gradlew check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin
+./gradlew verifyCyclonedxBom
 ./scripts/verify-sandbox-lifecycle.sh 20
 ./scripts/verify-optional-dependency-isolation.sh
 ./gradlew runIde
@@ -98,6 +102,10 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 - [S10 转换、格式化、日志、执行与测试验收记录](docs/S10-转换格式化日志执行与测试验收记录.md)
 - [S11 Spring、注解、Kotlin、框架与数据库扩展任务卡](docs/S11-Spring注解Kotlin框架与数据库扩展任务卡.md)
 - [S11 Spring、注解、Kotlin、框架与数据库扩展验收记录](docs/S11-Spring注解Kotlin框架与数据库扩展验收记录.md)
+- [S12 MCP、设置、国际化与产品化任务卡](docs/S12-MCP设置国际化与产品化任务卡.md)
+- [隐私说明](docs/隐私说明.md)
+- [第三方组件与 SBOM](docs/第三方组件与SBOM.md)
+- [发布、升级与回滚](docs/发布升级与回滚.md)
 - [风险清单](docs/风险清单.md)
 - [首批验收记录](docs/首批验收记录.md)
 - [交付完成度审计](docs/交付完成度审计.md)
@@ -109,4 +117,4 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 
 ## 许可证
 
-本项目采用 [Apache License 2.0](LICENSE) 许可证。
+本项目采用 [Apache License 2.0](LICENSE) 许可证，并提供发布署名与分发边界说明 [NOTICE](NOTICE)。

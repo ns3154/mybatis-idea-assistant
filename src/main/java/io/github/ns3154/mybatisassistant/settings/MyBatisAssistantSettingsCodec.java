@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.settings;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.charset.StandardCharsets;
@@ -52,12 +53,14 @@ public final class MyBatisAssistantSettingsCodec {
     public static @NotNull MyBatisAssistantSettings.SettingsState decode(
             @NotNull String content) {
         if (content.getBytes(StandardCharsets.UTF_8).length > MAX_BYTES) {
-            throw new IllegalArgumentException("设置导入内容超过 64 KiB 上限");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "settings.import.error.too.large"));
         }
         Map<String, String> values = parse(content);
         int schemaVersion = integer(values.getOrDefault("schemaVersion", "1"), "schemaVersion");
         if (schemaVersion < 1 || schemaVersion > MyBatisAssistantSettings.CURRENT_SCHEMA_VERSION) {
-            throw new IllegalArgumentException("不支持的设置 schemaVersion：" + schemaVersion);
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "settings.import.error.schema.version", schemaVersion));
         }
 
         MyBatisAssistantSettings.SettingsState state = new MyBatisAssistantSettings.SettingsState();
@@ -93,16 +96,19 @@ public final class MyBatisAssistantSettingsCodec {
             }
             int separator = line.indexOf('=');
             if (separator <= 0) {
-                throw new IllegalArgumentException("设置导入第 " + (index + 1) + " 行格式无效");
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "settings.import.error.line", index + 1));
             }
             String key = line.substring(0, separator).trim();
             String value = line.substring(separator + 1).trim();
             rejectSensitiveKey(key);
             if (!KNOWN_KEYS.contains(key)) {
-                throw new IllegalArgumentException("设置导入包含未知字段：" + key);
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "settings.import.error.unknown.key", key));
             }
             if (values.putIfAbsent(key, value) != null) {
-                throw new IllegalArgumentException("设置导入包含重复字段：" + key);
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "settings.import.error.duplicate.key", key));
             }
         }
         return values;
@@ -111,7 +117,8 @@ public final class MyBatisAssistantSettingsCodec {
     private static void rejectSensitiveKey(@NotNull String key) {
         String normalized = key.toLowerCase(java.util.Locale.ROOT).replace("_", "");
         if (SENSITIVE_FRAGMENTS.stream().anyMatch(normalized::contains)) {
-            throw new IllegalArgumentException("设置导入不得包含敏感字段：" + key);
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "settings.import.error.sensitive.key", key));
         }
     }
 
@@ -119,7 +126,8 @@ public final class MyBatisAssistantSettingsCodec {
         return switch (value) {
             case "true" -> true;
             case "false" -> false;
-            default -> throw new IllegalArgumentException("设置字段 " + key + " 必须为 true 或 false");
+            default -> throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "settings.import.error.boolean", key));
         };
     }
 
@@ -127,14 +135,16 @@ public final class MyBatisAssistantSettingsCodec {
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException failure) {
-            throw new IllegalArgumentException("设置字段 " + key + " 必须为整数", failure);
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "settings.import.error.integer", key), failure);
         }
     }
 
     private static int port(@NotNull String value) {
         int port = integer(value, "mcpPort");
         if (port != 0 && (port < 1024 || port > 65535)) {
-            throw new IllegalArgumentException("mcpPort 必须为 0 或 1024～65535");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "settings.import.error.port"));
         }
         return port;
     }
@@ -145,17 +155,20 @@ public final class MyBatisAssistantSettingsCodec {
         }
         String[] candidates = value.split(",", -1);
         if (candidates.length > 64) {
-            throw new IllegalArgumentException("MCP 工具白名单超过 64 项上限");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "settings.import.error.tool.limit"));
         }
         List<String> tools = new ArrayList<>();
         Set<String> unique = new HashSet<>();
         for (String candidate : candidates) {
             String tool = candidate.trim();
             if (!TOOL_ID.matcher(tool).matches()) {
-                throw new IllegalArgumentException("MCP 工具 ID 无效：" + tool);
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "settings.import.error.tool.id", tool));
             }
             if (!unique.add(tool)) {
-                throw new IllegalArgumentException("MCP 工具白名单包含重复项：" + tool);
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "settings.import.error.tool.duplicate", tool));
             }
             tools.add(tool);
         }
@@ -167,7 +180,8 @@ public final class MyBatisAssistantSettingsCodec {
         return switch (value) {
             case "system" -> "";
             case "en", "zh-CN" -> value;
-            default -> throw new IllegalArgumentException("uiLocale 只支持 system、en 或 zh-CN");
+            default -> throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "settings.import.error.locale"));
         };
     }
 }

@@ -40,7 +40,8 @@ final class MyBatisJdbcDataSourcesPanel {
         list.setCellRenderer(SimpleListCellRenderer.create(
                 "",
                 entry -> entry.config.displayName() + "  ·  " + entry.config.dialect()
-                        + (entry.config.enabled() ? "" : "  ·  已禁用")));
+                        + (entry.config.enabled() ? "" : MyBatisAssistantBundle.message(
+                                "settings.jdbc.source.disabled.suffix"))));
         JComponent listPanel = ToolbarDecorator.createDecorator(list)
                 .setAddAction(ignored -> addSource())
                 .setEditAction(ignored -> editSelected())

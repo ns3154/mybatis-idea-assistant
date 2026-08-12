@@ -7,6 +7,7 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBUI;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -29,9 +30,9 @@ final class MyBatisXmlFormatPreviewDialog extends DialogWrapper {
         super(project, true);
         this.original = original;
         this.formatted = formatted;
-        setTitle("预览 MyBatis XML 格式化");
-        setOKButtonText("应用格式化");
-        setCancelButtonText("取消");
+        setTitle(MyBatisAssistantBundle.message("sqltool.format.preview.title"));
+        setOKButtonText(MyBatisAssistantBundle.message("sqltool.format.button.apply"));
+        setCancelButtonText(MyBatisAssistantBundle.message("dialog.button.cancel"));
         setResizable(true);
         init();
     }
@@ -39,8 +40,10 @@ final class MyBatisXmlFormatPreviewDialog extends DialogWrapper {
     @Override
     protected @Nullable JComponent createCenterPanel() {
         JBSplitter splitter = new JBSplitter(false, 0.5f);
-        splitter.setFirstComponent(textPanel("格式化前", original));
-        splitter.setSecondComponent(textPanel("格式化后", formatted));
+        splitter.setFirstComponent(textPanel(MyBatisAssistantBundle.message(
+                "sqltool.format.before"), original));
+        splitter.setSecondComponent(textPanel(MyBatisAssistantBundle.message(
+                "sqltool.format.after"), formatted));
         splitter.setPreferredSize(new Dimension(1100, 650));
         return splitter;
     }

@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationCommandExecutor;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationPlan;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationPlanStatus;
@@ -32,17 +33,20 @@ final class MyBatisMcpWritePreviewStore implements AutoCloseable {
             @NotNull MyBatisGenerationPlan plan) {
         cleanupExpired();
         if (previews.size() >= MAX_PENDING) {
-            throw new MyBatisMcpToolException("待确认预览已达到 64 个上限");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.preview.limit"));
         }
         if (!plan.hasChanges() || plan.hasConflicts()) {
-            throw new MyBatisMcpToolException("预览不包含可安全确认的写入");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.preview.no.safe.change"));
         }
         long characters = plan.entries().stream()
                 .mapToLong(entry -> entry.proposedText().map(String::length).orElse(0)
                         + entry.existingText().map(String::length).orElse(0))
                 .sum();
         if (characters > MAX_PREVIEW_CHARS) {
-            throw new MyBatisMcpToolException("预览内容超过 2 MiB 上限");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.preview.too.large"));
         }
         String token = MyBatisMcpProtocolHandler.randomToken(24);
         previews.put(token, new PendingPreview(operation, plan, System.nanoTime()));
@@ -56,11 +60,13 @@ final class MyBatisMcpWritePreviewStore implements AutoCloseable {
             preview = previews.remove(token);
         }
         if (preview == null) {
-            throw new MyBatisMcpToolException("预览令牌不存在、已过期或已使用");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.preview.token.invalid"));
         }
         VirtualFile projectRoot = ProjectUtil.guessProjectDir(project);
         if (projectRoot == null || !projectRoot.isValid()) {
-            throw new MyBatisMcpToolException("无法确定当前项目目录");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.project.root.unavailable"));
         }
         RuntimeException[] failure = new RuntimeException[1];
         ApplicationManager.getApplication().invokeAndWait(() -> {
@@ -69,14 +75,15 @@ final class MyBatisMcpWritePreviewStore implements AutoCloseable {
                         project,
                         projectRoot,
                         preview.plan,
-                        "MCP 确认：" + preview.operation);
+                        MyBatisAssistantBundle.message(
+                                "mcp.command.confirm", preview.operation));
             } catch (RuntimeException problem) {
                 failure[0] = problem;
             }
         });
         if (failure[0] != null) {
             throw new MyBatisMcpToolException(failure[0].getMessage() == null
-                    ? "MCP 写入安全停止"
+                    ? MyBatisAssistantBundle.message("mcp.error.write.stopped")
                     : failure[0].getMessage());
         }
         return new Confirmation(

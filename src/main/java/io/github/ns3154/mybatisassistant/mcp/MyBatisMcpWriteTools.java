@@ -21,6 +21,7 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.xml.XmlFile;
 import com.intellij.psi.xml.XmlTag;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataService;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseSnapshot;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
@@ -109,13 +110,14 @@ final class MyBatisMcpWriteTools {
 
         @Override
         public @NotNull String description() {
-            return "使用一次性令牌确认已预览的生成计划";
+            return MyBatisAssistantBundle.message("mcp.tool.generation.confirm.description");
         }
 
         @Override
         protected @NotNull JsonObject properties() {
             JsonObject properties = new JsonObject();
-            properties.add("previewToken", stringSchema("一次性预览令牌"));
+            properties.add("previewToken", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.preview.token")));
             return properties;
         }
 
@@ -136,7 +138,8 @@ final class MyBatisMcpWriteTools {
             JsonArray paths = new JsonArray();
             confirmation.paths().forEach(paths::add);
             result.add("paths", paths);
-            result.addProperty("undo", "可在 IDE 中使用一次 Undo 撤销整批写入");
+            result.addProperty("undo", MyBatisAssistantBundle.message(
+                    "mcp.result.undo.available"));
             return result;
         }
     }
@@ -153,17 +156,23 @@ final class MyBatisMcpWriteTools {
 
         @Override
         public @NotNull String description() {
-            return "从已加载表元数据预览 Entity、Mapper、XML 和 Service";
+            return MyBatisAssistantBundle.message(
+                    "mcp.tool.generation.preview.crud.description");
         }
 
         @Override
         protected @NotNull JsonObject properties() {
             JsonObject properties = new JsonObject();
-            properties.add("dataSourceId", stringSchema("数据源 ID"));
-            properties.add("schema", stringSchema("可选 schema"));
-            properties.add("table", stringSchema("表名"));
-            properties.add("basePackage", stringSchema("生成基础包"));
-            properties.add("template", stringSchema("STANDARD 或 MYBATIS_PLUS"));
+            properties.add("dataSourceId", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.data.source.id")));
+            properties.add("schema", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.schema.optional")));
+            properties.add("table", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.table.name")));
+            properties.add("basePackage", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.base.package")));
+            properties.add("template", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.template.crud")));
             return properties;
         }
 
@@ -186,20 +195,25 @@ final class MyBatisMcpWriteTools {
                     : enumValue(MyBatisGenerationTemplateGroup.class, templateName, "template");
             MyBatisDatabaseSnapshot snapshot = MyBatisDatabaseMetadataService.getInstance(project)
                     .latest()
-                    .orElseThrow(() -> new MyBatisMcpToolException("数据库元数据尚未加载"))
+                    .orElseThrow(() -> new MyBatisMcpToolException(
+                            MyBatisAssistantBundle.message(
+                                    "mcp.error.database.metadata.not.loaded")))
                     .snapshots().stream()
                     .filter(candidate -> dataSourceId.equals(candidate.dataSourceId()))
                     .findFirst()
                     .orElseThrow(() -> new MyBatisMcpToolException(
-                            "未找到已加载数据源：" + dataSourceId));
+                            MyBatisAssistantBundle.message(
+                                    "mcp.error.data.source.not.loaded", dataSourceId)));
             List<MyBatisDatabaseTable> matching = snapshot.tables().stream()
                     .filter(table -> tableName.equals(table.name()))
                     .filter(table -> schema.isEmpty() || table.schema().map(schema::equals).orElse(false))
                     .toList();
             if (matching.size() != 1) {
-                throw new MyBatisMcpToolException(matching.isEmpty()
-                        ? "未找到精确表：" + tableName
-                        : "表名不唯一，请提供 schema：" + tableName);
+                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                        matching.isEmpty()
+                                ? "mcp.error.table.not.found"
+                                : "mcp.error.table.ambiguous",
+                        tableName));
             }
             MyBatisGenerationConfiguration standard =
                     MyBatisGenerationConfiguration.standard(basePackage);
@@ -223,7 +237,8 @@ final class MyBatisMcpWriteTools {
                             configuration));
             MyBatisGenerationPlan plan = read(project, () -> MyBatisGenerationPlanner.plan(
                     project, projectRoot(project), List.of(bundle)));
-            return preview("生成 CRUD", plan, previewStore);
+            return preview(MyBatisAssistantBundle.message(
+                    "mcp.operation.generate.crud"), plan, previewStore);
         }
     }
 
@@ -239,15 +254,19 @@ final class MyBatisMcpWriteTools {
 
         @Override
         public @NotNull String description() {
-            return "向唯一 Mapper XML 预览新增空 statement";
+            return MyBatisAssistantBundle.message(
+                    "mcp.tool.generation.preview.statement.description");
         }
 
         @Override
         protected @NotNull JsonObject properties() {
             JsonObject properties = new JsonObject();
-            properties.add("namespace", stringSchema("Mapper namespace"));
-            properties.add("statementId", stringSchema("statement id"));
-            properties.add("statementTag", stringSchema("select、insert、update 或 delete"));
+            properties.add("namespace", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.mapper.namespace")));
+            properties.add("statementId", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.statement.id")));
+            properties.add("statementTag", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.statement.tag")));
             return properties;
         }
 
@@ -264,14 +283,17 @@ final class MyBatisMcpWriteTools {
             String statementId = requiredString(arguments, "statementId");
             String statementTag = requiredString(arguments, "statementTag");
             if (!STATEMENT_TAGS.contains(statementTag)) {
-                throw new MyBatisMcpToolException("statementTag 不受支持：" + statementTag);
+                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                        "mcp.error.statement.tag.unsupported", statementTag));
             }
             if (!statementId.matches("[A-Za-z_$][A-Za-z0-9_.$-]{0,255}")) {
-                throw new MyBatisMcpToolException("statementId 格式无效");
+                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                        "mcp.error.statement.id.invalid"));
             }
             MyBatisGenerationPlan plan = read(project, () -> statementPlan(
                     project, namespace, statementId, statementTag));
-            return preview("创建 XML statement", plan, previewStore);
+            return preview(MyBatisAssistantBundle.message(
+                    "mcp.operation.create.statement"), plan, previewStore);
         }
     }
 
@@ -287,15 +309,19 @@ final class MyBatisMcpWriteTools {
 
         @Override
         public @NotNull String description() {
-            return "从精确 Mapper 方法预览创建 JUnit 测试骨架";
+            return MyBatisAssistantBundle.message(
+                    "mcp.tool.generation.preview.test.description");
         }
 
         @Override
         protected @NotNull JsonObject properties() {
             JsonObject properties = new JsonObject();
-            properties.add("qualifiedName", stringSchema("Mapper 接口全限定名"));
-            properties.add("signature", stringSchema("方法稳定签名"));
-            properties.add("platform", stringSchema("JUNIT_5 或 JUNIT_4"));
+            properties.add("qualifiedName", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.mapper.qualified.name")));
+            properties.add("signature", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.method.signature")));
+            properties.add("platform", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.junit.platform")));
             return properties;
         }
 
@@ -318,7 +344,8 @@ final class MyBatisMcpWriteTools {
                     "platform");
             MyBatisGenerationPlan plan = read(project, () -> testPlan(
                     project, qualifiedName, signature, platform));
-            return preview("创建 Mapper 测试骨架", plan, previewStore);
+            return preview(MyBatisAssistantBundle.message(
+                    "mcp.operation.create.mapper.test"), plan, previewStore);
         }
     }
 
@@ -328,31 +355,36 @@ final class MyBatisMcpWriteTools {
             @NotNull String statementId,
             @NotNull String statementTag) {
         if (DumbService.isDumb(project)) {
-            throw new MyBatisMcpToolException("索引尚未就绪");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.index.not.ready"));
         }
         List<XmlTag> roots = MyBatisXmlSymbolLocator.findMapperRoots(project, namespace);
         if (roots.size() != 1) {
-            throw new MyBatisMcpToolException(roots.isEmpty()
-                    ? "未找到 namespace 精确匹配的 Mapper XML"
-                    : "Mapper XML 目标不唯一");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    roots.isEmpty()
+                            ? "mcp.error.mapper.xml.not.found"
+                            : "mcp.error.mapper.xml.ambiguous"));
         }
         XmlTag root = roots.getFirst();
         for (XmlTag child : root.getSubTags()) {
             ProgressManager.checkCanceled();
             if (MyBatisXmlModel.isStatement(child)
                     && statementId.equals(MyBatisXmlModel.statementId(child))) {
-                throw new MyBatisMcpToolException("statement 已存在：" + statementId);
+                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                        "mcp.error.statement.exists", statementId));
             }
         }
         VirtualFile file = root.getContainingFile().getVirtualFile();
         String closingMarkup = "</" + root.getName();
         int closingOffsetInRoot = root.getText().lastIndexOf(closingMarkup);
         if (closingOffsetInRoot < 0 || file == null || !file.isWritable()) {
-            throw new MyBatisMcpToolException("目标 Mapper XML 不完整或只读");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.mapper.xml.incomplete.or.readonly"));
         }
         var document = FileDocumentManager.getInstance().getDocument(file);
         if (document == null) {
-            throw new MyBatisMcpToolException("无法取得 Mapper XML 当前文档");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.mapper.xml.document.unavailable"));
         }
         String original = document.getText();
         String lineSeparator = original.contains("\r\n") ? "\r\n" : "\n";
@@ -360,7 +392,7 @@ final class MyBatisMcpWriteTools {
         String escapedId = StringUtil.escapeXmlEntities(statementId);
         String insertion = "    <" + statementTag + " id=\"" + escapedId + "\">"
                 + lineSeparator
-                + "        <!-- TODO: 补充 SQL -->" + lineSeparator
+                + "        <!-- TODO: SQL -->" + lineSeparator
                 + "    </" + statementTag + ">" + lineSeparator;
         String prefix = original.substring(0, offset);
         if (!prefix.endsWith(lineSeparator)) {
@@ -370,7 +402,8 @@ final class MyBatisMcpWriteTools {
         XmlFile parsed = (XmlFile) PsiFileFactory.getInstance(project).createFileFromText(
                 "McpStatementPreview.xml", XmlFileType.INSTANCE, candidate);
         if (PsiTreeUtil.hasErrorElements(parsed)) {
-            throw new MyBatisMcpToolException("生成的 Mapper XML 预览无法通过 PSI 校验");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.mapper.xml.preview.invalid"));
         }
         return exactPlan(
                 MyBatisGenerationArtifactKind.XML,
@@ -392,13 +425,15 @@ final class MyBatisMcpWriteTools {
                 .filter(candidate -> qualifiedName.equals(candidate.getQualifiedName()))
                 .toList();
         if (exact.size() != 1) {
-            throw new MyBatisMcpToolException("Mapper 类型不存在或不唯一：" + qualifiedName);
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.mapper.type.unavailable", qualifiedName));
         }
         PsiMethod method = java.util.Arrays.stream(exact.getFirst().getAllMethods())
                 .filter(candidate -> signature.equals(stableSignature(candidate)))
                 .findFirst()
                 .orElseThrow(() -> new MyBatisMcpToolException(
-                        "Mapper 方法不存在：" + signature));
+                        MyBatisAssistantBundle.message(
+                                "mcp.error.mapper.signature.not.found", signature)));
         MyBatisMapperTestRequestFactory.Result request =
                 MyBatisMapperTestRequestFactory.create(method, platform);
         if (!(request instanceof MyBatisMapperTestRequestFactory.Result.Success success)) {
@@ -413,7 +448,8 @@ final class MyBatisMcpWriteTools {
                 + generation.suggestedFileName();
         VirtualFile root = projectRoot(project);
         if (root.findFileByRelativePath(relativePath) != null) {
-            throw new MyBatisMcpToolException("测试骨架目标已存在：" + relativePath);
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.test.target.exists", relativePath));
         }
         MyBatisGeneratedArtifact artifact = new MyBatisGeneratedArtifact(
                 MyBatisGenerationArtifactKind.SERVICE,
@@ -453,7 +489,8 @@ final class MyBatisMcpWriteTools {
         if (plan.hasConflicts()) {
             String message = plan.entries().stream()
                     .filter(entry -> entry.status() == MyBatisGenerationPlanStatus.CONFLICT)
-                    .map(entry -> entry.message().orElse("生成冲突"))
+                    .map(entry -> entry.message().orElse(MyBatisAssistantBundle.message(
+                            "mcp.error.generation.conflict")))
                     .collect(java.util.stream.Collectors.joining("；"));
             throw new MyBatisMcpToolException(message);
         }
@@ -478,7 +515,8 @@ final class MyBatisMcpWriteTools {
     private static @NotNull VirtualFile projectRoot(@NotNull Project project) {
         VirtualFile root = ProjectUtil.guessProjectDir(project);
         if (root == null || !root.isValid() || !root.isDirectory()) {
-            throw new MyBatisMcpToolException("无法确定当前项目目录");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.project.root.unavailable"));
         }
         return root;
     }
@@ -488,7 +526,8 @@ final class MyBatisMcpWriteTools {
             @NotNull VirtualFile file) {
         String relative = VfsUtilCore.getRelativePath(file, root);
         if (relative == null) {
-            throw new MyBatisMcpToolException("目标文件不在当前项目目录内");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.file.outside.project"));
         }
         return relative;
     }
@@ -506,7 +545,8 @@ final class MyBatisMcpWriteTools {
         return ApplicationManager.getApplication().runReadAction((Computable<T>) () -> {
             ProgressManager.checkCanceled();
             if (project.isDisposed() || !project.isOpen()) {
-                throw new MyBatisMcpToolException("项目已关闭");
+                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                        "mcp.error.project.closed"));
             }
             return supplier.get();
         });
@@ -525,7 +565,8 @@ final class MyBatisMcpWriteTools {
             @NotNull String name) {
         String value = optionalString(arguments, name);
         if (value.isEmpty()) {
-            throw new MyBatisMcpToolException("缺少参数：" + name);
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.argument.missing", name));
         }
         return value;
     }
@@ -538,11 +579,13 @@ final class MyBatisMcpWriteTools {
             return "";
         }
         if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()) {
-            throw new MyBatisMcpToolException("参数必须为字符串：" + name);
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.argument.string", name));
         }
         String normalized = value.getAsString().trim();
         if (normalized.length() > 512) {
-            throw new MyBatisMcpToolException("参数超过 512 字符上限：" + name);
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.argument.max.512", name));
         }
         return normalized;
     }
@@ -554,7 +597,8 @@ final class MyBatisMcpWriteTools {
         try {
             return Enum.valueOf(type, value);
         } catch (IllegalArgumentException failure) {
-            throw new MyBatisMcpToolException("参数 " + name + " 的值不受支持：" + value);
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.argument.value.unsupported", name, value));
         }
     }
 }

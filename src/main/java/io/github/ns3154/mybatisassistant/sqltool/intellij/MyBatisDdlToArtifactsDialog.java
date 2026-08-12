@@ -9,6 +9,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -32,7 +33,8 @@ final class MyBatisDdlToArtifactsDialog extends DialogWrapper {
     private final JBTextField basePackage = new JBTextField("com.example");
     private final ComboBox<MyBatisSqlDialect> dialect = new ComboBox<>(
             MyBatisSqlDialect.values());
-    private final Action convertAction = new AbstractAction("生成预览") {
+    private final Action convertAction = new AbstractAction(MyBatisAssistantBundle.message(
+            "dialog.button.generate.preview")) {
         @Override
         public void actionPerformed(ActionEvent event) {
             convert();
@@ -46,8 +48,8 @@ final class MyBatisDdlToArtifactsDialog extends DialogWrapper {
         output.setEditable(false);
         output.setLineWrap(false);
         dialect.setSelectedItem(MyBatisSqlDialect.MYSQL);
-        setTitle("CREATE TABLE 转 MyBatis 产物");
-        setCancelButtonText("关闭");
+        setTitle(MyBatisAssistantBundle.message("sqltool.ddl.dialog.title"));
+        setCancelButtonText(MyBatisAssistantBundle.message("dialog.button.close"));
         setResizable(true);
         init();
     }
@@ -55,13 +57,13 @@ final class MyBatisDdlToArtifactsDialog extends DialogWrapper {
     @Override
     protected @Nullable JComponent createCenterPanel() {
         JPanel options = new JPanel(new GridLayout(1, 4, JBUI.scale(8), 0));
-        options.add(new JBLabel("基础包名："));
+        options.add(new JBLabel(MyBatisAssistantBundle.message("sqltool.label.base.package")));
         options.add(basePackage);
-        options.add(new JBLabel("目标方言："));
+        options.add(new JBLabel(MyBatisAssistantBundle.message("sqltool.label.target.dialect")));
         options.add(dialect);
         JPanel content = new JPanel(new GridLayout(2, 1, 0, JBUI.scale(8)));
-        content.add(section("单条 CREATE TABLE DDL", input));
-        content.add(section("Entity / Mapper / ResultMap XML 预览", output));
+        content.add(section(MyBatisAssistantBundle.message("sqltool.ddl.section.input"), input));
+        content.add(section(MyBatisAssistantBundle.message("sqltool.ddl.section.preview"), output));
         JPanel root = new JPanel(new BorderLayout(0, JBUI.scale(8)));
         root.setBorder(JBUI.Borders.empty(6));
         root.add(options, BorderLayout.NORTH);
@@ -88,7 +90,7 @@ final class MyBatisDdlToArtifactsDialog extends DialogWrapper {
         String rendered = ProgressManager.getInstance().runProcessWithProgressSynchronously(
                 () -> MyBatisDdlToArtifactsAction.render(
                         input.getText(), selected, basePackage.getText().strip()),
-                "在本地转换 DDL",
+                MyBatisAssistantBundle.message("sqltool.ddl.progress"),
                 true,
                 project);
         output.setText(rendered);

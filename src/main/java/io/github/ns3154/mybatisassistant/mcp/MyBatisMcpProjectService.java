@@ -4,6 +4,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.messages.MessageBusConnection;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettings;
 import io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettingsListener;
 import org.jetbrains.annotations.NotNull;
@@ -70,7 +71,8 @@ public final class MyBatisMcpProjectService implements Disposable {
             protocol.close();
             clearToken();
             configuredPort = -1;
-            lastFailure = "本地 MCP 服务启动失败：" + failure.getClass().getSimpleName();
+            lastFailure = MyBatisAssistantBundle.message(
+                    "mcp.error.server.start", failure.getClass().getSimpleName());
         }
     }
 

@@ -14,6 +14,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.openapi.vfs.VfsUtilCore;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataResult;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataService;
@@ -89,14 +90,16 @@ final class MyBatisMcpReadTools {
 
         @Override
         public @NotNull String description() {
-            return "按精确全限定名读取当前项目 Mapper 模型";
+            return MyBatisAssistantBundle.message("mcp.tool.mapper.list.description");
         }
 
         @Override
         protected @NotNull JsonObject properties() {
             JsonObject properties = new JsonObject();
-            properties.add("qualifiedName", stringSchema("Mapper 接口全限定名"));
-            properties.add("limit", integerSchema("最大返回方法数量", 1, MAX_LIMIT));
+            properties.add("qualifiedName", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.mapper.qualified.name")));
+            properties.add("limit", integerSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.limit.methods"), 1, MAX_LIMIT));
             return properties;
         }
 
@@ -123,14 +126,16 @@ final class MyBatisMcpReadTools {
 
         @Override
         public @NotNull String description() {
-            return "读取精确 Mapper 的自定义方法与 statement 来源";
+            return MyBatisAssistantBundle.message("mcp.tool.statement.list.description");
         }
 
         @Override
         protected @NotNull JsonObject properties() {
             JsonObject properties = new JsonObject();
-            properties.add("qualifiedName", stringSchema("Mapper 接口全限定名"));
-            properties.add("limit", integerSchema("最大返回数量", 1, MAX_LIMIT));
+            properties.add("qualifiedName", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.mapper.qualified.name")));
+            properties.add("limit", integerSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.limit.results"), 1, MAX_LIMIT));
             return properties;
         }
 
@@ -166,14 +171,16 @@ final class MyBatisMcpReadTools {
 
         @Override
         public @NotNull String description() {
-            return "读取精确 Mapper 方法签名及参数模型";
+            return MyBatisAssistantBundle.message("mcp.tool.parameter.describe.description");
         }
 
         @Override
         protected @NotNull JsonObject properties() {
             JsonObject properties = new JsonObject();
-            properties.add("qualifiedName", stringSchema("Mapper 接口全限定名"));
-            properties.add("signature", stringSchema("方法稳定签名，例如 findById(java.lang.Long)"));
+            properties.add("qualifiedName", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.mapper.qualified.name")));
+            properties.add("signature", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.method.signature.example")));
             return properties;
         }
 
@@ -193,7 +200,10 @@ final class MyBatisMcpReadTools {
                         .filter(candidate -> signature.equals(candidate.stableSignature()))
                         .findFirst()
                         .orElseThrow(() -> new MyBatisMcpToolException(
-                                "未找到精确 Mapper 方法：" + qualifiedName + '#' + signature));
+                                MyBatisAssistantBundle.message(
+                                        "mcp.error.mapper.method.not.found",
+                                        qualifiedName,
+                                        signature)));
                 return methodJson(method);
             });
         }
@@ -207,7 +217,8 @@ final class MyBatisMcpReadTools {
 
         @Override
         public @NotNull String description() {
-            return "读取 Community JDBC 非敏感数据源摘要";
+            return MyBatisAssistantBundle.message(
+                    "mcp.tool.database.data.sources.description");
         }
 
         @Override
@@ -249,14 +260,16 @@ final class MyBatisMcpReadTools {
 
         @Override
         public @NotNull String description() {
-            return "读取已加载数据库快照，不触发连接";
+            return MyBatisAssistantBundle.message("mcp.tool.database.schema.description");
         }
 
         @Override
         protected @NotNull JsonObject properties() {
             JsonObject properties = new JsonObject();
-            properties.add("dataSourceId", stringSchema("数据源 ID；留空返回全部已加载快照"));
-            properties.add("limit", integerSchema("最大返回表数量", 1, MAX_LIMIT));
+            properties.add("dataSourceId", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.data.source.optional")));
+            properties.add("limit", integerSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.limit.tables"), 1, MAX_LIMIT));
             return properties;
         }
 
@@ -266,7 +279,9 @@ final class MyBatisMcpReadTools {
                 @NotNull JsonObject arguments) {
             MyBatisDatabaseMetadataResult.Loaded loaded = MyBatisDatabaseMetadataService
                     .getInstance(project).latest()
-                    .orElseThrow(() -> new MyBatisMcpToolException("数据库元数据尚未加载"));
+                    .orElseThrow(() -> new MyBatisMcpToolException(
+                            MyBatisAssistantBundle.message(
+                                    "mcp.error.database.metadata.not.loaded")));
             String requestedId = optionalString(arguments, "dataSourceId");
             int limit = limit(arguments);
             JsonArray snapshots = new JsonArray();
@@ -327,15 +342,18 @@ final class MyBatisMcpReadTools {
 
         @Override
         public @NotNull String description() {
-            return "读取精确 Mapper 方法的静态声明位置，不执行全项目文本扫描";
+            return MyBatisAssistantBundle.message("mcp.tool.reference.find.description");
         }
 
         @Override
         protected @NotNull JsonObject properties() {
             JsonObject properties = new JsonObject();
-            properties.add("qualifiedName", stringSchema("Mapper 接口全限定名"));
-            properties.add("signature", stringSchema("可选方法稳定签名"));
-            properties.add("limit", integerSchema("最大返回引用数量", 1, MAX_LIMIT));
+            properties.add("qualifiedName", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.mapper.qualified.name")));
+            properties.add("signature", stringSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.method.signature.optional")));
+            properties.add("limit", integerSchema(MyBatisAssistantBundle.message(
+                    "mcp.schema.limit.references"), 1, MAX_LIMIT));
             return properties;
         }
 
@@ -359,13 +377,17 @@ final class MyBatisMcpReadTools {
                             .filter(candidate -> signature.equals(candidate.stableSignature()))
                             .findFirst()
                             .orElseThrow(() -> new MyBatisMcpToolException(
-                                    "未找到精确 Mapper 方法：" + signature));
+                                    MyBatisAssistantBundle.message(
+                                            "mcp.error.mapper.signature.not.found",
+                                            signature)));
                     target = java.util.Arrays.stream(mapperClass.findMethodsByName(
                                     model.name(), true))
                             .filter(method -> signature.equals(stableSignature(method)))
                             .findFirst()
                             .orElseThrow(() -> new MyBatisMcpToolException(
-                                    "未找到精确 Mapper 方法声明：" + signature));
+                                    MyBatisAssistantBundle.message(
+                                            "mcp.error.mapper.declaration.not.found",
+                                            signature)));
                 }
                 JsonArray declarations = new JsonArray();
                 JsonObject declaration = location(project, target);
@@ -433,14 +455,16 @@ final class MyBatisMcpReadTools {
             @NotNull Project project,
             @NotNull String qualifiedName) {
         if (DumbService.isDumb(project)) {
-            throw new MyBatisMcpToolException("索引尚未就绪");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.index.not.ready"));
         }
         PsiClass mapper = exactClass(project, qualifiedName);
         MyBatisMapperModelResolution resolution = MyBatisMapperModelResolver.resolve(mapper);
         if (resolution instanceof MyBatisMapperModelResolution.Found found) {
             return found.model();
         }
-        throw new MyBatisMcpToolException("未找到确定的 Mapper 模型：" + qualifiedName);
+        throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                "mcp.error.mapper.model.not.found", qualifiedName));
     }
 
     private static @NotNull PsiClass exactClass(
@@ -453,8 +477,11 @@ final class MyBatisMcpReadTools {
                 .filter(candidate -> qualifiedName.equals(candidate.getQualifiedName()))
                 .toList();
         if (exact.size() != 1) {
-            throw new MyBatisMcpToolException(
-                    exact.isEmpty() ? "未找到类型：" + qualifiedName : "类型目标不唯一：" + qualifiedName);
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    exact.isEmpty()
+                            ? "mcp.error.type.not.found"
+                            : "mcp.error.type.ambiguous",
+                    qualifiedName));
         }
         return exact.getFirst();
     }
@@ -518,7 +545,8 @@ final class MyBatisMcpReadTools {
             @NotNull PsiElement element) {
         JsonObject location = optionalLocation(project, element);
         if (location == null) {
-            throw new MyBatisMcpToolException("声明不在当前项目内容根内");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.declaration.outside.project"));
         }
         return location;
     }
@@ -560,7 +588,8 @@ final class MyBatisMcpReadTools {
         return ApplicationManager.getApplication().runReadAction((Computable<JsonObject>) () -> {
             ProgressManager.checkCanceled();
             if (project.isDisposed() || !project.isOpen()) {
-                throw new MyBatisMcpToolException("项目已关闭");
+                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                        "mcp.error.project.closed"));
             }
             return supplier.get();
         });
@@ -591,7 +620,8 @@ final class MyBatisMcpReadTools {
             @NotNull String name) {
         String value = optionalString(arguments, name);
         if (value.isEmpty()) {
-            throw new MyBatisMcpToolException("缺少参数：" + name);
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.argument.missing", name));
         }
         return value;
     }
@@ -605,7 +635,8 @@ final class MyBatisMcpReadTools {
         }
         String normalized = value.getAsString().trim();
         if (normalized.length() > 512) {
-            throw new MyBatisMcpToolException("参数超过 512 字符上限：" + name);
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.argument.max.512", name));
         }
         return normalized;
     }
@@ -618,11 +649,13 @@ final class MyBatisMcpReadTools {
         try {
             int limit = value.getAsInt();
             if (limit < 1 || limit > MAX_LIMIT) {
-                throw new MyBatisMcpToolException("limit 必须在 1～500 之间");
+                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                        "mcp.error.limit.range"));
             }
             return limit;
         } catch (NumberFormatException | ClassCastException failure) {
-            throw new MyBatisMcpToolException("limit 必须为整数");
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.limit.integer"));
         }
     }
 }

@@ -55,6 +55,7 @@ jobs:
             build/reports/tests/
             build/reports/checkstyle/
             build/reports/jacoco/
+            build/reports/cyclonedx/
             build/reports/pluginVerifier/
             build/reports/problems/
             samples/**/target/surefire-reports/

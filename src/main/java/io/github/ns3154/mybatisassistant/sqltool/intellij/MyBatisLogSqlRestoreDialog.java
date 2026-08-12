@@ -8,6 +8,7 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBUI;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.sqltool.log.MyBatisLogRestoreFormatter;
 import io.github.ns3154.mybatisassistant.sqltool.log.MyBatisLogSqlRestorer;
 import org.jetbrains.annotations.NotNull;
@@ -28,7 +29,8 @@ final class MyBatisLogSqlRestoreDialog extends DialogWrapper {
     private final Project project;
     private final JBTextArea input = new JBTextArea();
     private final JBTextArea output = new JBTextArea();
-    private final Action restoreAction = new AbstractAction("还原 SQL") {
+    private final Action restoreAction = new AbstractAction(MyBatisAssistantBundle.message(
+            "sqltool.log.button.restore")) {
         @Override
         public void actionPerformed(ActionEvent event) {
             restore();
@@ -39,12 +41,12 @@ final class MyBatisLogSqlRestoreDialog extends DialogWrapper {
         super(project, true);
         this.project = project;
         input.setLineWrap(false);
-        input.getEmptyText().setText("粘贴 MyBatis Preparing/Parameters 日志；内容仅在本机内存中处理");
+        input.getEmptyText().setText(MyBatisAssistantBundle.message("sqltool.log.input.empty"));
         output.setEditable(false);
         output.setLineWrap(false);
-        output.getEmptyText().setText("还原结果、诊断与风险等级将在这里显示");
-        setTitle("还原 MyBatis 日志 SQL");
-        setCancelButtonText("关闭");
+        output.getEmptyText().setText(MyBatisAssistantBundle.message("sqltool.log.output.empty"));
+        setTitle(MyBatisAssistantBundle.message("sqltool.log.dialog.title"));
+        setCancelButtonText(MyBatisAssistantBundle.message("dialog.button.close"));
         setResizable(true);
         init();
     }
@@ -52,8 +54,10 @@ final class MyBatisLogSqlRestoreDialog extends DialogWrapper {
     @Override
     protected @Nullable JComponent createCenterPanel() {
         JBSplitter splitter = new JBSplitter(true, 0.5f);
-        splitter.setFirstComponent(section("日志输入", input));
-        splitter.setSecondComponent(section("还原结果（不会自动执行）", output));
+        splitter.setFirstComponent(section(MyBatisAssistantBundle.message(
+                "sqltool.log.section.input"), input));
+        splitter.setSecondComponent(section(MyBatisAssistantBundle.message(
+                "sqltool.log.section.output"), output));
         splitter.setPreferredSize(new Dimension(920, 640));
         return splitter;
     }
@@ -75,7 +79,7 @@ final class MyBatisLogSqlRestoreDialog extends DialogWrapper {
         String rendered = ProgressManager.getInstance().runProcessWithProgressSynchronously(
                 () -> MyBatisLogRestoreFormatter.format(
                         MyBatisLogSqlRestorer.restore(input.getText())),
-                "在本地还原 MyBatis 日志 SQL",
+                MyBatisAssistantBundle.message("sqltool.log.progress"),
                 true,
                 project);
         output.setText(rendered);

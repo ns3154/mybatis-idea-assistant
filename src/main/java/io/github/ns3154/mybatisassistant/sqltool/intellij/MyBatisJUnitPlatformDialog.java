@@ -4,6 +4,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.ui.components.JBLabel;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.sqltool.testgen.MyBatisJUnitPlatform;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -25,16 +26,17 @@ final class MyBatisJUnitPlatformDialog extends DialogWrapper {
                 .toArray(String[]::new);
         platforms = new ComboBox<>(labels);
         platforms.setSelectedIndex(0);
-        setTitle("生成 Mapper JUnit 测试骨架");
-        setOKButtonText("生成预览");
-        setCancelButtonText("取消");
+        setTitle(MyBatisAssistantBundle.message("sqltool.junit.dialog.title"));
+        setOKButtonText(MyBatisAssistantBundle.message("dialog.button.generate.preview"));
+        setCancelButtonText(MyBatisAssistantBundle.message("dialog.button.cancel"));
         init();
     }
 
     @Override
     protected @Nullable JComponent createCenterPanel() {
         JPanel panel = new JPanel(new BorderLayout(8, 0));
-        panel.add(new JBLabel("JUnit 平台："), BorderLayout.WEST);
+        panel.add(new JBLabel(MyBatisAssistantBundle.message(
+                "sqltool.junit.label.platform")), BorderLayout.WEST);
         panel.add(platforms, BorderLayout.CENTER);
         return panel;
     }
