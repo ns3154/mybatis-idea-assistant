@@ -8,12 +8,13 @@ is_retryable_failure() {
     awk '
         index($0, "ClosedFileSystemException") > 0 { closed_file_system = 1 }
         index($0, "Could not find bundled plugin with ID") > 0 { bundled_plugin_missing = 1 }
-        /status code 429.*Too Many Requests|429 .*Too Many Requests/ { rate_limited = 1 }
+        /Could not (GET|HEAD) '\''https:\/\// { dependency_request = 1 }
+        /status code (429|502|503|504) from server/ { transient_http_status = 1 }
         END {
             # IJPG 2.18.1 / plugin-structure 3.330 的已知冷布局索引竞态：
             # https://github.com/JetBrains/intellij-platform-gradle-plugin/issues/2192
-            # 另一条白名单只接受明确的 HTTP 429。
-            exit !((closed_file_system && bundled_plugin_missing) || rate_limited)
+            # 网络白名单要求同时存在 HTTPS 依赖请求与明确的限流/网关临时状态。
+            exit !((closed_file_system && bundled_plugin_missing) || (dependency_request && transient_http_status))
         }
     ' "${log_file}"
 }

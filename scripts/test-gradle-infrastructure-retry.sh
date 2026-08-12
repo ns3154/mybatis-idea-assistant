@@ -37,7 +37,16 @@ assert_retryable \
     "Could not find bundled plugin with ID: 'com.intellij.database'"
 assert_retryable \
     "Maven Central HTTP 429" \
+    "Could not GET 'https://repo.maven.apache.org/example.pom'" \
     "Received status code 429 from server: Too Many Requests"
+assert_retryable \
+    "JetBrains Cache Redirector HTTP 502" \
+    "Could not GET 'https://cache-redirector.jetbrains.com/example.pom'" \
+    "Received status code 502 from server: Bad Gateway"
+assert_retryable \
+    "依赖仓库 HTTP 503" \
+    "Could not HEAD 'https://example.invalid/example.pom'" \
+    "Received status code 503 from server: Service Unavailable"
 
 assert_not_retryable \
     "只有 ClosedFileSystemException，缺少捆绑插件误报" \
@@ -51,6 +60,17 @@ assert_not_retryable \
 assert_not_retryable \
     "只有限流文案但没有 HTTP 429" \
     "Too Many Requests"
+assert_not_retryable \
+    "只有 HTTP 502 但没有 HTTPS 依赖请求" \
+    "Received status code 502 from server: Bad Gateway"
+assert_not_retryable \
+    "依赖不存在 HTTP 404" \
+    "Could not GET 'https://repo.maven.apache.org/missing.pom'" \
+    "Received status code 404 from server: Not Found"
+assert_not_retryable \
+    "依赖认证失败 HTTP 401" \
+    "Could not GET 'https://repo.example.invalid/private.pom'" \
+    "Received status code 401 from server: Unauthorized"
 assert_not_retryable \
     "覆盖率失败" \
     "Rule violated for bundle mybatis-idea-assistant: lines covered ratio is 0.69"
