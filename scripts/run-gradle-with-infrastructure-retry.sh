@@ -8,7 +8,7 @@ is_retryable_failure() {
     awk '
         index($0, "ClosedFileSystemException") > 0 { closed_file_system = 1 }
         index($0, "Could not find bundled plugin with ID") > 0 { bundled_plugin_missing = 1 }
-        /status code 429|429 .*Too Many Requests|Too Many Requests/ { rate_limited = 1 }
+        /status code 429.*Too Many Requests|429 .*Too Many Requests/ { rate_limited = 1 }
         END {
             # IJPG 2.18.1 / plugin-structure 3.330 的已知冷布局索引竞态：
             # https://github.com/JetBrains/intellij-platform-gradle-plugin/issues/2192

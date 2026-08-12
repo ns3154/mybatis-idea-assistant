@@ -43,6 +43,9 @@ assert_not_retryable \
     "测试失败" \
     "There were failing tests"
 assert_not_retryable \
+    "只有限流文案但没有 HTTP 429" \
+    "Too Many Requests"
+assert_not_retryable \
     "覆盖率失败" \
     "Rule violated for bundle mybatis-idea-assistant: lines covered ratio is 0.69"
 assert_not_retryable \
