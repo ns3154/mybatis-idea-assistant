@@ -36,6 +36,12 @@ jobs:
       - name: 配置 Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
 
+      - name: 恢复 IntelliJ 布局索引缓存
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .intellijPlatform/layoutIndex
+          key: intellij-layout-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('settings.gradle.kts', 'build.gradle.kts', 'gradle.properties', 'gradle.lockfile') }}
+
       - name: 初始化 CodeQL
         uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
         with:
@@ -43,7 +49,7 @@ jobs:
           build-mode: manual
 
       - name: 编译生产代码
-        run: ./gradlew clean compileJava
+        run: ./scripts/run-gradle-with-infrastructure-retry.sh clean compileJava
 
       - name: 分析并上传结果
         uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4

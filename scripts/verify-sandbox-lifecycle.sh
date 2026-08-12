@@ -74,7 +74,8 @@ printf 'cycle\tplatform_version\tstart_line\tshutdown_line\tplugin_loaded\tproje
 cd "${PROJECT_ROOT}"
 readonly GRADLE_PLATFORM_ARGUMENT="-PplatformVersion=${PLATFORM_VERSION}"
 readonly GRADLE_LOCK_ARGUMENT="-PdependencyLockFile=gradle/lifecycle-${PLATFORM_VERSION}.lockfile"
-./gradlew "${GRADLE_PLATFORM_ARGUMENT}" "${GRADLE_LOCK_ARGUMENT}" \
+./scripts/run-gradle-with-infrastructure-retry.sh \
+    "${GRADLE_PLATFORM_ARGUMENT}" "${GRADLE_LOCK_ARGUMENT}" \
     prepareSandbox >/dev/null
 touch "${SANDBOX_LOG}"
 

@@ -13,6 +13,7 @@
 | 宿主平台 | IntelliJ Platform 2025.2.6.2 与内置插件 API | 最低 SDK 编译、平台测试和运行宿主 | 否 |
 | 构建 | Gradle Wrapper 9.3、IntelliJ Platform Gradle Plugin 2.18.1 | 编译、验证、打包、签名和发布 | 否 |
 | 构建审计 | CycloneDX Gradle Plugin 3.4.1 | 生成 CycloneDX 1.6 SBOM | 否 |
+| 持续集成 | GitHub 官方 checkout、setup-java、cache、upload-artifact、CodeQL 与 Gradle setup Action | 检出、工具链、布局索引缓存、报告归档和安全扫描；工作流固定到提交 SHA | 否 |
 | 质量 | Checkstyle 13.10.0、JaCoCo 0.8.15 | 静态检查与覆盖率 | 否 |
 | 测试 | JUnit 4.13.2、H2 2.3.232 | 平台测试与数据库测试 | 否 |
 | 样例 | MyBatis、H2、JUnit 等样例 Maven 依赖 | 验证语料与演示 | 否 |

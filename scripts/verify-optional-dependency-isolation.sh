@@ -45,7 +45,7 @@ if [[ -n "${SECONDARY_SCREEN_GATE_DIR}" ]]; then
 fi
 
 cd "${PROJECT_ROOT}"
-./gradlew prepareSandbox >/dev/null
+./scripts/run-gradle-with-infrastructure-retry.sh prepareSandbox >/dev/null
 touch "${SANDBOX_LOG}" "${DISABLED_PLUGINS_FILE}"
 
 readonly ORIGINAL_DISABLED_PLUGINS="$(mktemp)"
