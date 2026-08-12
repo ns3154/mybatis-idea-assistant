@@ -81,6 +81,9 @@ public final class MyBatisMethodNameParser {
                     MyBatisMethodSqlMessages.message(
                             "methodsql.parser.error.name.too.long", MAX_METHOD_NAME_LENGTH));
         }
+        if (methodName.startsWith("insertBatch")) {
+            return parseBatchInsert(methodName, schema);
+        }
         OperationPrefix operation = operation(methodName);
         if (operation == null) {
             return failure(MyBatisMethodDiagnosticCode.UNKNOWN_OPERATION, 0, methodName.length(),
@@ -131,6 +134,40 @@ public final class MyBatisMethodNameParser {
                 remainder.length(),
                 MyBatisMethodSqlMessages.message(
                         "methodsql.parser.error.combination.unsupported"));
+    }
+
+    private static @NotNull MyBatisMethodParseResult parseBatchInsert(
+            @NotNull String methodName,
+            @NotNull MyBatisMethodSchema schema) {
+        if (!"insertBatch".equals(methodName)) {
+            return failure(
+                    MyBatisMethodDiagnosticCode.UNSUPPORTED_COMBINATION,
+                    "insertBatch".length(),
+                    methodName.length() - "insertBatch".length(),
+                    MyBatisMethodSqlMessages.message(
+                            "methodsql.parser.error.batch.insert.exact"));
+        }
+        List<MyBatisMethodField> insertFields = schema.fields().stream()
+                .filter(field -> !field.autoIncrement() && !field.generated())
+                .toList();
+        if (insertFields.isEmpty()) {
+            return failure(
+                    MyBatisMethodDiagnosticCode.INVALID_SUBJECT,
+                    0,
+                    methodName.length(),
+                    MyBatisMethodSqlMessages.message(
+                            "methodsql.parser.error.batch.insert.fields.empty"));
+        }
+        return new MyBatisMethodParseResult.Success(new MyBatisMethodQuery(
+                methodName,
+                MyBatisMethodOperation.INSERT_BATCH,
+                insertFields,
+                false,
+                OptionalInt.empty(),
+                false,
+                false,
+                Optional.empty(),
+                List.of()));
     }
 
     private static List<MyBatisMethodQuery> queryCandidates(
@@ -200,12 +237,20 @@ public final class MyBatisMethodNameParser {
         }
         MyBatisMethodOperation operation = operationPrefix.operation();
         switch (operation) {
+            case INSERT_BATCH -> {
+                // insertBatch 由独立语法入口构造，不进入通用字段/条件切分。
+                return null;
+            }
             case SELECT -> {
                 // 查询允许全实体、字段投影、排序、limit 与显式分页。
             }
             case UPDATE -> {
                 if (subject.fields().isEmpty() || subject.distinct()
                         || subject.limit().isPresent() || subject.paged() || !orders.isEmpty()
+                        || new LinkedHashSet<>(subject.fields()).size()
+                                != subject.fields().size()
+                        || subject.fields().stream().anyMatch(field ->
+                                field.autoIncrement() || field.generated())
                         || conditions.conditions().isEmpty()) {
                     return null;
                 }

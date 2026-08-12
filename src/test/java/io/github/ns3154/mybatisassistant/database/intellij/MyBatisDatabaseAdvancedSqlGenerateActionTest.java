@@ -15,6 +15,7 @@ import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
+import io.github.ns3154.mybatisassistant.database.MyBatisForeignKeyReference;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationConfiguration;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisJoinGeneration;
@@ -79,9 +80,40 @@ public final class MyBatisDatabaseAdvancedSqlGenerateActionTest
         assertTrue(preview.xmlStatement().contains(
                 "<select id=\"findNameByRoleIdOrderByIdDesc\""));
         assertTrue(preview.wrapperCode().contains(
-                "wrapper.select(\"name\")"));
+                "wrapper.select(\"`name`\")"));
         assertTrue(preview.wrapperCode().contains(
-                ".eq(\"role_id\", roleId)"));
+                ".eq(\"`role_id`\", roleId)"));
+    }
+
+    public void testWrapperPreviewCarriesTheSelectedQualifiedTable() {
+        MyBatisDatabaseTable auditUsers = new MyBatisDatabaseTable(
+                Optional.of("tenant_catalog"),
+                Optional.of("audit"),
+                "users",
+                users().columns());
+
+        MyBatisDatabaseWrapperGenerateAction.WrapperPreview flex =
+                MyBatisDatabaseWrapperGenerateAction.buildPreview(
+                        auditUsers,
+                        MyBatisSqlDialect.POSTGRESQL,
+                        MyBatisGenerationConfiguration.standard("com.example"),
+                        "findByRoleId",
+                        MyBatisWrapperFramework.MYBATIS_FLEX,
+                        "1.11.8");
+
+        assertTrue(flex.xmlStatement().contains("FROM \"audit\".\"users\""));
+        assertTrue(flex.wrapperCode().contains(
+                "RawQueryTable(\"\\\"audit\\\".\\\"users\\\"\")"));
+        assertTrue(org.junit.Assert.assertThrows(
+                IllegalArgumentException.class,
+                () -> MyBatisDatabaseWrapperGenerateAction.buildPreview(
+                        auditUsers,
+                        MyBatisSqlDialect.POSTGRESQL,
+                        MyBatisGenerationConfiguration.standard("com.example"),
+                        "findByRoleId",
+                        MyBatisWrapperFramework.MYBATIS_PLUS,
+                        "3.5.17"))
+                .getMessage().contains("无法证明"));
     }
 
     public void testJoinModelRequiresEvidenceAndGeneratesExplicitSelection() {
@@ -146,6 +178,26 @@ public final class MyBatisDatabaseAdvancedSqlGenerateActionTest
                 .getMessage().contains("没有可供用户选择"));
     }
 
+    public void testJoinModelRejectsForeignKeyTargetingAnotherSelectedTableIdentity() {
+        MyBatisDatabaseTable misleadingUsers = new MyBatisDatabaseTable(
+                Optional.empty(),
+                Optional.empty(),
+                "users",
+                List.of(
+                        column("id", Types.BIGINT, true, false, 0),
+                        foreignColumn(
+                                "role_id", Types.BIGINT, "archived_roles", "id", 1)));
+
+        assertTrue(org.junit.Assert.assertThrows(
+                IllegalArgumentException.class,
+                () -> MyBatisDatabaseJoinGenerateAction.model(
+                        misleadingUsers,
+                        roles(),
+                        MyBatisSqlDialect.POSTGRESQL,
+                        MyBatisGenerationConfiguration.standard("com.example")))
+                .getMessage().contains("没有可供用户选择"));
+    }
+
     private Presentation update(AnAction action, DbElement[] elements) {
         SimpleDataContext.Builder context = SimpleDataContext.builder()
                 .add(CommonDataKeys.PROJECT, getProject());
@@ -171,7 +223,8 @@ public final class MyBatisDatabaseAdvancedSqlGenerateActionTest
                 "users",
                 List.of(
                         column("id", Types.BIGINT, true, false, 0),
-                        column("role_id", Types.BIGINT, false, true, 1),
+                        foreignColumn(
+                                "role_id", Types.BIGINT, "roles", "id", 1),
                         column("name", Types.VARCHAR, false, false, 2)));
     }
 
@@ -209,6 +262,27 @@ public final class MyBatisDatabaseAdvancedSqlGenerateActionTest
                 false,
                 Optional.empty(),
                 position);
+    }
+
+    private static MyBatisDatabaseColumn foreignColumn(
+            String name,
+            int jdbcType,
+            String targetTable,
+            String targetColumn,
+            int position) {
+        return new MyBatisDatabaseColumn(
+                name,
+                "TYPE",
+                jdbcType,
+                true,
+                false,
+                true,
+                false,
+                false,
+                Optional.empty(),
+                position,
+                Optional.of(new MyBatisForeignKeyReference(
+                        Optional.empty(), Optional.empty(), targetTable, targetColumn)));
     }
 
     private static DbDataSource dataSource(boolean loading) {

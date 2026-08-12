@@ -13,15 +13,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
  * 方法名解析只消费调用方显式提供的表与字段词典。
  */
 public record MyBatisMethodSchema(
+        @NotNull Optional<String> catalog,
+        @NotNull Optional<String> schema,
         @NotNull String tableName,
         @NotNull List<MyBatisMethodField> fields) {
     public MyBatisMethodSchema {
+        catalog = catalog.filter(value -> !value.isBlank());
+        schema = schema.filter(value -> !value.isBlank());
         if (tableName.isBlank()) {
             throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
                     "methodsql.error.schema.table.empty"));
@@ -43,6 +48,15 @@ public record MyBatisMethodSchema(
                         "methodsql.error.schema.token.duplicate", field.methodToken()));
             }
         }
+    }
+
+    /**
+     * 保留旧调用方只提供表名时的源码兼容性。
+     */
+    public MyBatisMethodSchema(
+            @NotNull String tableName,
+            @NotNull List<MyBatisMethodField> fields) {
+        this(Optional.empty(), Optional.empty(), tableName, fields);
     }
 
     public static @NotNull MyBatisMethodSchema from(
@@ -69,9 +83,13 @@ public record MyBatisMethodSchema(
                     column.jdbcType(),
                     column.nullable(),
                     column.primaryKey(),
-                    column.foreignKey()));
+                    column.foreignKey(),
+                    column.autoIncrement(),
+                    column.generated(),
+                    column.foreignKeyReference()));
         }
-        return new MyBatisMethodSchema(table.name(), fields);
+        return new MyBatisMethodSchema(
+                table.catalog(), table.schema(), table.name(), fields);
     }
 
     private static @NotNull String upperFirst(@NotNull String value) {

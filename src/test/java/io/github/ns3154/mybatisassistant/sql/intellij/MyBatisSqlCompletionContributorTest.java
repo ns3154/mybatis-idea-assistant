@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class MyBatisSqlCompletionContributorTest extends BasePlatformTestCase {
     public void testContributorIsRegisteredForXmlHostAndBuildsInjectedGenericSql() {
@@ -128,6 +129,151 @@ public final class MyBatisSqlCompletionContributorTest extends BasePlatformTestC
         assertFalse(lookups.contains("users"));
     }
 
+    public void testCompletesOnlyColumnsFromUniqueResultMapTable() throws Exception {
+        warmMetadata();
+        myFixture.configureByText("UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="UserMap" type="com.example.User">
+                        <result property="name" column="na<caret>"/>
+                    </resultMap>
+                    <select id="find" resultMap="UserMap">
+                        select id, name, nickname from users
+                    </select>
+                </mapper>
+                """);
+
+        List<String> lookups = lookupStrings();
+
+        assertContainsElements(lookups, "name", "nickname");
+        assertFalse(lookups.contains("user_id"));
+
+        myFixture.configureByText("UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="UserMap" type="com.example.User">
+                        <result property="name" column="<caret>"/>
+                    </resultMap>
+                    <select id="find" resultMap="UserMap">select id, name from users</select>
+                </mapper>
+                """);
+        assertContainsElements(lookupStrings(), "id", "name", "nickname");
+    }
+
+    public void testResultMapColumnCompletionRejectsNestedAmbiguousAndDuplicateTargets()
+            throws Exception {
+        warmMetadata();
+        myFixture.configureByText("UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="UserMap" type="com.example.User">
+                        <association property="profile">
+                            <result property="name" column="na<caret>"/>
+                        </association>
+                    </resultMap>
+                    <select id="find" resultMap="UserMap">
+                        select id, name from users
+                    </select>
+                </mapper>
+                """);
+        assertFalse(lookupStrings().contains("nickname"));
+
+        myFixture.configureByText("UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="UserMap" type="com.example.User">
+                        <association property="profile" column="{foreignId=i<caret>d}"/>
+                    </resultMap>
+                    <select id="find" resultMap="UserMap">select id, name from users</select>
+                </mapper>
+                """);
+        assertFalse(lookupStrings().contains("nickname"));
+
+        myFixture.configureByText("UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="UserMap" type="com.example.User">
+                        <result property="name" column="na<caret>"/>
+                    </resultMap>
+                    <select id="find" resultMap="UserMap">
+                        select u.name, o.user_id from users u
+                        join user_sessions o on u.id = o.user_id
+                    </select>
+                </mapper>
+                """);
+        assertFalse(lookupStrings().contains("nickname"));
+
+        myFixture.configureByText("UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="UserMap" type="com.example.User">
+                        <result property="name" column="na<caret>"/>
+                    </resultMap>
+                    <resultMap id="UserMap" type="com.example.User"/>
+                    <select id="find" resultMap="UserMap">select id, name from users</select>
+                </mapper>
+                """);
+        assertFalse(lookupStrings().contains("nickname"));
+    }
+
+    public void testResultMapColumnCompletionNeverStartsMetadataRefresh() {
+        AtomicInteger loads = new AtomicInteger();
+        MyBatisDatabaseMetadataProvider.EP_NAME.getPoint().registerExtension(
+                new CountingProvider(loads),
+                getTestRootDisposable());
+        myFixture.configureByText("UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="UserMap" type="com.example.User">
+                        <result property="name" column="na<caret>"/>
+                    </resultMap>
+                    <select id="find" resultMap="UserMap">
+                        select id, name from users
+                    </select>
+                </mapper>
+                """);
+
+        lookupStrings();
+        assertEquals(0, loads.get());
+    }
+
+    public void testResultMapColumnCompletionRequiresOneReadyTableCandidate()
+            throws Exception {
+        List<MyBatisDatabaseSnapshot> snapshots = List.of(
+                snapshot("main", "Main", MyBatisMetadataFreshness.READY),
+                snapshot("replica", "Replica", MyBatisMetadataFreshness.READY));
+        MyBatisDatabaseMetadataProvider.EP_NAME.getPoint().registerExtension(
+                new SnapshotProvider(snapshots),
+                getTestRootDisposable());
+        MyBatisDatabaseMetadataService.getInstance(getProject()).load(
+                MyBatisDatabaseRequest.all(),
+                Duration.ofSeconds(1)).get(2, TimeUnit.SECONDS);
+        myFixture.configureByText("UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="UserMap" type="com.example.User">
+                        <result property="name" column="nick<caret>"/>
+                    </resultMap>
+                    <select id="find" resultMap="UserMap">select id from users</select>
+                </mapper>
+                """);
+
+        assertFalse(lookupStrings().contains("nickname"));
+    }
+
+    public void testResultMapColumnCompletionRejectsLoadingSnapshot() throws Exception {
+        List<MyBatisDatabaseSnapshot> snapshots =
+                List.of(snapshot("main", "Main", MyBatisMetadataFreshness.LOADING));
+        MyBatisDatabaseMetadataProvider.EP_NAME.getPoint().registerExtension(
+                new SnapshotProvider(snapshots),
+                getTestRootDisposable());
+        MyBatisDatabaseMetadataService.getInstance(getProject()).load(
+                MyBatisDatabaseRequest.all(),
+                Duration.ofSeconds(1)).get(2, TimeUnit.SECONDS);
+        myFixture.configureByText("UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="UserMap" type="com.example.User">
+                        <result property="name" column="nick<caret>"/>
+                    </resultMap>
+                    <select id="find" resultMap="UserMap">select id from users</select>
+                </mapper>
+                """);
+
+        assertFalse(lookupStrings().contains("nickname"));
+    }
+
     private void warmMetadata() throws Exception {
         MyBatisDatabaseMetadataProvider.EP_NAME.getPoint().registerExtension(
                 new FakeProvider(),
@@ -184,6 +330,61 @@ public final class MyBatisSqlCompletionContributorTest extends BasePlatformTestC
                     Optional.of("public"),
                     name,
                     metadata);
+        }
+    }
+
+    private static final class CountingProvider implements MyBatisDatabaseMetadataProvider {
+        private final AtomicInteger loads;
+
+        private CountingProvider(AtomicInteger loads) {
+            this.loads = loads;
+        }
+
+        @Override
+        public String id() {
+            return "completion-counting-fixture";
+        }
+
+        @Override
+        public List<MyBatisDatabaseSnapshot> load(
+                Project project,
+                MyBatisDatabaseRequest request,
+                ProgressIndicator indicator) {
+            loads.incrementAndGet();
+            return List.of();
+        }
+    }
+
+    private static MyBatisDatabaseSnapshot snapshot(
+            String dataSourceId,
+            String displayName,
+            MyBatisMetadataFreshness freshness) {
+        return new MyBatisDatabaseSnapshot(
+                dataSourceId,
+                displayName,
+                MyBatisSqlDialect.MYSQL,
+                freshness,
+                1,
+                List.of(FakeProvider.table("users", "id", "name", "nickname")));
+    }
+
+    private record SnapshotProvider(List<MyBatisDatabaseSnapshot> snapshots)
+            implements MyBatisDatabaseMetadataProvider {
+        private SnapshotProvider {
+            snapshots = List.copyOf(snapshots);
+        }
+
+        @Override
+        public String id() {
+            return "completion-snapshots-" + snapshots.getFirst().dataSourceId();
+        }
+
+        @Override
+        public List<MyBatisDatabaseSnapshot> load(
+                Project project,
+                MyBatisDatabaseRequest request,
+                ProgressIndicator indicator) {
+            return snapshots;
         }
     }
 }

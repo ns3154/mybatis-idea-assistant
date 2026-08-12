@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.inspection;
 
 import com.intellij.codeInspection.LocalInspectionTool;
+import com.intellij.codeInspection.ProblemHighlightType;
 import com.intellij.codeInspection.ProblemsHolder;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.TextRange;
@@ -23,13 +24,14 @@ import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataService;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseSnapshot;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
-import io.github.ns3154.mybatisassistant.database.MyBatisMetadataFreshness;
 import io.github.ns3154.mybatisassistant.dynamic.MyBatisSourceMapKind;
 import io.github.ns3154.mybatisassistant.dynamic.MyBatisSourceMapping;
 import io.github.ns3154.mybatisassistant.model.MyBatisXmlModel;
 import io.github.ns3154.mybatisassistant.sql.MyBatisVirtualSqlDiagnosticCode;
 import io.github.ns3154.mybatisassistant.sql.intellij.MyBatisSqlPsiResult;
 import io.github.ns3154.mybatisassistant.sql.intellij.MyBatisSqlPsiService;
+import io.github.ns3154.mybatisassistant.sql.intellij.MyBatisResultMapMappingPlanner;
+import io.github.ns3154.mybatisassistant.sql.intellij.MyBatisResultMapSchemaResolver;
 import io.github.ns3154.mybatisassistant.sql.intellij.MyBatisSqlSchemaAnalysis;
 import io.github.ns3154.mybatisassistant.sql.intellij.MyBatisSqlSchemaAnalyzer;
 import io.github.ns3154.mybatisassistant.sql.intellij.MyBatisSqlSymbolKind;
@@ -40,10 +42,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.sql.Types;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -72,20 +72,17 @@ public final class MyBatisSqlSchemaInspection extends LocalInspectionTool {
             @NotNull XmlTag resultMap) {
         MyBatisDatabaseMetadataService metadata = MyBatisDatabaseMetadataService
                 .getInstance(resultMap.getProject());
-        var latest = metadata.latest();
+        var latest = metadata.latestVersioned();
         if (latest.isEmpty()) {
-            metadata.refresh();
             return;
         }
-        List<MyBatisDatabaseSnapshot> snapshots = latest.orElseThrow().snapshots();
-        if (snapshots.stream().anyMatch(
-                snapshot -> snapshot.freshness() != MyBatisMetadataFreshness.READY)) {
+        var versioned = latest.orElseThrow();
+        List<MyBatisDatabaseSnapshot> snapshots = versioned.loaded().snapshots();
+        var resolvedTable = MyBatisResultMapSchemaResolver.resolve(resultMap, snapshots);
+        if (resolvedTable.isEmpty()) {
             return;
         }
-        MyBatisDatabaseTable table = uniqueResultMapTable(resultMap, snapshots);
-        if (table == null) {
-            return;
-        }
+        MyBatisDatabaseTable table = resolvedTable.orElseThrow().table();
         for (XmlTag mapping : PsiTreeUtil.findChildrenOfType(resultMap, XmlTag.class)) {
             ProgressManager.checkCanceled();
             XmlAttribute columnAttribute = mapping.getAttribute("column");
@@ -111,63 +108,37 @@ public final class MyBatisSqlSchemaInspection extends LocalInspectionTool {
                 inspectPropertyType(holder, mapping, columns.getFirst());
             }
         }
-    }
-
-    private static @Nullable MyBatisDatabaseTable uniqueResultMapTable(
-            @NotNull XmlTag resultMap,
-            @NotNull List<MyBatisDatabaseSnapshot> snapshots) {
-        String id = resultMap.getAttributeValue("id");
+        var plan = MyBatisResultMapMappingPlanner.plan(
+                resultMap,
+                resolvedTable.orElseThrow());
+        if (plan.isEmpty() || plan.orElseThrow().entries().isEmpty()) {
+            return;
+        }
+        XmlAttribute idAttribute = resultMap.getAttribute("id");
+        XmlAttributeValue idValue = idAttribute == null ? null : idAttribute.getValueElement();
         XmlTag mapper = resultMap.getParentTag();
-        if (id == null || id.isBlank() || mapper == null
-                || !"mapper".equals(mapper.getName()) || snapshots.isEmpty()) {
-            return null;
+        PsiFile resultMapFile = resultMap.getContainingFile();
+        var virtualFile = resultMapFile == null ? null : resultMapFile.getVirtualFile();
+        String id = resultMap.getAttributeValue("id");
+        String namespace = mapper == null ? null : MyBatisXmlModel.namespace(mapper);
+        if (idValue == null || id == null || namespace == null || virtualFile == null) {
+            return;
         }
-        Map<String, MyBatisDatabaseTable> candidates = new LinkedHashMap<>();
-        for (MyBatisDatabaseSnapshot snapshot : snapshots) {
-            for (MyBatisDatabaseTable table : snapshot.tables()) {
-                candidates.put(candidateName(snapshot, table), table);
-            }
-        }
-        Set<MyBatisDatabaseTable> referencedTables = new LinkedHashSet<>();
-        boolean foundStatement = false;
-        for (XmlTag statement : mapper.getSubTags()) {
-            ProgressManager.checkCanceled();
-            if (!MyBatisXmlModel.isStatement(statement)
-                    || !referencesResultMap(statement.getAttributeValue("resultMap"), id)) {
-                continue;
-            }
-            foundStatement = true;
-            MyBatisSqlPsiResult result = MyBatisSqlPsiService
-                    .getInstance(resultMap.getProject())
-                    .parse(statement);
-            if (!(result instanceof MyBatisSqlPsiResult.Ready ready)
-                    || hasBlockingSyntaxProblem(ready)) {
-                return null;
-            }
-            MyBatisSqlSchemaAnalysis analysis = MyBatisSqlSchemaAnalyzer.analyze(
-                    ready,
-                    snapshots);
-            List<MyBatisSqlSymbolOccurrence> tableOccurrences = analysis.occurrences().stream()
-                    .filter(occurrence -> occurrence.kind() == MyBatisSqlSymbolKind.TABLE)
-                    .toList();
-            if (!analysis.metadataComplete() || tableOccurrences.isEmpty()) {
-                return null;
-            }
-            for (MyBatisSqlSymbolOccurrence occurrence : tableOccurrences) {
-                if (occurrence.status() != MyBatisSqlSymbolStatus.RESOLVED
-                        || occurrence.candidates().size() != 1) {
-                    return null;
-                }
-                MyBatisDatabaseTable table = candidates.get(occurrence.candidates().getFirst());
-                if (table == null) {
-                    return null;
-                }
-                referencedTables.add(table);
-            }
-        }
-        return foundStatement && referencedTables.size() == 1
-                ? referencedTables.iterator().next()
-                : null;
+        holder.registerProblem(
+                idValue,
+                MyBatisAssistantBundle.message(
+                        "inspection.sql.schema.resultmap.unmapped",
+                        table.name(),
+                        plan.orElseThrow().entries().size()),
+                ProblemHighlightType.INFORMATION,
+                valueRange(idValue),
+                new FillMyBatisResultMapFieldsQuickFix(
+                        namespace,
+                        id,
+                        virtualFile.getUrl(),
+                        resultMap.getText(),
+                        plan.orElseThrow(),
+                        versioned.generation()));
     }
 
     private static void inspectPropertyType(
@@ -245,26 +216,6 @@ public final class MyBatisSqlSchemaInspection extends LocalInspectionTool {
                 || javaCategory == jdbcCategory;
     }
 
-    private static boolean referencesResultMap(@Nullable String value, @NotNull String id) {
-        if (value == null || value.isBlank()) {
-            return false;
-        }
-        for (String token : value.trim().split("[,\\s]+")) {
-            if (id.equals(token) || token.endsWith("." + id)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static @NotNull String candidateName(
-            @NotNull MyBatisDatabaseSnapshot snapshot,
-            @NotNull MyBatisDatabaseTable table) {
-        return snapshot.displayName() + ":"
-                + table.schema().map(value -> value + ".").orElse("")
-                + table.name();
-    }
-
     private static boolean equalsName(@NotNull String first, @NotNull String second) {
         return first.equalsIgnoreCase(second);
     }
@@ -326,7 +277,6 @@ public final class MyBatisSqlSchemaInspection extends LocalInspectionTool {
                 .getInstance(statement.getProject());
         var latest = metadata.latest();
         if (latest.isEmpty()) {
-            metadata.refresh();
             return;
         }
         MyBatisSqlPsiResult sqlResult = MyBatisSqlPsiService

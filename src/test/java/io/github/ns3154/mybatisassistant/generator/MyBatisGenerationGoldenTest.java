@@ -18,7 +18,7 @@ import java.util.Set;
 
 public final class MyBatisGenerationGoldenTest extends BasePlatformTestCase {
     private static final String EXPECTED_SHA256 =
-            "8ebe038f967b75769333522cd370172e06ed4ae0001408fba01342d16ccce7f6";
+            "21872fd4dea5457f3bfd2376d4fac5964bd6cb3de720003b23f817951efa97b5";
 
     public void testOneHundredSchemaEvolutionGoldenCasesPreserveManualContent() throws Exception {
         MessageDigest aggregate = MessageDigest.getInstance("SHA-256");

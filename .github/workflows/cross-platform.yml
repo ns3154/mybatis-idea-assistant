@@ -59,9 +59,17 @@ jobs:
         run: ./scripts/test-gradle-infrastructure-retry.sh
 
       - name: 验证 Java 与完整语义语料
+        shell: bash
         run: |
           mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
           mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
+
+      - name: 验证 Gradle 多模块 Spring Boot 样例
+        shell: bash
+        run: >-
+          ./scripts/run-gradle-with-infrastructure-retry.sh
+          -p samples/gradle-spring-boot-multimodule
+          clean check :app:bootJar --no-daemon
 
       - name: 运行无界面质量门
         shell: bash
@@ -79,6 +87,7 @@ jobs:
             build/reports/problems/
             build/reports/gradle-infrastructure-retry/
             samples/**/target/surefire-reports/
+            samples/**/build/reports/tests/
           if-no-files-found: ignore
 
   lifecycle:

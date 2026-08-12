@@ -6,6 +6,9 @@ import org.cyclonedx.model.LicenseChoice
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
+import org.jetbrains.intellij.platform.gradle.tasks.PublishPluginTask
+import org.jetbrains.intellij.platform.gradle.tasks.SignPluginTask
+import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginSignatureTask
 import org.gradle.api.plugins.quality.Checkstyle
 import org.gradle.api.tasks.WriteProperties
 import org.gradle.jvm.tasks.Jar
@@ -34,6 +37,14 @@ val pluginVerifierIdeVersion = providers.gradleProperty("pluginVerifierIdeVersio
 val pluginVerifierProduct = providers.gradleProperty("pluginVerifierProduct").orElse("idea")
 val dependencyLockFile = providers.gradleProperty("dependencyLockFile")
     .orElse("gradle.lockfile")
+val externalPublishArchive = providers.gradleProperty("pluginArchiveFile")
+val externalSigningArchive = providers.gradleProperty("pluginSigningArchiveFile")
+val externalSignatureVerificationArchive = providers.gradleProperty(
+    "pluginSignatureVerificationArchiveFile",
+)
+val externalSignatureCertificate = providers.gradleProperty(
+    "pluginSignatureCertificateFile",
+)
 
 java {
     toolchain {
@@ -353,6 +364,23 @@ tasks {
         ),
         "0.70",
     )
+    val databaseObjectReferenceCoreCoverage = registerScopedCoverage(
+        "jacocoDatabaseObjectReferenceCoreCoverageVerification",
+        listOf(
+            "io/github/ns3154/mybatisassistant/database/intellij/MyBatisDatabaseObjectTarget*",
+        ),
+        "0.85",
+    )
+    val databaseObjectReferenceAdapterCoverage = registerScopedCoverage(
+        "jacocoDatabaseObjectReferenceAdapterCoverageVerification",
+        listOf(
+            "io/github/ns3154/mybatisassistant/database/intellij/MyBatisDatabaseObjectLocator*",
+            "io/github/ns3154/mybatisassistant/database/intellij/MyBatisDatabaseObjectReference*",
+            "io/github/ns3154/mybatisassistant/database/intellij/MyBatisDatabaseObjectReferenceContributor*",
+            "io/github/ns3154/mybatisassistant/database/intellij/MyBatisDatabaseObjectReferencesSearchExecutor*",
+        ),
+        "0.70",
+    )
     val generatorCoverage = registerScopedCoverage(
         "jacocoGeneratorCoverageVerification",
         listOf("io/github/ns3154/mybatisassistant/generator/**"),
@@ -421,6 +449,8 @@ tasks {
             coreCoverage,
             sqlDatabaseCoverage,
             databaseAdapterCoverage,
+            databaseObjectReferenceCoreCoverage,
+            databaseObjectReferenceAdapterCoverage,
             generatorCoverage,
             methodSqlCoverage,
             databaseCompatibilityCoverage,
@@ -441,5 +471,33 @@ tasks {
         // 2026.1.4 的 Vue 插件在轻量测试沙箱中会按完整 IDE 目录结构定位资源，
         // 与本插件无关且会导致测试框架启动失败，因此仅在测试沙箱禁用。
         disabledPlugins.add("org.jetbrains.plugins.vue")
+    }
+
+    named<PublishPluginTask>("publishPlugin") {
+        // 发布 job 只能消费前序签名 job 上传的同一候选包，禁止重新构建或重新签名。
+        if (externalPublishArchive.isPresent) {
+            archiveFile.set(layout.file(externalPublishArchive.map { file(it) }))
+        }
+    }
+
+    named<SignPluginTask>("signPlugin") {
+        // 签名 job 消费质量门上传的确切未签名候选，不允许另一个构建悄悄替换制品。
+        if (externalSigningArchive.isPresent) {
+            archiveFile.set(layout.file(externalSigningArchive.map { file(it) }))
+        }
+    }
+
+    named<VerifyPluginSignatureTask>("verifyPluginSignature") {
+        // 支持在独立 job 中校验下载回来的签名制品，并用于篡改失败关闭测试。
+        if (externalSignatureVerificationArchive.isPresent) {
+            inputArchiveFile.set(layout.file(
+                externalSignatureVerificationArchive.map { file(it) },
+            ))
+        }
+        if (externalSignatureCertificate.isPresent) {
+            certificateChainFile.set(layout.file(
+                externalSignatureCertificate.map { file(it) },
+            ))
+        }
     }
 }

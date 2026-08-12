@@ -2,7 +2,7 @@
 
 面向 IntelliJ IDEA 的 MyBatis 智能开发助手，采用独立实现路线开发。
 
-当前处于 `0.1.0-SNAPSHOT` 发布候选开发阶段：S0～S12 已形成阶段实现与验收记录，S13 正在收口最近四个稳定 IDE 大版本、三系统、百万行性能、生命周期、签名和正式发布链路。正式交付仍以统一质量门、支持矩阵及副屏/独立测试机的实机安装、升级、降级和卸载证据为准。
+当前处于 `0.1.0-SNAPSHOT` 发布候选开发阶段：S0～S12 已形成阶段实现与验收记录，S13 正在收口最近四个稳定 IDE 大版本、三系统、百万行性能、生命周期、签名和正式发布链路。提交 `afcf017` 保留 652 个平台测试、83.56% 整体行覆盖率、三系统、五宿主和 CodeQL 远端基线。截至 2026-08-12，包含 ResultMap、S5 黄金、S9 批量语义、样例与发布链加固的当前工作区已通过一次独占的本地统一候选门：`BUILD SUCCESSFUL`（2m25s），101 个测试套件中的 722/722 平台测试通过，失败/错误/跳过均为 0，整体行覆盖率 15135/17958（84.28%），各分区覆盖率、SBOM、本地化、结构与最低 `IU-252.28539.54` Verifier 均通过；候选 ZIP SHA-256 为 `85992cb50b0656c4745aac9eda68f0b18ec2d8ba64099c3caebdab1d423a87e9`。新 HEAD 的远端 CI/三系统/CodeQL/五宿主、加固生命周期 1/100 与 5/5、副屏/独立测试机实机及真实生产签名仍未取证，因此不标记阶段已验收。
 
 - 识别 Java Mapper 接口；
 - 识别 MyBatis XML 的 `namespace`；
@@ -22,7 +22,7 @@
 - 提供缺失 Mapper XML、重复 statement 等默认检查，并将高误报风险的 namespace、未使用 statement、缺失 `@Param` 检查默认关闭；
 - 提供可预览、单次撤销、冲突停止的 Mapper XML、statement、`@Param` 修复；未使用 statement 仅提供定位，不自动删除代码。
 - 按 MyBatis 参数命名规则解析 `#{}`、`${}`、`keyProperty`、`property` 与 `collection` 的根名、点路径和索引路径，对未知 Map 键与完整 OGNL 保守降级；
-- 解析 ResultMap 的可写属性、嵌套类型、constructor/discriminator 分支与 TypeAlias，提供精确引用、查找使用、补全候选和低误报检查；
+- 解析 ResultMap 的可写属性、嵌套类型、constructor/discriminator 分支与 TypeAlias，提供精确引用、查找使用、`property`/`column` 补全和低误报检查；当 READY 元数据、唯一单表目标和可写 Java 属性均可证明时，提供缺失映射的保守 Quick Fix，语义不完整或目标歧义时不写入；
 - 使用 IntelliJ 原生 Rename 同步更新 statement、resultMap/SQL fragment、`@Param`、JavaBean 属性与稳定类型引用；遇到动态 OGNL、include、多目标、只读或不完整语义时在写入前停止。
 - 将动态 statement 编译为不会组合爆炸的符号化 IR，覆盖 `if/choose/where/set/trim/foreach/bind/include`，并为普通文本、CDATA、entity 与 include property 建立双向字符级 source map；循环、重复目标、Dumb Mode、失效源与取消均保守停止。
 - 为 `test`、`when/test` 与 `bind/value` 注入自有 OGNL 语言，提供可恢复语法树、高亮、保守类型推导、引用、补全、Find Usages、作用域内 Rename 和可证明错误检查；分析过程不执行项目代码。
@@ -34,8 +34,8 @@
 - 从 Database Tools 已加载且由用户明确选择的表生成 Entity、Mapper、Mapper XML 和 Service；支持 Standard/MyBatis-Plus 模板、命名、字段过滤、注释、类型/TypeHandler、自增键与关键字转义；
 - 所有数据库生成先形成全量计划，支持按文件选择、候选文本和原生差异；稳定生成区以 SHA-256 防止覆盖用户修改，区域外手写内容、未保存编辑和 LF/CRLF 均保留；
 - 批量创建与更新由单个命名 IDE Command 承载，执行前复核 TOCTOU 并创建 Local History 标签；写入异常自动回滚，冲突或失败不留半成品，整批支持一次 Undo/Redo。
-- 以确定性方法语法生成 Mapper 方法和静态/动态 XML，覆盖投影、条件、排序、聚合、Top/分页及 MySQL、PostgreSQL、Oracle、SQL Server、SQLite、达梦六类数据库方言；歧义或无条件写操作在生成前拒绝；
-- 显式选择框架与版本后预览可编译的 MyBatis-Plus/Flex Wrapper，不按类路径猜测，也不使用不安全 SQL 尾部拼接；
+- 以确定性方法语法生成 Mapper 方法和静态/动态 XML，覆盖投影、条件、排序、聚合、Top/分页及六类数据库方言；`insertBatch(Collection<Entity>)` 生成一条 set-based 插入 statement（Oracle 为 `INSERT ALL`），null/空/含 null 元素在动态 SQL 绑定阶段失败；只有集合 `IN/NOT IN` 的对应输入进入 `1 = 0` 失败关闭。该能力不隐式启用 JDBC `ExecutorType.BATCH`，不自动分片，也不承诺任意集合大小、跨驱动原子性或零副作用。AND-only 可选条件当前只属于核心 API/夹具能力，Database Tools 两个动作仍固定传入 `optionalConditionIndexes=Set.of()`，未提供用户选择入口；
+- 显式选择框架与版本后预览 MyBatis-Plus/Flex Wrapper 代码，不按类路径猜测，也不使用不安全 SQL 尾部拼接；`MyBatisWrapperGeneratedCompileFixtureTest` 与 Maven 样例逐字绑定当前生成器输出，Plus 3.5.17/Flex 1.11.8 真实编译运行 5/5，不外推其他版本；
 - 从两张同数据源、已加载表中显式选择 FK↔PK、Join 类型和输出字段后预览 Join SQL，不按列名猜测业务关系。
 - 从单条 CREATE TABLE、显式投影 SELECT 或 Java PSI 预览 Entity/Mapper/ResultMap/Java 行模型/六方言 DDL；类型未知时使用明确占位并要求确认，不执行项目代码；
 - 本地还原 MyBatis `Preparing`/`Parameters` 日志，安全处理交错线程、null、JSON、枚举、时间和特殊字符；二进制、截断或错配时拒绝半成品；
@@ -45,6 +45,8 @@
 - 提供 schema v2 的非敏感设置迁移、确定性导入导出、恢复默认和中英文界面语言覆盖；损坏、未来版本和敏感键整体拒绝。
 - 提供默认关闭、只绑定 `127.0.0.1` 的项目级 MCP；随机内存令牌、会话、Host/Origin、请求体上限和白名单共同守门，写工具仍须 preview→confirm 并支持 Undo/失败回滚。
 - 生成可复现 CycloneDX 1.6 SBOM；正式发布只从 CI secret 注入签名材料和 Marketplace token，仓库不保存私钥或运行期凭据。
+
+当前候选包含三类验证资产：S5 `v1` 版本化动态 SQL 黄金文件；Java 21 + Spring Boot 4.1.0 的四模块 Gradle 样例；以及包含五类数据库版本文本夹具、1024 张表、1024 个 Mapper 和 5120 个 statement 的确定性合成物理文件树夹具。本地统一证据还包括 Java/MyBatis 样例 8/8、语义语料 11/11、Gradle Spring 四模块 2/2 及 `bootJar`，以及临时密钥签名/验签/篡改拒绝/归档身份和 shell/生命周期/发布静态契约。五库语料只有文本/版本/token 契约，大夹具只有合成文件树与五命名维度；二者都不是插件产品解析、真实数据库/数据源、驱动兼容、IDE 项目导入或 UI 证据，真实达梦 DM8 仍需外部环境验收。
 
 ## 开发环境
 
@@ -59,14 +61,15 @@
 ```bash
 mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
 mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
+./gradlew -p samples/gradle-spring-boot-multimodule clean check :app:bootJar --no-daemon
 ./gradlew check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin
 ./gradlew verifyCyclonedxBom
-./scripts/verify-sandbox-lifecycle.sh 20
+./scripts/verify-sandbox-lifecycle.sh 1
 ./scripts/verify-optional-dependency-isolation.sh
 ./gradlew runIde
 ```
 
-S13 正式候选需把生命周期命令提升为 `./scripts/verify-sandbox-lifecycle.sh 100`，且只在副屏或独立测试环境运行。
+S13 正式候选需把生命周期命令提升为 `./scripts/verify-sandbox-lifecycle.sh 100`。旧脚本在历史候选上的 100/100 只算基线；加固脚本必须先在新 HEAD 跑 1 次审查报告，再在同一 HEAD 跑满 100 次，并与 5/5 可选依赖隔离共同留证。涉及图形界面的路径只在副屏或独立测试环境运行。
 
 插件 ZIP 生成在 `build/distributions/`。
 

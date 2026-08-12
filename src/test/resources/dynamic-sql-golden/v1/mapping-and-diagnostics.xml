@@ -1,0 +1,13 @@
+<mapper namespace="golden.v1.MappingMapper">
+    <select id="mapped">select * from scores where score &gt; 10 and grade &lt; 5 <![CDATA[and active = 1]]><!-- ignored --></select>
+    <select id="invalid">
+        <choose>
+            <when>select 1</when>
+            <otherwise>select 2</otherwise>
+            <otherwise>select 3</otherwise>
+            <if test="ok">select 4</if>
+        </choose>
+        <foreach collection="ids" nullable="sometimes">#{item}</foreach>
+        <unknown>unavailable</unknown>
+    </select>
+</mapper>

@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.methodsql;
 
+import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import io.github.ns3154.mybatisassistant.model.MyBatisFrameworkMapperBinding;
 import org.jetbrains.annotations.NotNull;
 
@@ -15,6 +16,8 @@ public record MyBatisWrapperGenerationRequest(
         @NotNull MyBatisWrapperFramework framework,
         @NotNull String frameworkVersion,
         @NotNull String entityType,
+        @NotNull MyBatisSqlDialect dialect,
+        boolean escapeIdentifiers,
         @NotNull Set<Integer> optionalConditionIndexes) {
     public MyBatisWrapperGenerationRequest {
         if (frameworkVersion.isBlank() || entityType.isBlank()) {
@@ -24,6 +27,21 @@ public record MyBatisWrapperGenerationRequest(
         MyBatisJavaTypeValidator.requireQualifiedName(entityType,
                 MyBatisMethodSqlMessages.message("methodsql.role.wrapper.entity"));
         optionalConditionIndexes = Set.copyOf(optionalConditionIndexes);
+    }
+
+    /**
+     * 保留旧调用方的源码兼容性；新入口应显式传入实际数据库方言和引用策略。
+     */
+    public MyBatisWrapperGenerationRequest(
+            @NotNull MyBatisMethodSchema schema,
+            @NotNull MyBatisMethodQuery query,
+            @NotNull MyBatisMethodGeneration methodGeneration,
+            @NotNull MyBatisWrapperFramework framework,
+            @NotNull String frameworkVersion,
+            @NotNull String entityType,
+            @NotNull Set<Integer> optionalConditionIndexes) {
+        this(schema, query, methodGeneration, framework, frameworkVersion, entityType,
+                MyBatisSqlDialect.GENERIC, false, optionalConditionIndexes);
     }
 
     /**
@@ -49,6 +67,8 @@ public record MyBatisWrapperGenerationRequest(
                 framework,
                 frameworkVersion,
                 binding.entity().qualifiedName(),
+                MyBatisSqlDialect.GENERIC,
+                false,
                 optionalConditionIndexes);
     }
 }

@@ -40,14 +40,40 @@ jobs:
       - name: 验证 Gradle 基础设施重试边界
         run: ./scripts/test-gradle-infrastructure-retry.sh
 
+      - name: 验证交付 Shell 契约
+        run: |
+          bash -n scripts/*.sh
+          ./scripts/test-sandbox-lifecycle-contract.sh
+          ./scripts/test-optional-dependency-isolation-contract.sh
+          ./scripts/test-release-input-validation.sh
+          ./scripts/test-release-notes.sh
+          ./scripts/test-release-required-checks.sh
+          ./scripts/test-release-workflow-contract.sh
+          ./scripts/test-plugin-archive-identity.sh
+
       - name: 验证 Java + MyBatis 样例
         run: mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
 
       - name: 验证完整语义语料
         run: mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 
+      - name: 验证 Gradle 多模块 Spring Boot 样例
+        run: >-
+          ./scripts/run-gradle-with-infrastructure-retry.sh
+          -p samples/gradle-spring-boot-multimodule
+          clean check :app:bootJar --no-daemon
+
       - name: 运行测试与插件验证
         run: ./scripts/run-gradle-with-infrastructure-retry.sh check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin
+
+      - name: 验证临时测试签名链
+        run: ./scripts/verify-ephemeral-plugin-signing.sh
+
+      - name: 验证插件候选身份
+        run: >-
+          ./scripts/verify-plugin-archive-identity.sh
+          build/distributions/mybatis-idea-assistant-0.1.0-SNAPSHOT.zip
+          0.1.0-SNAPSHOT
 
       - name: 上传插件 ZIP
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -68,5 +94,7 @@ jobs:
             build/reports/pluginVerifier/
             build/reports/problems/
             build/reports/gradle-infrastructure-retry/
+            build/reports/ephemeral-signing/
             samples/**/target/surefire-reports/
+            samples/**/build/reports/tests/
           if-no-files-found: ignore

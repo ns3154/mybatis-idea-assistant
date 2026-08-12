@@ -11,5 +11,15 @@
                 enabled="true"
                 level="WARNING"
                 enabled_by_default="true"/>
+        <!--
+        semantic-corpus 中 findSummary 没有对应 Mapper 方法。该检查必须稳定产出且仅产出
+        这一条问题，生命周期与可选依赖隔离脚本据此证明插件检查确实执行过，而不是只
+        证明 IDEA 进程以 0 退出。
+        -->
+        <inspection_tool
+                class="MyBatisUnusedStatement"
+                enabled="true"
+                level="WARNING"
+                enabled_by_default="true"/>
     </profile>
 </component>

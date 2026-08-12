@@ -1,7 +1,7 @@
 # S12 MCP、设置、国际化与产品化任务卡
 
 > 阶段：S12 发布候选产品化
-> 状态：开发中
+> 状态：代码与发布链加固已通过当前候选本地统一门；新 HEAD 远端、真实签名、Marketplace 初始化、环境审批和副屏实机未验收
 
 ## 目标
 
@@ -27,7 +27,7 @@
 | S12-C | Mapper、statement、参数、表列、数据源、引用只读工具 | 精确项目选择、Dumb/取消/失效/多目标/加载中与上限测试 |
 | S12-D | CRUD、statement、测试骨架受控写工具 | preview→confirm 两阶段、白名单、TOCTOU、只读/冲突/取消、单命令 Undo 与失败恢复 |
 | S12-E | 中英文资源、图标、隐私、许可证与第三方清单 | 资源键对称、无新增界面硬编码、插件描述与文档校验、隐私负面承诺测试 |
-| S12-F | CycloneDX SBOM、签名/发布配置、升级降级回滚说明 | 可复现 SBOM、无密钥仓库、签名仅由 CI secret 注入、Alpha/Beta/RC 升降级演练 |
+| S12-F | CycloneDX SBOM、签名、GitHub 草稿 Release、Marketplace 与升级降级回滚 | 可复现 SBOM、无密钥仓库、候选 SHA/必需检查/制品身份/签名/来源证明守门、首次 Marketplace 人工初始化、Alpha/Beta/RC 升降级演练 |
 
 ## 设置 schema v2
 
@@ -40,6 +40,10 @@
 ## 统一质量门
 
 - S12 核心代码行覆盖率不低于 85%，整体覆盖率不低于 70%；
-- Checkstyle、完整平台测试、两个 Maven 语料、插件结构、最低 261 Verifier 与支持矩阵全绿；
+- Checkstyle、完整平台测试、两个 Maven 语料、插件结构、最低 252 Verifier 与支持矩阵全绿；
 - 安全扫描证明设置、导出、日志、测试报告和 ZIP 不含明文密码、token 或私钥；
+- 发布环境固定为 `release-signing`、`release-github`、`marketplace-preview` 和 `marketplace-production`；签名 secret 与 Marketplace token 必须放入对应 Environment，不能放进仓库或让用户在对话中粘贴；
+- `v*` 标签必须指向触发时 `origin/main` 的精确提交并通过同一 SHA 的必需检查；GitHub 草稿 Release 与 Marketplace 发布均复核制品身份、SHA-256 和来源证明；
 - 没有副屏时不启动 IDEA、`runIde`、生命周期脚本或 Computer Use；真实设置页、MCP 客户端和升级/卸载路径保留为待验，不能冒充完成。
+
+截至 2026-08-12，当前工作区已通过独占本地统一候选门：722/722 平台测试，15135/17958（84.28%）整体行覆盖率，各分区覆盖率、SBOM、本地化、结构和最低 `IU-252.28539.54` Verifier 均通过；临时密钥签名、验签、篡改拒绝、归档身份以及 shell/生命周期/发布静态契约均通过。这些是本地非生产证据，不替代新 HEAD 远端、Environment 审批、生产密钥签名、Marketplace 接收或副屏验收。

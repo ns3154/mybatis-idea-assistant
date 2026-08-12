@@ -224,6 +224,65 @@ public final class MyBatisDatabaseMetadataServiceTest extends BasePlatformTestCa
         assertTrue(service().latest().isEmpty());
     }
 
+    public void testVersionedLeaseSerializesInvalidationAndRejectsOldGeneration()
+            throws Exception {
+        register(new MyBatisDatabaseMetadataProvider() {
+            @Override
+            public String id() {
+                return "versioned-lease";
+            }
+
+            @Override
+            public List<MyBatisDatabaseSnapshot> load(
+                    Project project,
+                    MyBatisDatabaseRequest request,
+                    ProgressIndicator indicator) {
+                return List.of(snapshot("main", "Main", "public", "users"));
+            }
+        });
+        service().load(MyBatisDatabaseRequest.all(), Duration.ofSeconds(1))
+                .get(2, TimeUnit.SECONDS);
+        MyBatisDatabaseMetadataService.VersionedLoaded versioned = service()
+                .latestVersioned()
+                .orElseThrow();
+        CountDownLatch leaseEntered = new CountDownLatch(1);
+        CountDownLatch releaseLease = new CountDownLatch(1);
+        CountDownLatch invalidationStarted = new CountDownLatch(1);
+        AtomicBoolean staleOperationRan = new AtomicBoolean();
+
+        CompletableFuture<Boolean> lease = CompletableFuture.supplyAsync(() ->
+                service().withCurrentVersion(versioned.generation(), loaded -> {
+                    leaseEntered.countDown();
+                    try {
+                        if (!releaseLease.await(2, TimeUnit.SECONDS)) {
+                            throw new IllegalStateException("测试未释放元数据世代租约");
+                        }
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw new java.util.concurrent.CancellationException();
+                    }
+                    return true;
+                }));
+        assertTrue(leaseEntered.await(1, TimeUnit.SECONDS));
+        CompletableFuture<Void> invalidation = CompletableFuture.runAsync(() -> {
+            invalidationStarted.countDown();
+            service().invalidate();
+        });
+        assertTrue(invalidationStarted.await(1, TimeUnit.SECONDS));
+        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(50));
+        assertFalse("失效必须等待当前元数据世代租约结束", invalidation.isDone());
+
+        releaseLease.countDown();
+        assertTrue(lease.get(1, TimeUnit.SECONDS));
+        invalidation.get(1, TimeUnit.SECONDS);
+        assertTrue(service().latestVersioned().isEmpty());
+        assertFalse(service().withCurrentVersion(versioned.generation(), loaded -> {
+            staleOperationRan.set(true);
+            return true;
+        }));
+        assertFalse(staleOperationRan.get());
+    }
+
     public void testMetadataRecordsValidateAndDefensivelyCopyInputs() {
         expectIllegalArgument(() -> new MyBatisDatabaseColumn(
                 "", "BIGINT", java.sql.Types.BIGINT, false, false, false, 1));

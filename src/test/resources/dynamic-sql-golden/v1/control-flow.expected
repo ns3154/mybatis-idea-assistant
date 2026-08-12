@@ -1,0 +1,112 @@
+format=dynamic-sql-golden-v1
+fixture="control-flow"
+statement="find"
+  result=COMPILED
+  diagnostics=0
+  root:
+    sequence children=3
+      text:
+        value="\n        select * from users\n        "
+        source-map virtual-length=37 segments=1
+          segment kind=EXACT virtual=[0,37) source=control-flow.xml:[67,104)
+      trim kind=WHERE prefix="WHERE" suffix="" prefix-overrides="AND |OR " suffix-overrides="" source=control-flow.xml:[104,660)
+        body:
+          sequence children=7
+            text:
+              value="\n            "
+              source-map virtual-length=13 segments=1
+                segment kind=EXACT virtual=[0,13) source=control-flow.xml:[111,124)
+            if source=control-flow.xml:[124,207)
+              condition text="active != null" source=control-flow.xml:[134,148)
+              body:
+                text:
+                  value="\n                and active = #{active}\n            "
+                  source-map virtual-length=52 segments=1
+                    segment kind=EXACT virtual=[0,52) source=control-flow.xml:[150,202)
+            text:
+              value="\n            "
+              source-map virtual-length=13 segments=1
+                segment kind=EXACT virtual=[0,13) source=control-flow.xml:[207,220)
+            choose branches=2 otherwise=true source=control-flow.xml:[220,435)
+              when index=0 source=control-flow.xml:[245,296)
+                condition text="name != null" source=control-flow.xml:[257,269)
+                body:
+                  text:
+                    value="and name = #{name}"
+                    source-map virtual-length=18 segments=1
+                      segment kind=EXACT virtual=[0,18) source=control-flow.xml:[271,289)
+              when index=1 source=control-flow.xml:[313,358)
+                condition text="id != null" source=control-flow.xml:[325,335)
+                body:
+                  text:
+                    value="and id = #{id}"
+                    source-map virtual-length=14 segments=1
+                      segment kind=EXACT virtual=[0,14) source=control-flow.xml:[337,351)
+              otherwise:
+                text:
+                  value="and deleted = 0"
+                  source-map virtual-length=15 segments=1
+                    segment kind=EXACT virtual=[0,15) source=control-flow.xml:[386,401)
+            text:
+              value="\n            "
+              source-map virtual-length=13 segments=1
+                segment kind=EXACT virtual=[0,13) source=control-flow.xml:[435,448)
+            trim kind=TRIM prefix="and (" suffix=")" prefix-overrides="AND |OR " suffix-overrides="," source=control-flow.xml:[448,643)
+              body:
+                sequence children=3
+                  text:
+                    value="\n                "
+                    source-map virtual-length=17 segments=1
+                      segment kind=EXACT virtual=[0,17) source=control-flow.xml:[545,562)
+                  if source=control-flow.xml:[562,623)
+                    condition text="tenantId != null" source=control-flow.xml:[572,588)
+                    body:
+                      text:
+                        value="and tenant_id = #{tenantId},"
+                        source-map virtual-length=28 segments=1
+                          segment kind=EXACT virtual=[0,28) source=control-flow.xml:[590,618)
+                  text:
+                    value="\n            "
+                    source-map virtual-length=13 segments=1
+                      segment kind=EXACT virtual=[0,13) source=control-flow.xml:[623,636)
+            text:
+              value="\n        "
+              source-map virtual-length=9 segments=1
+                segment kind=EXACT virtual=[0,9) source=control-flow.xml:[643,652)
+      text:
+        value="\n    "
+        source-map virtual-length=5 segments=1
+          segment kind=EXACT virtual=[0,5) source=control-flow.xml:[660,665)
+  static-sql=<dynamic>
+statement="update"
+  result=COMPILED
+  diagnostics=0
+  root:
+    sequence children=3
+      text:
+        value="\n        update users\n        "
+        source-map virtual-length=30 segments=1
+          segment kind=EXACT virtual=[0,30) source=control-flow.xml:[699,729)
+      trim kind=SET prefix="SET" suffix="" prefix-overrides="" suffix-overrides="," source=control-flow.xml:[729,806)
+        body:
+          sequence children=3
+            text:
+              value="\n            "
+              source-map virtual-length=13 segments=1
+                segment kind=EXACT virtual=[0,13) source=control-flow.xml:[734,747)
+            if source=control-flow.xml:[747,791)
+              condition text="name != null" source=control-flow.xml:[757,769)
+              body:
+                text:
+                  value="name = #{name},"
+                  source-map virtual-length=15 segments=1
+                    segment kind=EXACT virtual=[0,15) source=control-flow.xml:[771,786)
+            text:
+              value="\n        "
+              source-map virtual-length=9 segments=1
+                segment kind=EXACT virtual=[0,9) source=control-flow.xml:[791,800)
+      text:
+        value="\n    "
+        source-map virtual-length=5 segments=1
+          segment kind=EXACT virtual=[0,5) source=control-flow.xml:[806,811)
+  static-sql=<dynamic>

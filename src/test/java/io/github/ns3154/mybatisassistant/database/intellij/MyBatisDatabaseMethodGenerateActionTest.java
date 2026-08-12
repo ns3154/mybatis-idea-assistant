@@ -76,6 +76,32 @@ public final class MyBatisDatabaseMethodGenerateActionTest extends BasePlatformT
                         .MyBatisGenerationPlanStatus.CREATE));
     }
 
+    public void testBuildPlanSupportsExplicitBatchInsertAndSkipsGeneratedKey()
+            throws Exception {
+        VirtualFile root = myFixture.getTempDirFixture()
+                .findOrCreateDir("method-batch-action-root");
+
+        MyBatisGenerationPlan plan = MyBatisDatabaseMethodGenerateAction.buildPlan(
+                getProject(),
+                root,
+                model(),
+                MyBatisSqlDialect.H2,
+                MyBatisGenerationConfiguration.standard("com.example"),
+                "insertBatch");
+
+        assertFalse(describe(plan), plan.hasConflicts());
+        String mapper = proposed(plan, MyBatisGenerationArtifactKind.MAPPER);
+        String xml = proposed(plan, MyBatisGenerationArtifactKind.XML);
+        assertTrue(mapper.contains("int insertBatch("));
+        assertTrue(mapper.contains("java.util.Collection<com.example.entity.User> entities"));
+        assertTrue(xml.contains("<insert id=\"insertBatch\""));
+        assertTrue(xml.contains("INSERT INTO \"user\" (\"name\", \"age\") VALUES"));
+        assertFalse(xml.contains("#{entity.id"));
+        assertTrue(xml.contains("@java.util.Collections@enumeration("));
+        assertTrue(xml.contains("_mybatisAssistantBatchEntities.iterator().next()"));
+        assertFalse(xml.contains("WHERE 1 = 0"));
+    }
+
     public void testBuildPlanRejectsInvalidMethodAtPosition() throws Exception {
         VirtualFile root = myFixture.getTempDirFixture().findOrCreateDir("invalid-method-root");
 
@@ -159,7 +185,7 @@ public final class MyBatisDatabaseMethodGenerateActionTest extends BasePlatformT
                 true,
                 primary,
                 false,
-                false,
+                primary,
                 Optional.empty(),
                 position);
     }

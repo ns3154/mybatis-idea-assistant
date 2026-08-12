@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.methodsql;
 
+import io.github.ns3154.mybatisassistant.database.MyBatisForeignKeyReference;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import org.junit.Test;
 
@@ -15,7 +16,8 @@ public class MyBatisJoinSqlGeneratorTest {
     private static final MyBatisMethodField USER_ID = field(
             "id", "Id", "id", true, false);
     private static final MyBatisMethodField USER_ROLE_ID = field(
-            "roleId", "RoleId", "role_id", false, true);
+            "roleId", "RoleId", "role_id", false,
+            reference(Optional.empty(), Optional.empty(), "roles", "id"));
     private static final MyBatisMethodField USER_NAME = field(
             "name", "Name", "name", false, false);
     private static final MyBatisMethodSchema USERS = new MyBatisMethodSchema(
@@ -49,13 +51,113 @@ public class MyBatisJoinSqlGeneratorTest {
     }
 
     @Test
+    public void qualifiesBaseAndTargetTablesWithoutCollapsingSameNamedSchemas() {
+        MyBatisMethodField tenantRoleId = field(
+                "roleId", "RoleId", "role_id", false,
+                reference(Optional.of("tenant_catalog"), Optional.of("tenant_b"),
+                        "roles", "id"));
+        MyBatisMethodSchema tenantUsers = new MyBatisMethodSchema(
+                Optional.of("tenant_catalog"),
+                Optional.of("tenant_a"),
+                "users",
+                List.of(USER_ID, tenantRoleId, USER_NAME));
+        MyBatisMethodSchema tenantRoles = new MyBatisMethodSchema(
+                Optional.of("tenant_catalog"),
+                Optional.of("tenant_b"),
+                "roles",
+                ROLES.fields());
+        MyBatisJoinSpec join = new MyBatisJoinSpec(
+                MyBatisJoinType.LEFT,
+                tenantRoles,
+                "r",
+                List.of(new MyBatisJoinRelation("u", tenantRoleId, ROLE_ID)));
+        List<MyBatisJoinSelection> selections = List.of(
+                new MyBatisJoinSelection("u", USER_ID, Optional.of("userId")));
+
+        MyBatisJoinGeneration sqlServer = MyBatisJoinSqlGenerator.generate(
+                new MyBatisJoinGenerationRequest(
+                        tenantUsers,
+                        "u",
+                        List.of(join),
+                        selections,
+                        MyBatisSqlDialect.SQL_SERVER,
+                        true));
+        MyBatisJoinGeneration postgresql = MyBatisJoinSqlGenerator.generate(
+                new MyBatisJoinGenerationRequest(
+                        tenantUsers,
+                        "u",
+                        List.of(join),
+                        selections,
+                        MyBatisSqlDialect.POSTGRESQL,
+                        true));
+
+        assertTrue(sqlServer.sql().contains(
+                "FROM [tenant_catalog].[tenant_a].[users] [u]"));
+        assertTrue(sqlServer.sql().contains(
+                "LEFT JOIN [tenant_catalog].[tenant_b].[roles] [r]"));
+        assertTrue(postgresql.sql().contains("FROM \"tenant_a\".\"users\" \"u\""));
+        assertTrue(postgresql.sql().contains(
+                "LEFT JOIN \"tenant_b\".\"roles\" \"r\""));
+    }
+
+    @Test
+    public void rejectsUnsafeUnquotedQualifiedTableParts() {
+        MyBatisMethodSchema unsafe = new MyBatisMethodSchema(
+                Optional.empty(), Optional.of("tenant;drop"), "users", USERS.fields());
+
+        assertTrue(assertThrows(
+                IllegalArgumentException.class,
+                () -> MyBatisJoinSqlGenerator.generate(
+                        new MyBatisJoinGenerationRequest(
+                                unsafe,
+                                "u",
+                                List.of(new MyBatisJoinSpec(
+                                        MyBatisJoinType.LEFT,
+                                        ROLES,
+                                        "r",
+                                        List.of(new MyBatisJoinRelation(
+                                                "u", USER_ROLE_ID, ROLE_ID)))),
+                                List.of(new MyBatisJoinSelection(
+                                        "u", USER_ID, Optional.of("userId"))),
+                                MyBatisSqlDialect.POSTGRESQL,
+                                false)))
+                .getMessage().contains("普通安全名称"));
+    }
+
+    @Test
+    public void rejectsUnescapedKeywordTablesInJoinSql() {
+        MyBatisMethodSchema keywordTable = new MyBatisMethodSchema(
+                "user", USERS.fields());
+        assertTrue(assertThrows(
+                IllegalArgumentException.class,
+                () -> MyBatisJoinSqlGenerator.generate(
+                        new MyBatisJoinGenerationRequest(
+                                keywordTable,
+                                "u",
+                                List.of(new MyBatisJoinSpec(
+                                        MyBatisJoinType.LEFT,
+                                        ROLES,
+                                        "r",
+                                        List.of(new MyBatisJoinRelation(
+                                                "u", USER_ROLE_ID, ROLE_ID)))),
+                                List.of(new MyBatisJoinSelection(
+                                        "u", USER_ID, Optional.of("userId"))),
+                                MyBatisSqlDialect.GENERIC,
+                                false)))
+                .getMessage().contains("普通安全名称"));
+    }
+
+    @Test
     public void supportsCompositeAndChainedRelations() {
         MyBatisMethodField permissionId = field(
-                "permissionId", "PermissionId", "permission_id", false, true);
+                "permissionId", "PermissionId", "permission_id", false,
+                reference(Optional.empty(), Optional.empty(), "permissions", "id"));
         MyBatisMethodSchema rolePermissions = new MyBatisMethodSchema(
                 "role_permissions",
                 List.of(
-                        field("roleId", "RoleId", "role_id", false, true),
+                        field("roleId", "RoleId", "role_id", false,
+                                reference(Optional.empty(), Optional.empty(),
+                                        "roles", "id")),
                         permissionId));
         MyBatisMethodField targetPermissionId = field(
                 "id", "Id", "id", true, false);
@@ -107,6 +209,84 @@ public class MyBatisJoinSqlGeneratorTest {
                                 "u", USER_ID, Optional.of("userId"))))));
 
         assertTrue(failure.getMessage().contains("缺少外键到主键证据"));
+    }
+
+    @Test
+    public void rejectsForeignKeyThatPointsToAnotherTableIdentity() {
+        MyBatisMethodField misleadingForeignKey = field(
+                "roleId", "RoleId", "role_id", false,
+                reference(Optional.empty(), Optional.empty(), "archived_roles", "id"));
+        MyBatisMethodSchema misleadingUsers = new MyBatisMethodSchema(
+                "users", List.of(USER_ID, misleadingForeignKey, USER_NAME));
+
+        IllegalArgumentException failure = assertThrows(
+                IllegalArgumentException.class,
+                () -> MyBatisJoinSqlGenerator.generate(new MyBatisJoinGenerationRequest(
+                        misleadingUsers,
+                        "u",
+                        List.of(new MyBatisJoinSpec(
+                                MyBatisJoinType.INNER,
+                                ROLES,
+                                "r",
+                                List.of(new MyBatisJoinRelation(
+                                        "u", misleadingForeignKey, ROLE_ID)))),
+                        List.of(new MyBatisJoinSelection(
+                                "u", USER_ID, Optional.of("userId"))),
+                        MyBatisSqlDialect.MYSQL,
+                        true)));
+
+        assertTrue(failure.getMessage().contains("缺少外键到主键证据"));
+    }
+
+    @Test
+    public void rejectsLegacyForeignFlagWithoutTargetIdentity() {
+        MyBatisMethodField unknownForeignKey = field(
+                "roleId", "RoleId", "role_id", false, true);
+        MyBatisMethodSchema legacyUsers = new MyBatisMethodSchema(
+                "users", List.of(USER_ID, unknownForeignKey, USER_NAME));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> MyBatisJoinSqlGenerator.generate(new MyBatisJoinGenerationRequest(
+                        legacyUsers,
+                        "u",
+                        List.of(new MyBatisJoinSpec(
+                                MyBatisJoinType.INNER,
+                                ROLES,
+                                "r",
+                                List.of(new MyBatisJoinRelation(
+                                        "u", unknownForeignKey, ROLE_ID)))),
+                        List.of(new MyBatisJoinSelection(
+                                "u", USER_ID, Optional.of("userId"))),
+                        MyBatisSqlDialect.MYSQL,
+                        true)));
+    }
+
+    @Test
+    public void rejectsSinglePredicateFromCompositeForeignKey() {
+        MyBatisForeignKeyReference compositeReference = new MyBatisForeignKeyReference(
+                Optional.empty(), Optional.empty(), "roles", "id",
+                Optional.of("fk_users_role"), 1, 2);
+        MyBatisMethodField compositeForeignKey = field(
+                "roleId", "RoleId", "role_id", false, compositeReference);
+        MyBatisMethodSchema compositeUsers = new MyBatisMethodSchema(
+                "users", List.of(USER_ID, compositeForeignKey, USER_NAME));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> MyBatisJoinSqlGenerator.generate(new MyBatisJoinGenerationRequest(
+                        compositeUsers,
+                        "u",
+                        List.of(new MyBatisJoinSpec(
+                                MyBatisJoinType.INNER,
+                                ROLES,
+                                "r",
+                                List.of(new MyBatisJoinRelation(
+                                        "u", compositeForeignKey, ROLE_ID)))),
+                        List.of(new MyBatisJoinSelection(
+                                "u", USER_ID, Optional.of("userId"))),
+                        MyBatisSqlDialect.MYSQL,
+                        true)));
     }
 
     @Test
@@ -265,5 +445,34 @@ public class MyBatisJoinSqlGeneratorTest {
                 false,
                 primary,
                 foreign);
+    }
+
+    private static MyBatisMethodField field(
+            String property,
+            String token,
+            String column,
+            boolean primary,
+            MyBatisForeignKeyReference foreignKeyReference) {
+        return new MyBatisMethodField(
+                property,
+                token,
+                column,
+                "java.lang.Long",
+                Optional.empty(),
+                Types.BIGINT,
+                false,
+                primary,
+                true,
+                false,
+                false,
+                Optional.of(foreignKeyReference));
+    }
+
+    private static MyBatisForeignKeyReference reference(
+            Optional<String> catalog,
+            Optional<String> schema,
+            String table,
+            String column) {
+        return new MyBatisForeignKeyReference(catalog, schema, table, column);
     }
 }

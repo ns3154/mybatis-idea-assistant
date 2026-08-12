@@ -2,9 +2,14 @@ package io.github.ns3154.mybatisassistant.generator;
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
+import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseObjectKind;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.Types;
 import java.util.EnumSet;
 import java.util.Map;
@@ -61,7 +66,7 @@ public final class MyBatisGenerationEngineTest extends BasePlatformTestCase {
         assertTrue(mapper.contains("int updateByPrimaryKey(OrderEntity entity);"));
 
         String xml = artifact(bundle, MyBatisGenerationArtifactKind.XML).content();
-        assertTrue(xml.contains("FROM public.t_order"));
+        assertTrue(xml.contains("FROM \"public\".\"t_order\""));
         assertTrue(xml.contains("\"user\""));
         assertTrue(xml.contains("column=\"payload\" property=\"content\""));
         assertTrue(xml.contains("typeHandler=\"com.example.JsonTypeHandler\""));
@@ -72,6 +77,26 @@ public final class MyBatisGenerationEngineTest extends BasePlatformTestCase {
         String service = artifact(bundle, MyBatisGenerationArtifactKind.SERVICE).content();
         assertTrue(service.contains("public OrderEntity findByPrimaryKey(Long id)"));
         assertTrue(service.contains("return mapper.deleteByPrimaryKey(id);"));
+    }
+
+    public void testSanitizesEveryConsecutiveHyphenAndIllegalXmlCommentCharacter()
+            throws Exception {
+        for (String comment : java.util.List.of(
+                "--", "---", "----", "尾随-", "控制" + (char) 1 + "符")) {
+            MyBatisDatabaseTable table = new MyBatisDatabaseTable(
+                    Optional.empty(),
+                    Optional.empty(),
+                    "comment_sample",
+                    Optional.of(comment),
+                    java.util.List.of(column(
+                            "id", Types.BIGINT, false, true, false, 1, null)));
+
+            String xml = artifact(
+                    generate(table, MyBatisGenerationConfiguration.standard("com.example")),
+                    MyBatisGenerationArtifactKind.XML).content();
+
+            assertWellFormedXml(xml);
+        }
     }
 
     public void testCompositeAndMissingPrimaryKeysGenerateConservativeCrud() {
@@ -87,7 +112,8 @@ public final class MyBatisGenerationEngineTest extends BasePlatformTestCase {
         assertTrue(mapper.contains("@Param(\"tenantId\") Long tenantId"));
         assertTrue(mapper.contains("@Param(\"userId\") Long userId"));
         String xml = artifact(compositeBundle, MyBatisGenerationArtifactKind.XML).content();
-        assertTrue(xml.contains("tenant_id = #{tenantId,jdbcType=BIGINT} AND user_id = #{userId,jdbcType=BIGINT}"));
+        assertTrue(xml.contains("\"tenant_id\" = #{tenantId,jdbcType=BIGINT} "
+                + "AND \"user_id\" = #{userId,jdbcType=BIGINT}"));
 
         MyBatisDatabaseTable withoutKey = table(
                 "audit_event",
@@ -124,8 +150,8 @@ public final class MyBatisGenerationEngineTest extends BasePlatformTestCase {
         MyBatisGenerationBundle bundle = generate(table, configuration);
 
         String entity = artifact(bundle, MyBatisGenerationArtifactKind.ENTITY).content();
-        assertTrue(entity.contains("@TableName(\"event\")"));
-        assertTrue(entity.contains("@TableId(value = \"id\", type = IdType.AUTO)"));
+        assertTrue(entity.contains("@TableName(\"\\\"event\\\"\")"));
+        assertTrue(entity.contains("@TableId(value = \"\\\"id\\\"\", type = IdType.AUTO)"));
         assertTrue(entity.contains("typeHandler = JsonTypeHandler.class"));
         String mapper = artifact(bundle, MyBatisGenerationArtifactKind.MAPPER).content();
         assertTrue(mapper.contains("extends BaseMapper<Event>"));
@@ -163,6 +189,168 @@ public final class MyBatisGenerationEngineTest extends BasePlatformTestCase {
                 "person",
                 column("first_name", Types.VARCHAR, true, false, false, 1, null),
                 column("last_name", Types.VARCHAR, true, false, false, 2, null)), duplicate));
+    }
+
+    public void testRejectsDynamicTokensAndUnsafeUnescapedSqlIdentifiers() {
+        MyBatisGenerationConfiguration escaped = new MyBatisGenerationConfiguration(
+                "com.example", "src/main/java", "src/main/resources",
+                Set.of(MyBatisGenerationArtifactKind.ENTITY),
+                MyBatisGenerationTemplateGroup.MYBATIS_PLUS, "", "", true, true,
+                Set.of(), Map.of());
+        IllegalArgumentException tokenFailure = expectIllegalArgument(() -> generate(table(
+                "users${status}",
+                column("id", Types.BIGINT, false, true, false, 1, null)), escaped));
+        assertTrue(tokenFailure.getMessage().contains("动态替换令牌"));
+
+        IllegalArgumentException columnTokenFailure = expectIllegalArgument(() -> generate(table(
+                "users",
+                column("name#{value}", Types.VARCHAR, true, false, false, 1, null)),
+                escaped));
+        assertTrue(columnTokenFailure.getMessage().contains("动态替换令牌"));
+
+        MyBatisDatabaseTable quotedTable = table(
+                "order",
+                column("select", Types.VARCHAR, true, false, false, 1, null));
+        MyBatisGenerationBundle quotedBundle = generate(
+                quotedTable, escaped, MyBatisSqlDialect.MYSQL);
+        String quotedEntity = artifact(
+                quotedBundle, MyBatisGenerationArtifactKind.ENTITY).content();
+        assertTrue(quotedEntity.contains("@TableName(\"`order`\")"));
+        assertTrue(quotedEntity.contains("@TableField(value = \"`select`\")"));
+
+        MyBatisGenerationConfiguration unescaped = new MyBatisGenerationConfiguration(
+                "com.example", "src/main/java", "src/main/resources",
+                EnumSet.allOf(MyBatisGenerationArtifactKind.class),
+                MyBatisGenerationTemplateGroup.STANDARD, "", "", true, false,
+                Set.of(), Map.of());
+        IllegalArgumentException rawFailure = expectIllegalArgument(() -> generate(table(
+                "users; DELETE FROM audit",
+                column("id", Types.BIGINT, false, true, false, 1, null)), unescaped));
+        assertTrue(rawFailure.getMessage().contains("已关闭标识符转义"));
+    }
+
+    public void testQualifiesCatalogAndSchemaWithoutChangingSelectedTableIdentity() {
+        MyBatisGenerationConfiguration configuration = MyBatisGenerationConfiguration
+                .standard("com.example");
+        MyBatisDatabaseTable table = new MyBatisDatabaseTable(
+                Optional.of("tenant_catalog"),
+                Optional.of("audit_schema"),
+                "users",
+                java.util.List.of(column(
+                        "id", Types.BIGINT, false, true, false, 1, null)));
+
+        String mysqlXml = artifact(
+                generate(table, configuration, MyBatisSqlDialect.MYSQL),
+                MyBatisGenerationArtifactKind.XML).content();
+        assertTrue(mysqlXml.contains("FROM `tenant_catalog`.`users`"));
+        assertFalse(mysqlXml.contains("`audit_schema`.`users`"));
+
+        String sqlServerXml = artifact(
+                generate(table, configuration, MyBatisSqlDialect.SQL_SERVER),
+                MyBatisGenerationArtifactKind.XML).content();
+        assertTrue(sqlServerXml.contains(
+                "FROM [tenant_catalog].[audit_schema].[users]"));
+
+        String postgresXml = artifact(
+                generate(table, configuration, MyBatisSqlDialect.POSTGRESQL),
+                MyBatisGenerationArtifactKind.XML).content();
+        assertTrue(postgresXml.contains("FROM \"audit_schema\".\"users\""));
+        assertFalse(postgresXml.contains("\"tenant_catalog\".\"audit_schema\""));
+    }
+
+    public void testRejectsViewsAndKeepsGeneratedPlusColumnsReadOnly() {
+        MyBatisGenerationConfiguration standard = MyBatisGenerationConfiguration
+                .standard("com.example");
+        MyBatisDatabaseTable view = new MyBatisDatabaseTable(
+                Optional.empty(), Optional.of("public"), "user_view", Optional.empty(),
+                MyBatisDatabaseObjectKind.VIEW,
+                java.util.List.of(column(
+                        "id", Types.BIGINT, false, true, false, 1, null)));
+        IllegalArgumentException viewFailure = expectIllegalArgument(
+                () -> generate(view, standard));
+        assertTrue(viewFailure.getMessage().contains("物理表"));
+
+        MyBatisGenerationConfiguration plus = new MyBatisGenerationConfiguration(
+                "com.example", "src/main/java", "src/main/resources",
+                Set.of(MyBatisGenerationArtifactKind.ENTITY),
+                MyBatisGenerationTemplateGroup.MYBATIS_PLUS, "", "", true, true,
+                Set.of(), Map.of());
+        MyBatisDatabaseColumn generated = new MyBatisDatabaseColumn(
+                "name_upper", "VARCHAR", Types.VARCHAR, true,
+                false, false, false, true, Optional.empty(), 2);
+        MyBatisDatabaseTable table = table(
+                "users",
+                column("id", Types.BIGINT, false, true, true, 1, null),
+                generated);
+        String entity = artifact(generate(table, plus),
+                MyBatisGenerationArtifactKind.ENTITY).content();
+        assertTrue(entity.contains("@TableId(value = \"\\\"id\\\"\", type = IdType.AUTO)"));
+        assertTrue(entity.contains("import com.baomidou.mybatisplus.annotation.FieldStrategy;"));
+        assertTrue(entity.contains("@TableField(value = \"\\\"name_upper\\\"\", "
+                + "insertStrategy = FieldStrategy.NEVER, "
+                + "updateStrategy = FieldStrategy.NEVER)"));
+
+        MyBatisGenerationBundle standardBundle = generate(table, standard);
+        String mapper = artifact(standardBundle,
+                MyBatisGenerationArtifactKind.MAPPER).content();
+        String xml = artifact(standardBundle,
+                MyBatisGenerationArtifactKind.XML).content();
+        String service = artifact(standardBundle,
+                MyBatisGenerationArtifactKind.SERVICE).content();
+        assertFalse(mapper.contains("updateByPrimaryKey"));
+        assertFalse(xml.contains("updateByPrimaryKey"));
+        assertFalse(service.contains("mapper.updateByPrimaryKey"));
+
+        MyBatisDatabaseColumn generatedPrimaryKey = new MyBatisDatabaseColumn(
+                "computed_id", "BIGINT", Types.BIGINT, false,
+                true, false, false, true, Optional.empty(), 1);
+        IllegalArgumentException primaryKeyFailure = expectIllegalArgument(
+                () -> generate(table("computed_key", generatedPrimaryKey), plus));
+        assertTrue(primaryKeyFailure.getMessage().contains("generated primary key")
+                || primaryKeyFailure.getMessage().contains("生成主键"));
+    }
+
+    public void testEscapesRenderedIdentifiersBeforeEmbeddingThemInMapperXml() {
+        MyBatisGenerationConfiguration configuration = MyBatisGenerationConfiguration
+                .standard("com.example");
+        MyBatisDatabaseTable table = new MyBatisDatabaseTable(
+                Optional.empty(),
+                Optional.of("tenant<if test=\"attack\">"),
+                "users",
+                java.util.List.of(column(
+                        "id", Types.BIGINT, false, true, false, 1, null)));
+
+        String xml = artifact(generate(
+                table, configuration, MyBatisSqlDialect.POSTGRESQL),
+                MyBatisGenerationArtifactKind.XML).content();
+
+        assertTrue(xml.contains("tenant&lt;if test=\"\"attack\"\"&gt;"));
+        assertFalse(xml.contains("<if test=\"attack\">"));
+    }
+
+    public void testNeutralizesUnicodeEscapesInGeneratedJavaDoc() {
+        String closeComment = "\\u" + "002a\\u" + "002f";
+        String openComment = "\\u" + "002f\\u" + "002a";
+        MyBatisDatabaseColumn named = new MyBatisDatabaseColumn(
+                "name", "VARCHAR", Types.VARCHAR, true,
+                false, false, false, Optional.of(
+                        closeComment + " static { throw new Error(); } " + openComment), 2);
+        MyBatisDatabaseTable table = new MyBatisDatabaseTable(
+                Optional.empty(), Optional.empty(), "users",
+                Optional.of(closeComment + " class Injected {} " + openComment),
+                java.util.List.of(
+                        column("id", Types.BIGINT, false, true, false, 1, null),
+                        named));
+
+        MyBatisGenerationBundle bundle = generate(
+                table, MyBatisGenerationConfiguration.standard("com.example"));
+        MyBatisGeneratedArtifact entity = artifact(
+                bundle, MyBatisGenerationArtifactKind.ENTITY);
+
+        assertFalse(entity.content().contains(closeComment));
+        assertFalse(entity.content().contains(openComment));
+        assertTrue(entity.content().contains("&#92;u002a&#92;u002f"));
+        MyBatisGenerationPsiValidator.validate(getProject(), entity, entity.content());
     }
 
     public void testRejectsAmbiguousJavaTypeAndHandlerShortNames() {
@@ -227,22 +415,22 @@ public final class MyBatisGenerationEngineTest extends BasePlatformTestCase {
                 identityOnly,
                 MyBatisGenerationConfiguration.standard("com.example"),
                 MyBatisSqlDialect.MYSQL), MyBatisGenerationArtifactKind.XML).content();
-        assertTrue(mysql.contains("INSERT INTO identity_only () VALUES ()"));
+        assertTrue(mysql.contains("INSERT INTO `identity_only` () VALUES ()"));
         String oracle = artifact(generate(
                 identityOnly,
                 MyBatisGenerationConfiguration.standard("com.example"),
                 MyBatisSqlDialect.ORACLE), MyBatisGenerationArtifactKind.XML).content();
-        assertTrue(oracle.contains("INSERT INTO identity_only (id) VALUES (DEFAULT)"));
+        assertTrue(oracle.contains("INSERT INTO \"identity_only\" (\"id\") VALUES (DEFAULT)"));
         String postgres = artifact(generate(
                 identityOnly,
                 MyBatisGenerationConfiguration.standard("com.example"),
                 MyBatisSqlDialect.POSTGRESQL), MyBatisGenerationArtifactKind.XML).content();
-        assertTrue(postgres.contains("INSERT INTO identity_only DEFAULT VALUES"));
+        assertTrue(postgres.contains("INSERT INTO \"identity_only\" DEFAULT VALUES"));
         String dameng = artifact(generate(
                 identityOnly,
                 MyBatisGenerationConfiguration.standard("com.example"),
                 MyBatisSqlDialect.DAMENG), MyBatisGenerationArtifactKind.XML).content();
-        assertTrue(dameng.contains("INSERT INTO identity_only (id) VALUES (DEFAULT)"));
+        assertTrue(dameng.contains("INSERT INTO \"identity_only\" (\"id\") VALUES (DEFAULT)"));
     }
 
     private static MyBatisGenerationBundle generate(
@@ -313,5 +501,14 @@ public final class MyBatisGenerationEngineTest extends BasePlatformTestCase {
             // 安全生成边界不做自动纠错。
             return expected;
         }
+    }
+
+    private static void assertWellFormedXml(String xml) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        factory.newDocumentBuilder().parse(new ByteArrayInputStream(
+                xml.getBytes(StandardCharsets.UTF_8)));
     }
 }

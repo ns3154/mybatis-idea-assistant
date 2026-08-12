@@ -6,9 +6,11 @@ import com.intellij.openapi.project.Project;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMessages;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataProvider;
+import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseObjectKind;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseRequest;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseSnapshot;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
+import io.github.ns3154.mybatisassistant.database.MyBatisForeignKeyReference;
 import io.github.ns3154.mybatisassistant.database.MyBatisMetadataFreshness;
 import org.jetbrains.annotations.NotNull;
 
@@ -24,8 +26,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
@@ -182,12 +186,17 @@ public final class MyBatisJdbcMetadataProvider implements MyBatisDatabaseMetadat
                 if (tableName == null || tableName.isBlank()) {
                     continue;
                 }
+                MyBatisDatabaseObjectKind kind = "VIEW".equalsIgnoreCase(
+                        rows.getString("TABLE_TYPE"))
+                        ? MyBatisDatabaseObjectKind.VIEW
+                        : MyBatisDatabaseObjectKind.TABLE;
                 tables.add(table(
                         metadata,
                         tableCatalog,
                         tableSchema,
                         tableName,
                         optional(rows.getString("REMARKS")),
+                        kind,
                         indicator));
             }
         }
@@ -204,15 +213,14 @@ public final class MyBatisJdbcMetadataProvider implements MyBatisDatabaseMetadat
             String schema,
             @NotNull String tableName,
             @NotNull Optional<String> comment,
+            @NotNull MyBatisDatabaseObjectKind kind,
             @NotNull ProgressIndicator indicator) throws SQLException {
         Set<String> primaryKeys = names(
                 () -> metadata.getPrimaryKeys(catalog, schema, tableName),
                 "COLUMN_NAME",
                 indicator);
-        Set<String> foreignKeys = names(
-                () -> metadata.getImportedKeys(catalog, schema, tableName),
-                "FKCOLUMN_NAME",
-                indicator);
+        ImportedForeignKeys foreignKeys = importedForeignKeys(
+                metadata, catalog, schema, tableName, indicator);
         List<MyBatisDatabaseColumn> columns = new ArrayList<>();
         try (ResultSet rows = metadata.getColumns(catalog, schema, tableName, "%")) {
             while (rows.next()) {
@@ -228,16 +236,18 @@ public final class MyBatisJdbcMetadataProvider implements MyBatisDatabaseMetadat
                         rows.getInt("DATA_TYPE"),
                         rows.getInt("NULLABLE") != DatabaseMetaData.columnNoNulls,
                         primaryKeys.contains(name),
-                        foreignKeys.contains(name),
+                        foreignKeys.columns().contains(name),
                         "YES".equalsIgnoreCase(safeString(rows, "IS_AUTOINCREMENT")),
+                        "YES".equalsIgnoreCase(safeString(rows, "IS_GENERATEDCOLUMN")),
                         optional(rows.getString("REMARKS")),
-                        position));
+                        position,
+                        foreignKeys.reference(name)));
             }
         }
         columns.sort(Comparator.comparingInt(MyBatisDatabaseColumn::position)
                 .thenComparing(MyBatisDatabaseColumn::name));
         return new MyBatisDatabaseTable(
-                optional(catalog), optional(schema), tableName, comment, columns);
+                optional(catalog), optional(schema), tableName, comment, kind, columns);
     }
 
     private static @NotNull Set<String> names(
@@ -259,11 +269,82 @@ public final class MyBatisJdbcMetadataProvider implements MyBatisDatabaseMetadat
         }
     }
 
+    private static @NotNull ImportedForeignKeys importedForeignKeys(
+            @NotNull DatabaseMetaData metadata,
+            String catalog,
+            String schema,
+            @NotNull String tableName,
+            @NotNull ProgressIndicator indicator) {
+        Set<String> columns = new HashSet<>();
+        List<ImportedKeyRow> importedRows = new ArrayList<>();
+        try (ResultSet rows = metadata.getImportedKeys(catalog, schema, tableName)) {
+            while (rows.next()) {
+                indicator.checkCanceled();
+                String foreignColumn = safeString(rows, "FKCOLUMN_NAME");
+                if (foreignColumn == null || foreignColumn.isBlank()) {
+                    continue;
+                }
+                columns.add(foreignColumn);
+                String primaryTable = safeString(rows, "PKTABLE_NAME");
+                String primaryColumn = safeString(rows, "PKCOLUMN_NAME");
+                if (primaryTable == null || primaryTable.isBlank()
+                        || primaryColumn == null || primaryColumn.isBlank()) {
+                    continue;
+                }
+                String constraintIdentity = safeString(rows, "FK_NAME");
+                int ordinal = safeInt(rows, "KEY_SEQ", 0);
+                if (ordinal < 1) {
+                    continue;
+                }
+                importedRows.add(new ImportedKeyRow(
+                        foreignColumn,
+                        optional(safeString(rows, "PKTABLE_CAT")),
+                        optional(safeString(rows, "PKTABLE_SCHEM")),
+                        primaryTable,
+                        primaryColumn,
+                        optional(constraintIdentity),
+                        ordinal));
+            }
+        } catch (SQLException unsupportedKeys) {
+            return ImportedForeignKeys.empty();
+        }
+        Map<ImportedConstraintIdentity, Integer> columnCounts = new HashMap<>();
+        for (ImportedKeyRow row : importedRows) {
+            ImportedConstraintIdentity identity = row.constraintIdentity();
+            columnCounts.merge(identity, row.ordinal(), Math::max);
+        }
+        Map<String, Set<MyBatisForeignKeyReference>> candidates = new HashMap<>();
+        for (ImportedKeyRow row : importedRows) {
+            int columnCount = columnCounts.getOrDefault(row.constraintIdentity(), row.ordinal());
+            MyBatisForeignKeyReference reference = new MyBatisForeignKeyReference(
+                    row.catalog(), row.schema(), row.table(), row.primaryColumn(),
+                    row.constraintName(), row.ordinal(), columnCount);
+            candidates.computeIfAbsent(row.foreignColumn(), ignored -> new HashSet<>())
+                    .add(reference);
+        }
+        Map<String, Set<MyBatisForeignKeyReference>> immutableCandidates = new HashMap<>();
+        candidates.forEach((name, references) ->
+                immutableCandidates.put(name, Set.copyOf(references)));
+        return new ImportedForeignKeys(Set.copyOf(columns), Map.copyOf(immutableCandidates));
+    }
+
     private static String safeString(@NotNull ResultSet rows, @NotNull String column) {
         try {
             return rows.getString(column);
         } catch (SQLException ignored) {
             return null;
+        }
+    }
+
+    private static int safeInt(
+            @NotNull ResultSet rows,
+            @NotNull String column,
+            int fallback) {
+        try {
+            int value = rows.getInt(column);
+            return rows.wasNull() ? fallback : value;
+        } catch (SQLException ignored) {
+            return fallback;
         }
     }
 
@@ -279,6 +360,44 @@ public final class MyBatisJdbcMetadataProvider implements MyBatisDatabaseMetadat
                 classLoader.close();
             }
         }
+    }
+
+    private record ImportedForeignKeys(
+            @NotNull Set<String> columns,
+            @NotNull Map<String, Set<MyBatisForeignKeyReference>> candidates) {
+        private static @NotNull ImportedForeignKeys empty() {
+            return new ImportedForeignKeys(Set.of(), Map.of());
+        }
+
+        private @NotNull Optional<MyBatisForeignKeyReference> reference(
+                @NotNull String column) {
+            Set<MyBatisForeignKeyReference> references = candidates.getOrDefault(
+                    column, Set.of());
+            return references.size() == 1
+                    ? Optional.of(references.iterator().next())
+                    : Optional.empty();
+        }
+    }
+
+    private record ImportedKeyRow(
+            @NotNull String foreignColumn,
+            @NotNull Optional<String> catalog,
+            @NotNull Optional<String> schema,
+            @NotNull String table,
+            @NotNull String primaryColumn,
+            @NotNull Optional<String> constraintName,
+            int ordinal) {
+        private @NotNull ImportedConstraintIdentity constraintIdentity() {
+            return new ImportedConstraintIdentity(
+                    constraintName, catalog, schema, table);
+        }
+    }
+
+    private record ImportedConstraintIdentity(
+            @NotNull Optional<String> constraintName,
+            @NotNull Optional<String> catalog,
+            @NotNull Optional<String> schema,
+            @NotNull String table) {
     }
 
     @FunctionalInterface

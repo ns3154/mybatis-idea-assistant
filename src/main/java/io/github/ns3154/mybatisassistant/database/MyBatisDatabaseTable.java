@@ -13,6 +13,7 @@ public record MyBatisDatabaseTable(
         @NotNull Optional<String> schema,
         @NotNull String name,
         @NotNull Optional<String> comment,
+        @NotNull MyBatisDatabaseObjectKind kind,
         @NotNull List<MyBatisDatabaseColumn> columns) {
     public MyBatisDatabaseTable {
         if (name.isBlank()) {
@@ -27,7 +28,16 @@ public record MyBatisDatabaseTable(
             @NotNull Optional<String> catalog,
             @NotNull Optional<String> schema,
             @NotNull String name,
+            @NotNull Optional<String> comment,
             @NotNull List<MyBatisDatabaseColumn> columns) {
-        this(catalog, schema, name, Optional.empty(), columns);
+        this(catalog, schema, name, comment, MyBatisDatabaseObjectKind.TABLE, columns);
+    }
+
+    public MyBatisDatabaseTable(
+            @NotNull Optional<String> catalog,
+            @NotNull Optional<String> schema,
+            @NotNull String name,
+            @NotNull List<MyBatisDatabaseColumn> columns) {
+        this(catalog, schema, name, Optional.empty(), MyBatisDatabaseObjectKind.TABLE, columns);
     }
 }

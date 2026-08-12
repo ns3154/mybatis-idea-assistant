@@ -14,6 +14,8 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiLanguageInjectionHost;
 import com.intellij.psi.PsiLiteralExpression;
 import com.intellij.psi.util.PsiTreeUtil;
+import com.intellij.psi.xml.XmlAttribute;
+import com.intellij.psi.xml.XmlAttributeValue;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.psi.xml.XmlText;
 import com.intellij.sql.psi.SqlAsExpression;
@@ -49,7 +51,86 @@ public final class MyBatisSqlCompletionContributor extends CompletionContributor
     public void fillCompletionVariants(
             @NotNull CompletionParameters parameters,
             @NotNull CompletionResultSet result) {
+        if (addResultMapColumnCompletions(parameters, result)) {
+            return;
+        }
         addMetadataCompletions(parameters, result);
+    }
+
+    private static boolean addResultMapColumnCompletions(
+            @NotNull CompletionParameters parameters,
+            @NotNull CompletionResultSet result) {
+        ProgressManager.checkCanceled();
+        PsiElement position = parameters.getOriginalPosition();
+        if (position == null) {
+            position = parameters.getPosition();
+        }
+        XmlAttributeValue value = position instanceof XmlAttributeValue direct
+                ? direct
+                : PsiTreeUtil.getParentOfType(position, XmlAttributeValue.class, false);
+        if (value == null || !(value.getParent() instanceof XmlAttribute attribute)
+                || !"column".equals(attribute.getName())
+                || !(attribute.getParent() instanceof XmlTag mapping)
+                || !MyBatisResultMapMappingPlanner.isDirectColumnMapping(mapping)) {
+            return false;
+        }
+        XmlTag resultMap = mapping.getParentTag();
+        if (resultMap == null || !isSimpleStaticColumnValue(value.getValue())) {
+            return true;
+        }
+        var latest = MyBatisDatabaseMetadataService
+                .getInstance(position.getProject())
+                .latest();
+        if (latest.isEmpty()) {
+            return true;
+        }
+        var resolved = MyBatisResultMapSchemaResolver.resolve(
+                resultMap,
+                latest.orElseThrow().snapshots());
+        if (resolved.isEmpty()) {
+            return true;
+        }
+        Map<String, LookupElementBuilder> candidates = new LinkedHashMap<>();
+        MyBatisDatabaseTable table = resolved.orElseThrow().table();
+        for (MyBatisDatabaseColumn column : table.columns()) {
+            ProgressManager.checkCanceled();
+            String key = column.name().toLowerCase(java.util.Locale.ROOT);
+            if (candidates.containsKey(key)) {
+                return true;
+            }
+            candidates.put(
+                    key,
+                    LookupElementBuilder.create(column.name())
+                            .withTypeText(MyBatisAssistantBundle.message(
+                                    "completion.sql.column.table",
+                                    table.name()), true));
+        }
+        candidates.values().forEach(result::addElement);
+        return true;
+    }
+
+    private static boolean isSimpleStaticColumnValue(@NotNull String value) {
+        if (value.isEmpty()) {
+            return true;
+        }
+        if (value.contains("${") || value.contains("#{")
+                || value.indexOf('{') >= 0 || value.indexOf('}') >= 0
+                || value.indexOf(',') >= 0) {
+            return false;
+        }
+        int first = value.codePointAt(0);
+        if (!Character.isUnicodeIdentifierStart(first) && first != '_') {
+            return false;
+        }
+        for (int offset = Character.charCount(first); offset < value.length();) {
+            int codePoint = value.codePointAt(offset);
+            if (!Character.isUnicodeIdentifierPart(codePoint)
+                    && codePoint != '_' && codePoint != '$') {
+                return false;
+            }
+            offset += Character.charCount(codePoint);
+        }
+        return true;
     }
 
     private static void addMetadataCompletions(

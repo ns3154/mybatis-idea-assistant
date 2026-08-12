@@ -13,9 +13,11 @@ import org.junit.Test;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 public class FrameworkCorpusContractTest {
@@ -28,9 +30,64 @@ public class FrameworkCorpusContractTest {
 
     @Test
     public void keepsGeneratedWrapperApisCompilable() {
-        assertNotNull(PlusGeneratedWrapperSample.query("yang", 1L));
-        assertNotNull(PlusGeneratedWrapperSample.update("newName", 1L));
-        assertNotNull(FlexGeneratedWrapperSample.query("yang", 1L, 20, 0L));
+        assertNotNull(PlusGeneratedWrapperSample.collectionsAndRange(
+                List.of(1), List.of("ACTIVE"), 18, 65));
+        assertNotNull(PlusGeneratedWrapperSample.singleOr("ACTIVE", 18));
+        assertNotNull(PlusGeneratedWrapperSample.multiOr("ACTIVE", 18));
+        assertNotNull(PlusGeneratedWrapperSample.parameterNameConflicts(
+                "WRAPPER", "GROUP"));
+        assertNotNull(FlexGeneratedWrapperSample.collectionsAndRange(
+                List.of(1), List.of("ACTIVE"), 18, 65));
+        assertNotNull(FlexGeneratedWrapperSample.singleOr("ACTIVE", 18));
+        assertNotNull(FlexGeneratedWrapperSample.multiOr("ACTIVE", 18));
+        assertNotNull(FlexGeneratedWrapperSample.parameterNameConflicts(
+                "WRAPPER", "GROUP"));
+    }
+
+    @Test
+    public void failsClosedBeforeCallingLockedWrapperApis() {
+        for (java.util.Collection<Integer> invalid : List.of(
+                List.<Integer>of(), Arrays.asList(1, null))) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> PlusGeneratedWrapperSample.collectionsAndRange(
+                            invalid, List.of("ACTIVE"), 18, 65));
+            assertThrows(IllegalArgumentException.class,
+                    () -> FlexGeneratedWrapperSample.collectionsAndRange(
+                            invalid, List.of("ACTIVE"), 18, 65));
+        }
+        assertThrows(IllegalArgumentException.class,
+                () -> PlusGeneratedWrapperSample.collectionsAndRange(
+                        null, List.of("ACTIVE"), 18, 65));
+        assertThrows(IllegalArgumentException.class,
+                () -> FlexGeneratedWrapperSample.collectionsAndRange(
+                        null, List.of("ACTIVE"), 18, 65));
+        assertThrows(IllegalArgumentException.class,
+                () -> PlusGeneratedWrapperSample.singleOr(null, 18));
+        assertThrows(IllegalArgumentException.class,
+                () -> FlexGeneratedWrapperSample.singleOr(null, 18));
+        assertThrows(IllegalArgumentException.class,
+                () -> FlexGeneratedWrapperSample.multiOr("ACTIVE", null));
+        assertThrows(IllegalArgumentException.class,
+                () -> PlusGeneratedWrapperSample.parameterNameConflicts(null, "GROUP"));
+        assertThrows(IllegalArgumentException.class,
+                () -> FlexGeneratedWrapperSample.parameterNameConflicts("WRAPPER", null));
+    }
+
+    @Test
+    public void keepsRequiredFlexConditionsUnderGlobalIgnorePolicy() {
+        java.util.function.Predicate<Object> original =
+                com.mybatisflex.core.query.QueryColumnBehavior.getIgnoreFunction();
+        try {
+            com.mybatisflex.core.query.QueryColumnBehavior.setIgnoreFunction(value -> true);
+            assertTrue(FlexGeneratedWrapperSample.collectionsAndRange(
+                    List.of(1), List.of("ACTIVE"), 18, 65).hasCondition());
+            assertTrue(FlexGeneratedWrapperSample.singleOr("ACTIVE", 18).hasCondition());
+            assertTrue(FlexGeneratedWrapperSample.multiOr("ACTIVE", 18).hasCondition());
+            assertTrue(FlexGeneratedWrapperSample.parameterNameConflicts(
+                    "WRAPPER", "GROUP").hasCondition());
+        } finally {
+            com.mybatisflex.core.query.QueryColumnBehavior.setIgnoreFunction(original);
+        }
     }
 
     @Test

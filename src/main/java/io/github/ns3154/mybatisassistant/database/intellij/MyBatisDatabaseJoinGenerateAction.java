@@ -18,6 +18,7 @@ import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationConfiguratio
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisJoinGeneration;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisJoinGenerationRequest;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisJoinRelation;
+import io.github.ns3154.mybatisassistant.methodsql.MyBatisJoinRelationshipVerifier;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisJoinSelection;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisJoinSpec;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisJoinSqlGenerator;
@@ -133,8 +134,8 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
         for (MyBatisMethodField baseField : base.fields()) {
             ProgressManager.checkCanceled();
             for (MyBatisMethodField targetField : target.fields()) {
-                if (baseField.foreignKey() && targetField.primaryKey()
-                        || baseField.primaryKey() && targetField.foreignKey()) {
+                if (MyBatisJoinRelationshipVerifier.isVerifiedForeignKeyToPrimaryKey(
+                        base, baseField, target, targetField)) {
                     choices.add(new RelationChoice(baseField, targetField));
                 }
             }

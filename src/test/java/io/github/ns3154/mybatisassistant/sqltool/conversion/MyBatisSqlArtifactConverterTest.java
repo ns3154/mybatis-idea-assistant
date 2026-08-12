@@ -59,6 +59,34 @@ public final class MyBatisSqlArtifactConverterTest extends BasePlatformTestCase 
                 .confirmationRequired());
     }
 
+    public void testKeepsParsedComputedColumnsOutOfEngineWrites() {
+        MyBatisSqlArtifactConversionResult result = MyBatisSqlArtifactConverter.convert(
+                """
+                        CREATE TABLE metric (
+                          id BIGINT PRIMARY KEY,
+                          raw_value INTEGER NOT NULL,
+                          doubled INTEGER GENERATED ALWAYS AS (raw_value * 2) STORED
+                        )
+                        """,
+                MyBatisSqlDialect.POSTGRESQL,
+                "com.example");
+
+        assertInstanceOf(result, MyBatisSqlArtifactConversionResult.Success.class);
+        MyBatisSqlArtifactConversionResult.Success success =
+                (MyBatisSqlArtifactConversionResult.Success) result;
+        String xml = success.bundle().artifacts().stream()
+                .filter(artifact -> artifact.kind() == MyBatisGenerationArtifactKind.XML)
+                .findFirst()
+                .orElseThrow()
+                .content();
+
+        assertTrue(success.table().columns().get(2).generated());
+        assertTrue(xml.contains("column=\"doubled\" property=\"doubled\""));
+        assertTrue(xml.contains("INSERT INTO \"metric\" (\"id\", \"raw_value\")"));
+        assertFalse(xml.contains("(\"id\", \"raw_value\", \"doubled\") VALUES"));
+        assertFalse(xml.contains("\"doubled\" = #{doubled"));
+    }
+
     public void testRejectsInvalidPackageAsTypedFailure() {
         MyBatisSqlArtifactConversionResult result = MyBatisSqlArtifactConverter.convert(
                 "CREATE TABLE sample (id BIGINT)",

@@ -2,7 +2,7 @@
 
 > 阶段：S4 参数、ResultMap、TypeAlias 与安全重构
 > 日期：2026-08-11
-> 状态：开发完成，待最终统一质量门与副屏验收
+> 状态：开发完成，当前候选本地统一质量门已通过，待远端与副屏验收
 
 ## 目标
 
@@ -14,7 +14,7 @@
 - Java 源参数名是否进入运行期字节码可能受编译配置影响，检查不得把仅依赖实际参数名的表达式误报为必错；
 - Map 键、`${}` 动态标识符和无法静态确定的 Provider/动态 SQL保持未知，不伪造属性；
 - S4 只解析点路径、数组/列表索引与明确的 Mapper 属性位置；完整 OGNL 语法、foreach/bind 变量作用域和动态 SQL source map 由 S5/S6 负责；
-- ResultMap 的 `property` 只按当前嵌套 Java 类型解析，`column` 没有数据库元数据时只做结构补全，不报告不存在；
+- ResultMap 的 `property` 只按当前嵌套 Java 类型解析；`column` 只有 READY 元数据和唯一表目标时才提供数据库候选或可证明检查，没有元数据时不报告不存在；
 - TypeAlias 多目标必须保留候选，未解析占位符和不可见模块不猜测；
 - 重命名遇到多目标、只读、冲突或不完整 PSI 时停止，不做文本替换兜底。
 
@@ -24,7 +24,7 @@
 |---|---|---|---|
 | S4-A | 参数命名、特殊参数、单参数、集合/数组、Map 与泛型上下文模型 | 开发完成，待 S4 统一验收 | 纯模型与平台 PSI 黄金测试；参数模型行覆盖率不低于 90% |
 | S4-B | `#{}`、`${}`、`keyProperty`、`property`、`collection` 的静态引用、补全与检查 | 开发完成，待 S4 统一验收 | 根名/嵌套属性/索引/未知 Map/不完整输入、Dumb/取消与真实编辑器测试 |
-| S4-C | ResultMap property/类型、TypeAlias 引用与补全 | 开发完成，待 S4 统一验收 | association/collection/constructor/discriminator/extends 与别名冲突测试 |
+| S4-C | ResultMap property/column、缺失映射 Quick Fix、类型与 TypeAlias | 代码与当前候选本地统一门已通过，待远端/实机 | association/collection/constructor/discriminator/extends、READY/唯一单表、TOCTOU、Undo 与别名冲突测试 |
 | S4-D | statement、`@Param`、resultMap/refid、实体属性的安全重命名 | 开发完成，待 S4 统一验收 | 原生预览、多文件、只读、冲突、模块隔离、单次 Undo 与副屏实机 |
 
 ## S4-A 验收矩阵
@@ -58,6 +58,7 @@
 | S4-C-03 | 类型继承与分支 | resultMap `type`、`extends`、association/collection `javaType/ofType` 与 discriminator `case/resultMap` 组合后得到当前类型 | 循环继承和未解析类型及时停止 |
 | S4-C-04 | TypeAlias | 内置、显式、默认、包扫描和 `@Alias` 可引用、查找使用和补全 | 冲突别名保留全部目标；不可见模块与占位符不参与 |
 | S4-C-05 | 检查 | 只报告可证明不存在的可写属性或类型 | `column` 无数据库元数据时不报告不存在 |
+| S4-C-06 | `column` 补全与缺失映射 Quick Fix | 直接 ResultMap 映射的 `column` 从 READY 唯一表返回候选；简单 ResultMap 可按主键优先补齐缺失 `<id>/<result>` | 仅接受唯一 resultMap、唯一单表、可写 Java 属性和简单静态映射；extends、嵌套复杂映射、动态值、重复列/属性、语法错误、元数据变化或目标变化时不提供或停止写入 |
 
 ## S4-D 验收矩阵
 
@@ -75,8 +76,9 @@
 mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
 mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 ./gradlew check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin
-./scripts/verify-sandbox-lifecycle.sh 20
+./scripts/verify-sandbox-lifecycle.sh 1
+./scripts/verify-sandbox-lifecycle.sh 100
 ./scripts/verify-optional-dependency-isolation.sh
 ```
 
-当前代码与自动化已经覆盖 S4-A～S4-D；只有最终统一 Gradle/Maven 门、最低 261 Verifier、20/20 生命周期、5/5 可选依赖隔离和副屏真实 IDEA 验收全部通过后，S4 才能标记为已验收。
+当前代码已经覆盖 S4-A～S4-D，并叠加了 ResultMap `column` 补全与保守缺失映射 Quick Fix。截至 2026-08-12，包含该新路径的工作区已通过独占本地统一门：722/722 平台测试，整体行覆盖率 15135/17958（84.28%），各分区覆盖率、最低 `IU-252.28539.54` Verifier、结构、本地化和 SBOM 均通过。新 HEAD 远端门、加固生命周期 1/100、5/5 可选依赖隔离和副屏真实 IDEA 验收仍待补齐；以上全部通过前，S4 不得标记为已验收。

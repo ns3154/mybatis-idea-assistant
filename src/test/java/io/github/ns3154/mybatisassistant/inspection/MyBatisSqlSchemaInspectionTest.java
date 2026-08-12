@@ -2,21 +2,32 @@ package io.github.ns3154.mybatisassistant.inspection;
 
 import com.intellij.codeHighlighting.HighlightDisplayLevel;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
+import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.codeInspection.InspectionProfileEntry;
 import com.intellij.codeInspection.InspectionManager;
 import com.intellij.codeInspection.LocalInspectionEP;
+import com.intellij.codeInspection.ProblemDescriptor;
 import com.intellij.codeInspection.ProblemsHolder;
 import com.intellij.codeInspection.ex.InspectionToolWrapper;
+import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.command.undo.UndoManager;
+import com.intellij.openapi.fileEditor.FileEditor;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.TestDialog;
+import com.intellij.openapi.ui.TestDialogManager;
 import com.intellij.profile.codeInspection.InspectionProfileManager;
+import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElementVisitor;
+import com.intellij.psi.XmlElementFactory;
 import com.intellij.psi.xml.XmlFile;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.testFramework.DumbModeTestUtils;
+import com.intellij.testFramework.EdtTestUtil;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataProvider;
@@ -29,10 +40,11 @@ import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 
 import java.sql.Types;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class MyBatisSqlSchemaInspectionTest extends BasePlatformTestCase {
     private static final String SHORT_NAME = "MyBatisSqlSchema";
@@ -223,6 +235,284 @@ public final class MyBatisSqlSchemaInspectionTest extends BasePlatformTestCase {
         assertEmpty(warnings());
     }
 
+    public void testInspectionNeverStartsMetadataRefresh() throws Exception {
+        CountDownLatch loadStarted = new CountDownLatch(1);
+        MyBatisDatabaseMetadataProvider.EP_NAME.getPoint().registerExtension(
+                new CountingProvider(loadStarted),
+                getTestRootDisposable());
+        configure("select * from users");
+
+        assertEmpty(warnings());
+        assertFalse("Inspection 不得主动连接或刷新元数据",
+                loadStarted.await(500, TimeUnit.MILLISECONDS));
+    }
+
+    public void testFillUnmappedResultFieldsQuickFixHasPreview()
+            throws Throwable {
+        warmReadyMetadata();
+        myFixture.addFileToProject("src/main/java/com/example/User.java", """
+                package com.example;
+                public class User {
+                    public void setId(long id) { }
+                    public void setName(String name) { }
+                }
+                """);
+        XmlFile file = configureWritableXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="User<caret>Map" type="com.example.User"/>
+                    <select id="find" resultMap="UserMap">
+                        select id, name from users
+                    </select>
+                </mapper>
+                """);
+        myFixture.doHighlighting();
+        IntentionAction action = intentionStartingWith("补齐未映射字段");
+
+        assertPreviewContains(action, "<id column=\"id\" property=\"id\"");
+        assertPreviewContains(action, "<result column=\"name\" property=\"name\"");
+        assertEquals(0, occurrences(file.getText(), "column=\"id\""));
+        assertEquals(0, occurrences(file.getText(), "column=\"name\""));
+    }
+
+    public void testFillUnmappedResultFieldsExecutesInSingleUndoAndOrdersPrimaryKeyFirst()
+            throws Throwable {
+        warmReadyMetadata();
+        myFixture.addFileToProject("src/main/java/com/example/User.java", """
+                package com.example;
+                public class User {
+                    public void setId(long id) { }
+                    public void setName(String name) { }
+                }
+                """);
+        XmlFile file = configureWritableXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="User<caret>Map" type="com.example.User"/>
+                    <select id="find" resultMap="UserMap">select id, name from users</select>
+                </mapper>
+                """);
+        myFixture.doHighlighting();
+        IntentionAction action = intentionStartingWith("补齐未映射字段");
+
+        myFixture.launchAction(action);
+        PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
+
+        XmlTag resultMap = file.getRootTag().findFirstSubTag("resultMap");
+        assertNotNull(resultMap);
+        assertEquals(1, occurrences(resultMap.getText(), "column=\"id\""));
+        assertEquals(1, occurrences(resultMap.getText(), "column=\"name\""));
+        assertTrue(resultMap.getText(),
+                resultMap.getText().indexOf("<id ")
+                        < resultMap.getText().indexOf("<result "));
+
+        FileEditor editor = FileEditorManager.getInstance(getProject())
+                .getSelectedEditor(file.getVirtualFile());
+        assertNotNull(editor);
+        UndoManager undoManager = UndoManager.getInstance(getProject());
+        assertTrue(undoManager.isUndoAvailable(editor));
+        TestDialogManager.setTestDialog(TestDialog.OK, getTestRootDisposable());
+        EdtTestUtil.runInEdtAndWait(() -> undoManager.undo(editor));
+        PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
+        assertEquals(0, occurrences(file.getText(), "column=\"id\""));
+        assertEquals(0, occurrences(file.getText(), "column=\"name\""));
+    }
+
+    public void testFillUnmappedResultFieldsStopsForReadOnlyTarget() throws Exception {
+        warmReadyMetadata();
+        myFixture.addFileToProject("src/main/java/com/example/User.java", """
+                package com.example;
+                public class User {
+                    public void setId(long id) { }
+                    public void setName(String name) { }
+                }
+                """);
+        XmlFile file = configureWritableXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="User<caret>Map" type="com.example.User"/>
+                    <select id="find" resultMap="UserMap">select id, name from users</select>
+                </mapper>
+                """);
+        myFixture.doHighlighting();
+        ProblemDescriptor descriptor = fillDescriptor(file);
+        FillMyBatisResultMapFieldsQuickFix fix = fillQuickFix(descriptor);
+
+        setWritable(file, false);
+        try {
+            fix.applyFix(getProject(), descriptor);
+            assertEquals(0, occurrences(file.getText(), "column=\"id\""));
+            assertEquals(0, occurrences(file.getText(), "column=\"name\""));
+        } finally {
+            setWritable(file, true);
+        }
+    }
+
+    public void testFillUnmappedResultFieldsStopsWhenMadeReadOnlyAfterPreview()
+            throws Exception {
+        warmReadyMetadata();
+        myFixture.addFileToProject("src/main/java/com/example/User.java", """
+                package com.example;
+                public class User {
+                    public void setId(long id) { }
+                    public void setName(String name) { }
+                }
+                """);
+        XmlFile file = configureWritableXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="User<caret>Map" type="com.example.User"/>
+                    <select id="find" resultMap="UserMap">select id, name from users</select>
+                </mapper>
+                """);
+        myFixture.doHighlighting();
+        IntentionAction action = intentionStartingWith("补齐未映射字段");
+        setWritable(file, true);
+        assertPreviewContains(action, "<id column=\"id\" property=\"id\"");
+        ProblemDescriptor descriptor = fillDescriptor(file);
+        FillMyBatisResultMapFieldsQuickFix fix = fillQuickFix(descriptor);
+
+        setWritable(file, false);
+        try {
+            fix.applyFix(getProject(), descriptor);
+            assertEquals(0, occurrences(file.getText(), "column=\"id\""));
+            assertEquals(0, occurrences(file.getText(), "column=\"name\""));
+        } finally {
+            setWritable(file, true);
+        }
+    }
+
+    public void testFillUnmappedResultFieldsStopsOnSourceConflict() throws Exception {
+        warmReadyMetadata();
+        myFixture.addFileToProject("src/main/java/com/example/User.java", """
+                package com.example;
+                public class User {
+                    public void setId(long id) { }
+                    public void setName(String name) { }
+                }
+                """);
+        XmlFile file = configureWritableXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="User<caret>Map" type="com.example.User"/>
+                    <select id="find" resultMap="UserMap">
+                        select id, name from users
+                    </select>
+                </mapper>
+                """);
+        myFixture.doHighlighting();
+        IntentionAction action = intentionStartingWith("补齐未映射字段");
+        XmlTag resultMap = file.getRootTag().findFirstSubTag("resultMap");
+        assertNotNull(resultMap);
+        WriteCommandAction.runWriteCommandAction(getProject(), (Runnable) () -> resultMap.addSubTag(
+                XmlElementFactory.getInstance(getProject()).createTagFromText(
+                        "<result property=\"id\" column=\"legacy_id\"/>"),
+                false));
+        setWritable(file, true);
+
+        myFixture.launchAction(action);
+        PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
+
+        assertEquals(1, occurrences(file.getText(), "column=\"legacy_id\""));
+        assertEquals(0, occurrences(file.getText(), "column=\"name\""));
+        assertEquals(0, occurrences(file.getText(), "column=\"id\""));
+    }
+
+    public void testFillUnmappedResultFieldsStopsWhenMetadataExpires() throws Exception {
+        warmReadyMetadata();
+        myFixture.addFileToProject("src/main/java/com/example/User.java", """
+                package com.example;
+                public class User {
+                    public void setId(long id) { }
+                    public void setName(String name) { }
+                }
+                """);
+        XmlFile file = configureWritableXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="User<caret>Map" type="com.example.User"/>
+                    <select id="find" resultMap="UserMap">select id, name from users</select>
+                </mapper>
+                """);
+        myFixture.doHighlighting();
+        IntentionAction action = intentionStartingWith("补齐未映射字段");
+        MyBatisDatabaseMetadataService.getInstance(getProject()).invalidate();
+        setWritable(file, true);
+
+        myFixture.launchAction(action);
+        PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
+
+        assertEquals(0, occurrences(file.getText(), "column=\"id\""));
+        assertEquals(0, occurrences(file.getText(), "column=\"name\""));
+    }
+
+    public void testFillUnmappedResultFieldsCancellationAfterOfflineBuildWritesNothing()
+            throws Exception {
+        warmReadyMetadata();
+        myFixture.addFileToProject("src/main/java/com/example/User.java", """
+                package com.example;
+                public class User {
+                    public void setId(long id) { }
+                    public void setName(String name) { }
+                }
+                """);
+        XmlFile file = configureWritableXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="User<caret>Map" type="com.example.User"/>
+                    <select id="find" resultMap="UserMap">select id, name from users</select>
+                </mapper>
+                """);
+        myFixture.doHighlighting();
+        ProblemDescriptor descriptor = fillDescriptor(file);
+        FillMyBatisResultMapFieldsQuickFix fix = fillQuickFix(descriptor);
+        XmlTag resultMap = file.getRootTag().findFirstSubTag("resultMap");
+        assertNotNull(resultMap);
+        AtomicInteger offlineBuildChecks = new AtomicInteger();
+
+        try {
+            WriteCommandAction.runWriteCommandAction(
+                    getProject(),
+                    (Runnable) () -> fix.replaceWithPlan(
+                            getProject(),
+                            resultMap,
+                            () -> {
+                                if (offlineBuildChecks.incrementAndGet() == 2) {
+                                    throw new ProcessCanceledException();
+                                }
+                            }));
+            fail("离线计划构建取消必须向上传播");
+        } catch (ProcessCanceledException expected) {
+            // 第一个映射只加入离线副本；取消时物理 ResultMap 必须保持原样。
+        }
+        PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
+        assertEquals(2, offlineBuildChecks.get());
+        assertEquals(0, occurrences(file.getText(), "column=\"id\""));
+        assertEquals(0, occurrences(file.getText(), "column=\"name\""));
+    }
+
+    public void testFillUnmappedResultFieldsIsUnavailableForAmbiguousOrUnknownProperties()
+            throws Exception {
+        warmReadyMetadata();
+        myFixture.addFileToProject("src/main/java/com/example/User.java", """
+                package com.example;
+                public class User { public void setId(long id) { } }
+                """);
+        myFixture.configureByText("UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="User<caret>Map" type="com.example.User"/>
+                    <select id="find" resultMap="UserMap">
+                        select u.id, o.user_id from users u
+                        join orders o on u.id = o.user_id
+                    </select>
+                </mapper>
+                """);
+        myFixture.doHighlighting();
+        assertFalse(hasIntentionStartingWith("补齐未映射字段"));
+
+        myFixture.configureByText("UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <resultMap id="User<caret>Map" type="com.example.User"/>
+                    <select id="find" resultMap="UserMap">select id, name from users</select>
+                </mapper>
+                """);
+        myFixture.doHighlighting();
+        assertFalse(hasIntentionStartingWith("补齐未映射字段"));
+    }
+
     public void testDumbModeIsSilentAndCancellationPropagates() throws Exception {
         warmReadyMetadata();
         configure("select * from missing_users");
@@ -270,6 +560,22 @@ public final class MyBatisSqlSchemaInspectionTest extends BasePlatformTestCase {
                 """.formatted(sql));
     }
 
+    private XmlFile configureWritableXml(String sourceWithCaret) {
+        int caretOffset = sourceWithCaret.indexOf("<caret>");
+        String source = sourceWithCaret.replace("<caret>", "");
+        XmlFile file = (XmlFile) myFixture.addFileToProject(
+                "src/main/resources/mapper/UserMapper.xml",
+                source);
+        if (!file.getVirtualFile().isWritable()) {
+            setWritable(file, true);
+        }
+        myFixture.configureFromExistingVirtualFile(file.getVirtualFile());
+        if (caretOffset >= 0) {
+            myFixture.getEditor().getCaretModel().moveToOffset(caretOffset);
+        }
+        return file;
+    }
+
     private List<HighlightInfo> warnings() {
         return myFixture.doHighlighting().stream()
                 .filter(info -> SHORT_NAME.equals(info.getInspectionToolId()))
@@ -285,6 +591,66 @@ public final class MyBatisSqlSchemaInspectionTest extends BasePlatformTestCase {
                 .buildVisitor(holder, true);
         tag.accept(visitor);
         return holder;
+    }
+
+    private IntentionAction intentionStartingWith(String prefix) {
+        return myFixture.getAvailableIntentions().stream()
+                .filter(action -> action.getText().startsWith(prefix))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private ProblemDescriptor fillDescriptor(XmlFile file) {
+        XmlTag resultMap = file.getRootTag().findFirstSubTag("resultMap");
+        assertNotNull(resultMap);
+        return inspect(file, resultMap).getResults().stream()
+                .filter(descriptor -> descriptor.getFixes() != null
+                        && java.util.Arrays.stream(descriptor.getFixes())
+                                .anyMatch(FillMyBatisResultMapFieldsQuickFix.class::isInstance))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private FillMyBatisResultMapFieldsQuickFix fillQuickFix(ProblemDescriptor descriptor) {
+        return java.util.Arrays.stream(descriptor.getFixes())
+                .filter(FillMyBatisResultMapFieldsQuickFix.class::isInstance)
+                .map(FillMyBatisResultMapFieldsQuickFix.class::cast)
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private void assertPreviewContains(IntentionAction action, String expected) {
+        final String[] preview = new String[1];
+        com.intellij.codeInsight.intention.preview.IntentionPreviewUtils.previewSession(
+                myFixture.getEditor(),
+                () -> preview[0] = myFixture.getIntentionPreviewText(action));
+        assertNotNull(preview[0]);
+        assertTrue(preview[0], preview[0].contains(expected));
+    }
+
+    private boolean hasIntentionStartingWith(String prefix) {
+        return myFixture.getAvailableIntentions().stream()
+                .anyMatch(action -> action.getText().startsWith(prefix));
+    }
+
+    private static int occurrences(String text, String expected) {
+        int count = 0;
+        int offset = 0;
+        while ((offset = text.indexOf(expected, offset)) >= 0) {
+            count++;
+            offset += expected.length();
+        }
+        return count;
+    }
+
+    private void setWritable(XmlFile file, boolean writable) {
+        WriteCommandAction.runWriteCommandAction(getProject(), (Runnable) () -> {
+            try {
+                file.getVirtualFile().setWritable(writable);
+            } catch (java.io.IOException failure) {
+                throw new IllegalStateException(failure);
+            }
+        });
     }
 
     private LocalInspectionEP extension() {
@@ -325,21 +691,39 @@ public final class MyBatisSqlSchemaInspectionTest extends BasePlatformTestCase {
         }
 
         private static MyBatisDatabaseTable table(String name, String... columns) {
-            List<MyBatisDatabaseColumn> metadata = Arrays.stream(columns)
-                    .map(column -> new MyBatisDatabaseColumn(
-                            column,
-                            "id".equals(column) ? "BIGINT" : "VARCHAR",
-                            "id".equals(column) ? Types.BIGINT : Types.VARCHAR,
+            List<MyBatisDatabaseColumn> metadata = java.util.stream.IntStream
+                    .range(0, columns.length)
+                    .mapToObj(index -> new MyBatisDatabaseColumn(
+                            columns[index],
+                            "id".equals(columns[index]) ? "BIGINT" : "VARCHAR",
+                            "id".equals(columns[index]) ? Types.BIGINT : Types.VARCHAR,
                             true,
+                            "id".equals(columns[index]),
                             false,
-                            false,
-                            1))
+                            index + 1))
                     .toList();
             return new MyBatisDatabaseTable(
                     Optional.empty(),
                     Optional.of("public"),
                     name,
                     metadata);
+        }
+    }
+
+    private record CountingProvider(CountDownLatch loadStarted)
+            implements MyBatisDatabaseMetadataProvider {
+        @Override
+        public String id() {
+            return "inspection-counting-fixture";
+        }
+
+        @Override
+        public List<MyBatisDatabaseSnapshot> load(
+                Project project,
+                MyBatisDatabaseRequest request,
+                ProgressIndicator indicator) {
+            loadStarted.countDown();
+            return List.of();
         }
     }
 }

@@ -22,6 +22,11 @@ public interface UserMapper {
     int insert(User user);
 
     /**
+     * S9 set-based 批量插入：单条插入 statement，无效集合在动态 SQL 绑定阶段失败。
+     */
+    int insertBatch(@Param("entities") Collection<User> entities);
+
+    /**
      * S9 方法名语法生成样例：包含字符串、比较和排序。
      */
     List<User> findByUsernameContainingAndIdGreaterThanOrderByIdDesc(
@@ -32,6 +37,13 @@ public interface UserMapper {
      * S9 方法名语法生成样例：集合条件使用安全 foreach。
      */
     List<User> findByIdIn(@Param("idValues") Collection<Long> idValues);
+
+    /**
+     * S9 复合 OR 语料：必填集合为空时必须让整个谓词 fail-closed。
+     */
+    List<User> findByIdInOrUsername(
+            @Param("idValues") Collection<Long> idValues,
+            @Param("username") String username);
 
     /**
      * S9 动态条件样例：空参数只省略对应条件。
@@ -46,6 +58,26 @@ public interface UserMapper {
     int updateEmailById(
             @Param("newEmail") String newEmail,
             @Param("id") Long id);
+
+    /**
+     * S9 集合更新：null/空集合必须通过 1=0 保证零写入。
+     */
+    int updateEmailByIdIn(
+            @Param("newEmail") String newEmail,
+            @Param("idValues") Collection<Long> idValues);
+
+    /**
+     * S9 复合 OR 更新：必填集合为空时不能让另一分支扩大写入范围。
+     */
+    int updateEmailByIdInOrUsername(
+            @Param("newEmail") String newEmail,
+            @Param("idValues") Collection<Long> idValues,
+            @Param("username") String username);
+
+    /**
+     * S9 集合删除：null/空集合必须通过 1=0 保证零写入。
+     */
+    int deleteByIdIn(@Param("idValues") Collection<Long> idValues);
 
     /**
      * S9 方法名语法生成样例：统计返回 long。

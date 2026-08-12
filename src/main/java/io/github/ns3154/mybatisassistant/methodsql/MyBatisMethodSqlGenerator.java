@@ -23,6 +23,8 @@ public final class MyBatisMethodSqlGenerator {
 
     public static @NotNull MyBatisMethodGeneration generate(
             @NotNull MyBatisMethodGenerationRequest request) {
+        validateBatchInsertAst(request);
+        validateCanonicalAst(request);
         List<MyBatisMethodCondition> conditions = conditions(request.query().predicate());
         validateOptionalConditions(request, conditions);
         ParameterModel parameterModel = parameters(request, conditions);
@@ -40,8 +42,44 @@ public final class MyBatisMethodSqlGenerator {
                 javaMethod,
                 xml,
                 xmlTextToPreview(body),
-                !request.optionalConditionIndexes().isEmpty()
+                request.query().operation() == MyBatisMethodOperation.INSERT_BATCH
+                        || !request.optionalConditionIndexes().isEmpty()
                         || conditions.stream().anyMatch(MyBatisMethodSqlGenerator::usesXmlElement));
+    }
+
+    private static void validateBatchInsertAst(
+            @NotNull MyBatisMethodGenerationRequest request) {
+        if (request.query().operation() != MyBatisMethodOperation.INSERT_BATCH) {
+            return;
+        }
+        List<MyBatisMethodField> expectedFields = request.schema().fields().stream()
+                .filter(field -> !field.autoIncrement() && !field.generated())
+                .toList();
+        MyBatisMethodQuery query = request.query();
+        boolean invalid = !"insertBatch".equals(query.methodName())
+                || expectedFields.isEmpty()
+                || !query.subjectFields().equals(expectedFields)
+                || query.distinct()
+                || query.limit().isPresent()
+                || query.paged()
+                || query.singleResult()
+                || query.predicate().isPresent()
+                || !query.orders().isEmpty();
+        if (invalid) {
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.generator.error.batch.insert.ast"));
+        }
+    }
+
+    private static void validateCanonicalAst(
+            @NotNull MyBatisMethodGenerationRequest request) {
+        MyBatisMethodParseResult reparsed = MyBatisMethodNameParser.parse(
+                request.query().methodName(), request.schema());
+        if (!(reparsed instanceof MyBatisMethodParseResult.Success success)
+                || !success.query().equals(request.query())) {
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.generator.error.ast.noncanonical"));
+        }
     }
 
     private static void validateOptionalConditions(
@@ -62,6 +100,13 @@ public final class MyBatisMethodSqlGenerator {
             throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
                     "methodsql.generator.error.optional.or"));
         }
+        boolean conditionalWrite = request.query().operation() == MyBatisMethodOperation.UPDATE
+                || request.query().operation() == MyBatisMethodOperation.DELETE;
+        if (conditionalWrite && !conditions.isEmpty()
+                && request.optionalConditionIndexes().size() == conditions.size()) {
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.generator.error.write.all.optional"));
+        }
     }
 
     private static @NotNull ParameterModel parameters(
@@ -69,6 +114,13 @@ public final class MyBatisMethodSqlGenerator {
             @NotNull List<MyBatisMethodCondition> conditions) {
         NameAllocator names = new NameAllocator();
         List<MyBatisMethodParameter> parameters = new ArrayList<>();
+        if (request.query().operation() == MyBatisMethodOperation.INSERT_BATCH) {
+            parameters.add(parameter(
+                    names.allocate("entities"),
+                    "java.util.Collection<" + request.entityType() + ">",
+                    MyBatisMethodParameterRole.BATCH_ENTITIES,
+                    null));
+        }
         for (MyBatisMethodField field : request.query().subjectFields()) {
             if (request.query().operation() != MyBatisMethodOperation.UPDATE) {
                 break;
@@ -146,6 +198,7 @@ public final class MyBatisMethodSqlGenerator {
         StringBuilder body = new StringBuilder();
         appendBinds(body, conditions, parameters);
         switch (request.query().operation()) {
+            case INSERT_BATCH -> appendBatchInsert(body, request, parameters);
             case SELECT -> appendSelect(body, request, conditions, parameters);
             case COUNT, EXISTS, SUM, AVERAGE, MINIMUM, MAXIMUM ->
                     appendAggregate(body, request, conditions, parameters);
@@ -155,6 +208,58 @@ public final class MyBatisMethodSqlGenerator {
                     "methodsql.error.operation.unknown", request.query().operation()));
         }
         return body.toString();
+    }
+
+    private static void appendBatchInsert(
+            @NotNull StringBuilder body,
+            @NotNull MyBatisMethodGenerationRequest request,
+            @NotNull ParameterModel parameters) {
+        MyBatisMethodParameter entities = parameters.parameters().stream()
+                .filter(parameter -> parameter.role()
+                        == MyBatisMethodParameterRole.BATCH_ENTITIES)
+                .findFirst()
+                .orElseThrow();
+        List<MyBatisMethodField> fields = request.query().subjectFields();
+        String table = tableIdentifier(request);
+        String columns = fields.stream()
+                .map(field -> identifier(field.columnName(), request))
+                .collect(Collectors.joining(", "));
+        String values = fields.stream()
+                .map(field -> entityPlaceholder("entity", field))
+                .collect(Collectors.joining(", ", "(", ")"));
+        String validated = "_mybatisAssistantBatchEntities";
+        body.append("<bind name=\"").append(validated)
+                .append("\" value=\"@java.util.Collections@list("
+                        + "@java.util.Collections@enumeration("
+                        + "@java.util.Objects@requireNonNull(")
+                .append(xmlAttribute(entities.name())).append(")))\"/>\n")
+                .append("<bind name=\"_mybatisAssistantBatchFirst\" value=\"")
+                .append(validated).append(".iterator().next()\"/>\n")
+                .append("<bind name=\"_mybatisAssistantBatchNullFree\" value=\"")
+                .append("@java.util.Objects@checkIndex("
+                        + "@java.util.Collections@frequency(")
+                .append(validated).append(", null), 1)\"/>\n");
+        if (request.dialect() == MyBatisSqlDialect.SQL_SERVER) {
+            int maximumRows = Math.min(1000, 2100 / fields.size());
+            body.append("<bind name=\"_mybatisAssistantBatchLimit\" value=\"")
+                    .append("@java.util.Objects@checkIndex(")
+                    .append(validated).append(".size() - 1, ")
+                    .append(maximumRows).append(")\"/>\n");
+        }
+        if (request.dialect() == MyBatisSqlDialect.ORACLE) {
+            body.append("INSERT ALL\n<foreach collection=\"")
+                    .append(validated)
+                    .append("\" item=\"entity\">\n  INTO ")
+                    .append(table).append(" (").append(columns).append(") VALUES ")
+                    .append(values)
+                    .append("\n</foreach>\nSELECT 1 FROM DUAL");
+        } else {
+            body.append("INSERT INTO ").append(table).append(" (")
+                    .append(columns).append(") VALUES\n<foreach collection=\"")
+                    .append(validated)
+                    .append("\" item=\"entity\" separator=\",\">\n  ")
+                    .append(values).append("\n</foreach>");
+        }
     }
 
     private static void appendSelect(
@@ -179,7 +284,7 @@ public final class MyBatisMethodSqlGenerator {
                     .map(field -> identifier(field.columnName(), request))
                     .collect(Collectors.joining(", ")));
         }
-        body.append(" FROM ").append(identifier(request.schema().tableName(), request));
+        body.append(" FROM ").append(tableIdentifier(request));
         appendWhere(body, request, conditions, parameters);
         appendOrder(body, request);
         appendLimit(body, request, parameters);
@@ -224,7 +329,7 @@ public final class MyBatisMethodSqlGenerator {
             default -> throw new IllegalStateException(MyBatisMethodSqlMessages.message(
                     "methodsql.generator.error.aggregate.operation", query.operation()));
         }
-        body.append(" FROM ").append(identifier(request.schema().tableName(), request));
+        body.append(" FROM ").append(tableIdentifier(request));
         appendWhere(body, request, conditions, parameters);
     }
 
@@ -233,7 +338,7 @@ public final class MyBatisMethodSqlGenerator {
             @NotNull MyBatisMethodGenerationRequest request,
             @NotNull List<MyBatisMethodCondition> conditions,
             @NotNull ParameterModel parameters) {
-        body.append("UPDATE ").append(identifier(request.schema().tableName(), request))
+        body.append("UPDATE ").append(tableIdentifier(request))
                 .append(" SET ");
         int parameterIndex = 0;
         for (int index = 0; index < request.query().subjectFields().size(); index++) {
@@ -252,7 +357,7 @@ public final class MyBatisMethodSqlGenerator {
             @NotNull MyBatisMethodGenerationRequest request,
             @NotNull List<MyBatisMethodCondition> conditions,
             @NotNull ParameterModel parameters) {
-        body.append("DELETE FROM ").append(identifier(request.schema().tableName(), request));
+        body.append("DELETE FROM ").append(tableIdentifier(request));
         appendWhere(body, request, conditions, parameters);
     }
 
@@ -264,25 +369,59 @@ public final class MyBatisMethodSqlGenerator {
         if (conditions.isEmpty()) {
             return;
         }
+        List<MyBatisMethodParameter> mandatoryCollections = mandatoryCollections(
+                request, conditions, parameters);
+        String mandatoryTest = mandatoryCollections.stream()
+                .map(MyBatisMethodSqlGenerator::collectionPresentTest)
+                .collect(Collectors.joining(" and "));
         if (request.optionalConditionIndexes().isEmpty()) {
-            body.append(" WHERE ").append(renderPredicate(
-                    request.query().predicate().orElseThrow(), request, parameters));
+            body.append(" WHERE ");
+            if (mandatoryCollections.isEmpty()) {
+                body.append(renderPredicate(
+                        request.query().predicate().orElseThrow(), request, parameters));
+            } else {
+                body.append("<choose><when test=\"")
+                        .append(xmlAttribute(mandatoryTest)).append("\">")
+                        .append(renderPredicate(
+                                request.query().predicate().orElseThrow(), request, parameters))
+                        .append("</when><otherwise>1 = 0</otherwise></choose>");
+            }
             return;
+        }
+        if (!mandatoryCollections.isEmpty()) {
+            body.append("\n<choose>\n  <when test=\"")
+                    .append(xmlAttribute(mandatoryTest)).append("\">\n  ");
         }
         body.append("\n<where>\n");
         for (int index = 0; index < conditions.size(); index++) {
             MyBatisMethodCondition condition = conditions.get(index);
+            boolean optional = request.optionalConditionIndexes().contains(index);
             String sql = renderCondition(condition, request, parameters);
-            if (request.optionalConditionIndexes().contains(index)) {
-                body.append("  <if test=\"")
-                        .append(xmlAttribute(optionalTest(
-                                parameters.conditionParameters().get(condition))))
-                        .append("\">AND ").append(sql).append("</if>\n");
+            if (optional) {
+                ConditionParameters conditionParameters =
+                        parameters.conditionParameters().get(condition);
+                if (condition.comparison() == MyBatisMethodComparison.IN
+                        || condition.comparison() == MyBatisMethodComparison.NOT_IN) {
+                    body.append("  <choose>\n    <when test=\"")
+                            .append(xmlAttribute(optionalTest(conditionParameters)))
+                            .append("\">AND ").append(sql).append("</when>\n")
+                            .append("    <when test=\"")
+                            .append(xmlAttribute(collectionContainsNullTest(
+                                    conditionParameters.only())))
+                            .append("\">AND 1 = 0</when>\n  </choose>\n");
+                } else {
+                    body.append("  <if test=\"")
+                            .append(xmlAttribute(optionalTest(conditionParameters)))
+                            .append("\">AND ").append(sql).append("</if>\n");
+                }
             } else {
                 body.append("  AND ").append(sql).append('\n');
             }
         }
         body.append("</where>");
+        if (!mandatoryCollections.isEmpty()) {
+            body.append("\n  </when>\n  <otherwise>WHERE 1 = 0</otherwise>\n</choose>");
+        }
     }
 
     private static @NotNull String renderPredicate(
@@ -317,11 +456,7 @@ public final class MyBatisMethodSqlGenerator {
             case BETWEEN -> column + " BETWEEN "
                     + placeholder(values.values().get(0), condition.field()) + " AND "
                     + placeholder(values.values().get(1), condition.field());
-            case IN, NOT_IN -> column
-                    + (condition.comparison() == MyBatisMethodComparison.NOT_IN ? " NOT IN " : " IN ")
-                    + "<foreach collection=\"" + xmlAttribute(values.only().name())
-                    + "\" item=\"item\" open=\"(\" separator=\",\" close=\")\">"
-                    + itemPlaceholder(condition.field()) + "</foreach>";
+            case IN, NOT_IN -> collectionCondition(column, condition, values);
             case LIKE, NOT_LIKE -> column
                     + (condition.comparison() == MyBatisMethodComparison.NOT_LIKE
                             ? " NOT LIKE " : " LIKE ")
@@ -335,6 +470,56 @@ public final class MyBatisMethodSqlGenerator {
         };
     }
 
+    private static @NotNull String collectionCondition(
+            @NotNull String column,
+            @NotNull MyBatisMethodCondition condition,
+            @NotNull ConditionParameters values) {
+        MyBatisMethodParameter collection = values.only();
+        return column
+                + (condition.comparison() == MyBatisMethodComparison.NOT_IN
+                        ? " NOT IN " : " IN ")
+                + "<foreach collection=\"" + xmlAttribute(collection.name())
+                + "\" item=\"item\" open=\"(\" separator=\",\" close=\")\">"
+                + itemPlaceholder(condition.field()) + "</foreach>";
+    }
+
+    private static @NotNull List<MyBatisMethodParameter> mandatoryCollections(
+            @NotNull MyBatisMethodGenerationRequest request,
+            @NotNull List<MyBatisMethodCondition> conditions,
+            @NotNull ParameterModel parameters) {
+        List<MyBatisMethodParameter> result = new ArrayList<>();
+        for (int index = 0; index < conditions.size(); index++) {
+            if (request.optionalConditionIndexes().contains(index)) {
+                continue;
+            }
+            MyBatisMethodCondition condition = conditions.get(index);
+            if (condition.comparison() != MyBatisMethodComparison.IN
+                    && condition.comparison() != MyBatisMethodComparison.NOT_IN) {
+                continue;
+            }
+            MyBatisMethodParameter collection = parameters.conditionParameters()
+                    .get(condition).only();
+            if (!result.contains(collection)) {
+                result.add(collection);
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private static @NotNull String collectionPresentTest(
+            @NotNull MyBatisMethodParameter collection) {
+        return collection.name() + " != null and !" + collection.name() + ".isEmpty()"
+                + " and @java.util.Collections@frequency("
+                + collection.name() + ", null) == 0";
+    }
+
+    private static @NotNull String collectionContainsNullTest(
+            @NotNull MyBatisMethodParameter collection) {
+        return collection.name() + " != null and !" + collection.name() + ".isEmpty()"
+                + " and @java.util.Collections@frequency("
+                + collection.name() + ", null) != 0";
+    }
+
     private static void appendBinds(
             @NotNull StringBuilder body,
             @NotNull List<MyBatisMethodCondition> conditions,
@@ -346,9 +531,9 @@ public final class MyBatisMethodSqlGenerator {
             }
             String name = values.only().name();
             String expression = switch (condition.comparison()) {
-                case STARTING_WITH -> name + " + '%'";
-                case ENDING_WITH -> "'%' + " + name;
-                case CONTAINING -> "'%' + " + name + " + '%'";
+                case STARTING_WITH -> name + " == null ? null : " + name + " + '%'";
+                case ENDING_WITH -> name + " == null ? null : '%' + " + name;
+                case CONTAINING -> name + " == null ? null : '%' + " + name + " + '%'";
                 default -> throw new IllegalStateException(MyBatisMethodSqlMessages.message(
                         "methodsql.generator.error.bind.unneeded", condition.comparison()));
             };
@@ -409,6 +594,7 @@ public final class MyBatisMethodSqlGenerator {
             @NotNull MyBatisMethodGenerationRequest request,
             @NotNull String body) {
         String tag = switch (request.query().operation()) {
+            case INSERT_BATCH -> "insert";
             case UPDATE -> "update";
             case DELETE -> "delete";
             default -> "select";
@@ -416,8 +602,13 @@ public final class MyBatisMethodSqlGenerator {
         StringBuilder result = new StringBuilder("<").append(tag)
                 .append(" id=\"").append(xmlAttribute(request.query().methodName())).append('"');
         if ("select".equals(tag)) {
-            result.append(" resultType=\"").append(xmlAttribute(xmlResultType(request)))
-                    .append('"');
+            if (request.query().operation() == MyBatisMethodOperation.SELECT
+                    && request.query().subjectFields().isEmpty()) {
+                result.append(" resultMap=\"BaseResultMap\"");
+            } else {
+                result.append(" resultType=\"").append(xmlAttribute(xmlResultType(request)))
+                        .append('"');
+            }
         }
         return result.append(">\n  ")
                 .append(body.replace("\n", "\n  "))
@@ -429,7 +620,7 @@ public final class MyBatisMethodSqlGenerator {
             @NotNull MyBatisMethodGenerationRequest request) {
         MyBatisMethodQuery query = request.query();
         return switch (query.operation()) {
-            case UPDATE, DELETE -> "int";
+            case INSERT_BATCH, UPDATE, DELETE -> "int";
             case COUNT -> "long";
             case EXISTS -> "boolean";
             case SUM, AVERAGE -> "java.math.BigDecimal";
@@ -465,7 +656,7 @@ public final class MyBatisMethodSqlGenerator {
             case MINIMUM, MAXIMUM -> request.query().subjectFields().get(0).javaType();
             case SELECT -> request.query().subjectFields().size() > 1
                     ? "map" : selectElementType(request);
-            case UPDATE, DELETE -> throw new IllegalStateException(
+            case INSERT_BATCH, UPDATE, DELETE -> throw new IllegalStateException(
                     MyBatisMethodSqlMessages.message(
                             "methodsql.generator.error.write.result.type"));
         };
@@ -474,18 +665,14 @@ public final class MyBatisMethodSqlGenerator {
     private static @NotNull String identifier(
             @NotNull String name,
             @NotNull MyBatisMethodGenerationRequest request) {
-        String sql;
-        if (!request.escapeIdentifiers()) {
-            sql = name;
-        } else {
-            sql = switch (request.dialect()) {
-                case MYSQL -> "`" + name.replace("`", "``") + "`";
-                case SQL_SERVER -> "[" + name.replace("]", "]]" ) + "]";
-                case GENERIC, POSTGRESQL, ORACLE, SQLITE, DAMENG, H2 ->
-                        "\"" + name.replace("\"", "\"\"") + "\"";
-            };
-        }
-        return xmlText(sql);
+        return xmlText(MyBatisSqlIdentifierRenderer.identifier(
+                name, request.dialect(), request.escapeIdentifiers()));
+    }
+
+    private static @NotNull String tableIdentifier(
+            @NotNull MyBatisMethodGenerationRequest request) {
+        return xmlText(MyBatisSqlIdentifierRenderer.qualifiedTable(
+                request.schema(), request.dialect(), request.escapeIdentifiers()));
     }
 
     private static @NotNull String placeholder(
@@ -506,6 +693,17 @@ public final class MyBatisMethodSqlGenerator {
         return value.append('}').toString();
     }
 
+    private static @NotNull String entityPlaceholder(
+            @NotNull String item,
+            @NotNull MyBatisMethodField field) {
+        StringBuilder value = new StringBuilder("#{").append(item).append('.')
+                .append(field.propertyName()).append(",jdbcType=")
+                .append(jdbcTypeName(field.jdbcType()));
+        field.typeHandler().ifPresent(handler -> value
+                .append(",typeHandler=").append(handler));
+        return value.append('}').toString();
+    }
+
     private static @NotNull String optionalTest(@NotNull ConditionParameters parameters) {
         if (parameters.values().size() == 2) {
             return parameters.values().get(0).name() + " != null and "
@@ -513,7 +711,7 @@ public final class MyBatisMethodSqlGenerator {
         }
         MyBatisMethodParameter parameter = parameters.only();
         if (parameter.role() == MyBatisMethodParameterRole.COLLECTION) {
-            return parameter.name() + " != null and !" + parameter.name() + ".isEmpty()";
+            return collectionPresentTest(parameter);
         }
         return parameter.name() + " != null";
     }
@@ -633,11 +831,15 @@ public final class MyBatisMethodSqlGenerator {
     }
 
     private static @NotNull String xmlText(@NotNull String value) {
-        return value.replace("&", "&amp;").replace("<", "&lt;");
+        return value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
     }
 
     private static @NotNull String xmlTextToPreview(@NotNull String value) {
-        return value.replace("&lt;", "<").replace("&amp;", "&");
+        return value.replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&amp;", "&");
     }
 
     private record ParameterModel(

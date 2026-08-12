@@ -4,44 +4,33 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 不带 v 的唯一插件版本
-        required: true
-        type: string
-      channel:
-        description: JetBrains Marketplace 渠道
-        required: true
-        default: rc
-        type: choice
-        options:
-          - alpha
-          - beta
-          - rc
-          - default
-      publish_marketplace:
-        description: 签名验证后发布到 JetBrains Marketplace
-        required: true
-        default: false
-        type: boolean
 
 permissions:
-  contents: write
+  contents: read
+  checks: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
-  sign-release:
-    name: 完整验证、签名与发布候选
+  build-candidate:
+    name: 验证并构建唯一候选
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      channel: ${{ steps.release.outputs.channel }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+      tag: ${{ steps.release.outputs.tag }}
+      candidate_sha: ${{ steps.release.outputs.candidate_sha }}
+      unsigned_artifact: ${{ steps.release.outputs.unsigned_artifact }}
 
     steps:
-      - name: 检出源码
+      - name: 检出标签源码
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
 
       - name: 配置 Java 21
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
@@ -58,28 +47,57 @@ jobs:
           path: .intellijPlatform/layoutIndex
           key: intellij-layout-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('settings.gradle.kts', 'build.gradle.kts', 'gradle.properties', 'gradle.lockfile') }}
 
+      - name: 验证发布策略自测
+        run: |
+          ./scripts/test-release-input-validation.sh
+          ./scripts/test-release-notes.sh
+          ./scripts/test-release-required-checks.sh
+          ./scripts/test-release-workflow-contract.sh
+          ./scripts/test-plugin-archive-identity.sh
+
+      - name: 解析并校验标签、版本与渠道
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./scripts/validate-release-inputs.sh \
+            "" "" "${GITHUB_EVENT_NAME}" "${GITHUB_REF_TYPE}" "${GITHUB_REF_NAME}" \
+            >> "${GITHUB_OUTPUT}"
+
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if [[ "${GITHUB_SHA}" != "$(git rev-parse refs/remotes/origin/main)" ]]; then
+            echo "发布标签必须指向触发时默认分支 main 的最新提交" >&2
+            exit 1
+          fi
+          if [[ "$(git rev-list -n 1 "${GITHUB_REF_NAME}")" != "${GITHUB_SHA}" ]]; then
+            echo "标签与当前候选提交不一致" >&2
+            exit 1
+          fi
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "版本 ${GITHUB_REF_NAME} 已存在 GitHub Release，禁止同版本重建" >&2
+            exit 1
+          fi
+
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p build
+          ./scripts/extract-release-notes.sh \
+            "${version}" CHANGELOG.md build/release-notes.md
+          echo "unsigned_artifact=unsigned-release-${version}-${GITHUB_SHA}" \
+            >> "${GITHUB_OUTPUT}"
+          echo "candidate_sha=${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+
       - name: 验证 Gradle 基础设施重试边界
         run: ./scripts/test-gradle-infrastructure-retry.sh
 
-      - name: 解析并校验版本
-        id: release
+      - name: 验证发布检查聚合契约
+        run: ./scripts/test-release-required-checks.sh
+
+      - name: 验证候选提交全部交付检查
         env:
-          INPUT_VERSION: ${{ inputs.version }}
-          INPUT_CHANNEL: ${{ inputs.channel }}
-        run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            version="${GITHUB_REF_NAME#v}"
-            channel="default"
-          else
-            version="${INPUT_VERSION}"
-            channel="${INPUT_CHANNEL}"
-          fi
-          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-            echo "版本号不符合发布格式" >&2
-            exit 1
-          fi
-          echo "version=${version}" >> "${GITHUB_OUTPUT}"
-          echo "channel=${channel}" >> "${GITHUB_OUTPUT}"
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          ./scripts/verify-release-required-checks.sh
+          "${GITHUB_SHA}" "${GITHUB_REPOSITORY}"
 
       - name: 验证 Java + MyBatis 样例
         run: mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
@@ -87,82 +105,232 @@ jobs:
       - name: 验证完整语义语料
         run: mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 
+      - name: 验证 Gradle 多模块 Spring Boot 样例
+        run: >-
+          ./scripts/run-gradle-with-infrastructure-retry.sh
+          -p samples/gradle-spring-boot-multimodule
+          clean check :app:bootJar --no-daemon
+
       - name: 运行完整质量门
         run: >-
           ./scripts/run-gradle-with-infrastructure-retry.sh
           clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin
           -PpluginVersion=${{ steps.release.outputs.version }}
 
-      - name: 检查签名密钥
+      - name: 固化未签名候选
+        run: |
+          candidate_dir="build/release-unsigned"
+          mkdir -p "${candidate_dir}"
+          mapfile -t unsigned_zips < <(
+            find build/distributions -maxdepth 1 -type f \
+              -name '*.zip' ! -name '*-signed.zip' -print
+          )
+          if [[ "${#unsigned_zips[@]}" -ne 1 ]]; then
+            echo "未签名候选 ZIP 数量必须为 1，实际为 ${#unsigned_zips[@]}" >&2
+            exit 1
+          fi
+          cp "${unsigned_zips[0]}" "${candidate_dir}/"
+          cp build/reports/cyclonedx/bom.json "${candidate_dir}/bom.json"
+          cp build/reports/cyclonedx/bom.xml "${candidate_dir}/bom.xml"
+          cp build/release-notes.md "${candidate_dir}/release-notes.md"
+          {
+            echo "commit=${GITHUB_SHA}"
+            echo "tag=${{ steps.release.outputs.tag }}"
+            echo "version=${{ steps.release.outputs.version }}"
+            echo "channel=${{ steps.release.outputs.channel }}"
+          } > "${candidate_dir}/release-metadata.txt"
+          (
+            cd "${candidate_dir}"
+            sha256sum ./*.zip bom.json bom.xml release-notes.md release-metadata.txt \
+              > SHA256SUMS.unsigned
+          )
+
+      - name: 上传未签名候选
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.release.outputs.unsigned_artifact }}
+          path: build/release-unsigned/
+          if-no-files-found: error
+          retention-days: 14
+
+  sign-candidate:
+    name: 受保护签名与验签
+    needs: build-candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: release-signing
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    outputs:
+      signed_artifact: ${{ steps.package.outputs.signed_artifact }}
+
+    steps:
+      - name: 检出同一标签源码
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.build-candidate.outputs.candidate_sha }}
+          fetch-depth: 0
+
+      - name: 固定签名工具提交
+        run: |
+          test "$(git rev-parse HEAD)" = \
+            "${{ needs.build-candidate.outputs.candidate_sha }}"
+
+      - name: 配置 Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: zulu
+          java-version: 21
+
+      - name: 配置 Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+
+      - name: 下载已验证的未签名候选
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ needs.build-candidate.outputs.unsigned_artifact }}
+          path: build/release-input
+
+      - name: 核对候选摘要与签名材料
         env:
           CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
-          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
-          PUBLISH_REQUESTED: ${{ inputs.publish_marketplace }}
         run: |
+          (cd build/release-input && sha256sum -c SHA256SUMS.unsigned)
+          grep -qx "commit=${GITHUB_SHA}" build/release-input/release-metadata.txt
           if [[ -z "${CERTIFICATE_CHAIN}" || -z "${PRIVATE_KEY}" || -z "${PRIVATE_KEY_PASSWORD}" ]]; then
-            echo "缺少插件签名 secret，停止发布" >&2
-            exit 1
-          fi
-          if [[ "${PUBLISH_REQUESTED}" == "true" && -z "${PUBLISH_TOKEN}" ]]; then
-            echo "缺少 Marketplace 发布 token，停止发布" >&2
+            echo "release-signing 环境缺少生产签名材料，停止发布" >&2
             exit 1
           fi
 
-      - name: 签名并验证签名
+      - name: 签名下载的确切候选
         env:
           CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
-        run: >-
-          ./gradlew signPlugin verifyPluginSignature
-          -PpluginVersion=${{ steps.release.outputs.version }}
-
-      - name: 生成发布校验文件
         run: |
-          signed_zip="$(find build/distributions -maxdepth 1 -type f -name '*-signed.zip' -print -quit)"
-          if [[ -z "${signed_zip}" ]]; then
-            echo "未找到签名 ZIP" >&2
+          certificate_file="$(mktemp)"
+          trap 'rm -f "${certificate_file}"' EXIT
+          printf '%s\n' "${CERTIFICATE_CHAIN}" > "${certificate_file}"
+          chmod 600 "${certificate_file}"
+          mapfile -t unsigned_zips < <(
+            find build/release-input -maxdepth 1 -type f -name '*.zip' -print
+          )
+          if [[ "${#unsigned_zips[@]}" -ne 1 ]]; then
+            echo "待签名候选 ZIP 数量必须为 1，实际为 ${#unsigned_zips[@]}" >&2
             exit 1
           fi
-          sha256sum "${signed_zip}" build/reports/cyclonedx/bom.json build/reports/cyclonedx/bom.xml \
-            > build/reports/SHA256SUMS
-          echo "SIGNED_ZIP=${signed_zip}" >> "${GITHUB_ENV}"
+          unsigned_zip="${unsigned_zips[0]}"
+          ./scripts/run-gradle-with-infrastructure-retry.sh \
+            signPlugin -x buildPlugin \
+            -PpluginVersion=${{ needs.build-candidate.outputs.version }} \
+            -PpluginSigningArchiveFile="${unsigned_zip}"
+
+          signed_zip="${unsigned_zip%.zip}-signed.zip"
+          if [[ ! -f "${signed_zip}" ]]; then
+            echo "签名 ZIP 未在输入候选同级目录生成：${signed_zip}" >&2
+            exit 1
+          fi
+          ./scripts/verify-plugin-archive-identity.sh \
+            "${signed_zip}" "${{ needs.build-candidate.outputs.version }}"
+          ./scripts/run-gradle-with-infrastructure-retry.sh \
+            verifyPluginSignature -x signPlugin -x buildPlugin \
+            -PpluginVersion=${{ needs.build-candidate.outputs.version }} \
+            -PpluginSignatureVerificationArchiveFile="${signed_zip}" \
+            -PpluginSignatureCertificateFile="${certificate_file}"
+
+      - name: 生成签名候选校验文件
+        id: package
+        run: |
+          signed_dir="build/release-signed"
+          mkdir -p "${signed_dir}"
+          mapfile -t signed_zips < <(
+            find build/release-input -maxdepth 1 -type f -name '*-signed.zip' -print
+          )
+          if [[ "${#signed_zips[@]}" -ne 1 ]]; then
+            echo "固化签名 ZIP 时数量必须为 1，实际为 ${#signed_zips[@]}" >&2
+            exit 1
+          fi
+          signed_zip="${signed_zips[0]}"
+          cp "${signed_zip}" "${signed_dir}/"
+          cp build/release-input/bom.json "${signed_dir}/bom.json"
+          cp build/release-input/bom.xml "${signed_dir}/bom.xml"
+          cp build/release-input/release-notes.md "${signed_dir}/release-notes.md"
+          cp build/release-input/release-metadata.txt "${signed_dir}/release-metadata.txt"
+          (
+            cd "${signed_dir}"
+            sha256sum ./*-signed.zip bom.json bom.xml release-notes.md release-metadata.txt \
+              > SHA256SUMS
+          )
+          if unzip -p "${signed_zip}" | strings | \
+            grep -E 'BEGIN (RSA |EC |ENCRYPTED )?PRIVATE KEY|PRIVATE_KEY_PASSWORD|PUBLISH_TOKEN|/Users/|/home/runner/work/' \
+              >/dev/null; then
+            echo "签名候选包含私钥标记、敏感字段或构建机绝对路径" >&2
+            exit 1
+          fi
+          echo "signed_artifact=signed-release-${{ needs.build-candidate.outputs.version }}-${GITHUB_SHA}" \
+            >> "${GITHUB_OUTPUT}"
+
+      - name: 生成候选来源证明
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            build/release-signed/*-signed.zip
+            build/release-signed/SHA256SUMS
 
       - name: 上传签名候选与 SBOM
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: mybatis-idea-assistant-${{ steps.release.outputs.version }}-signed
-          path: |
-            ${{ env.SIGNED_ZIP }}
-            build/reports/cyclonedx/bom.json
-            build/reports/cyclonedx/bom.xml
-            build/reports/SHA256SUMS
+          name: ${{ steps.package.outputs.signed_artifact }}
+          path: build/release-signed/
+          if-no-files-found: error
+          retention-days: 30
 
-      - name: 发布到 JetBrains Marketplace
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_marketplace }}
-        env:
-          CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
-          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
-          PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
-          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
-        run: >-
-          ./gradlew publishPlugin
-          -PpluginVersion=${{ steps.release.outputs.version }}
-          -PpluginChannel=${{ steps.release.outputs.channel }}
+  create-draft-release:
+    name: 创建受保护的 GitHub 草稿 Release
+    needs:
+      - build-candidate
+      - sign-candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: release-github
+    permissions:
+      contents: write
 
-      - name: 创建 GitHub 草稿 Release
-        if: ${{ github.ref_type == 'tag' }}
+    steps:
+      - name: 下载签名候选
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ needs.sign-candidate.outputs.signed_artifact }}
+          path: release-assets
+
+      - name: 核对并创建草稿 Release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            "${SIGNED_ZIP}" \
-            build/reports/cyclonedx/bom.json \
-            build/reports/cyclonedx/bom.xml \
-            build/reports/SHA256SUMS \
-            --draft \
-            --verify-tag \
-            --title "MyBatis Assistant ${{ steps.release.outputs.version }}" \
-            --notes-file CHANGELOG.md
+          (cd release-assets && sha256sum -c SHA256SUMS)
+          if gh release view "${{ needs.build-candidate.outputs.tag }}" >/dev/null 2>&1; then
+            echo "Release 已存在，禁止同一版本重新上传制品" >&2
+            exit 1
+          fi
+          release_args=(
+            "${{ needs.build-candidate.outputs.tag }}"
+            release-assets/*-signed.zip
+            release-assets/bom.json
+            release-assets/bom.xml
+            release-assets/SHA256SUMS
+            release-assets/release-metadata.txt
+            release-assets/release-notes.md
+            --draft
+            --verify-tag
+            --title "MyBatis Assistant ${{ needs.build-candidate.outputs.version }}"
+            --notes-file release-assets/release-notes.md
+          )
+          if [[ "${{ needs.build-candidate.outputs.prerelease }}" == "true" ]]; then
+            release_args+=(--prerelease)
+          fi
+          gh release create "${release_args[@]}"

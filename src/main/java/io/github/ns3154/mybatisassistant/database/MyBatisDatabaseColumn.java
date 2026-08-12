@@ -15,8 +15,10 @@ public record MyBatisDatabaseColumn(
         boolean primaryKey,
         boolean foreignKey,
         boolean autoIncrement,
+        boolean generated,
         @NotNull Optional<String> comment,
-        int position) {
+        int position,
+        @NotNull Optional<MyBatisForeignKeyReference> foreignKeyReference) {
     public MyBatisDatabaseColumn {
         if (name.isBlank()) {
             throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
@@ -30,6 +32,28 @@ public record MyBatisDatabaseColumn(
                     "database.error.column.position.negative"));
         }
         comment = comment.filter(value -> !value.isBlank());
+        if (!foreignKey && foreignKeyReference.isPresent()) {
+            throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                    "database.error.foreign.key.reference.without.flag"));
+        }
+    }
+
+    /**
+     * 保留尚未携带外键目标身份的完整列模型调用方；目标身份默认未知。
+     */
+    public MyBatisDatabaseColumn(
+            @NotNull String name,
+            @NotNull String typeName,
+            int jdbcType,
+            boolean nullable,
+            boolean primaryKey,
+            boolean foreignKey,
+            boolean autoIncrement,
+            boolean generated,
+            @NotNull Optional<String> comment,
+            int position) {
+        this(name, typeName, jdbcType, nullable, primaryKey, foreignKey,
+                autoIncrement, generated, comment, position, Optional.empty());
     }
 
     public MyBatisDatabaseColumn(
@@ -41,6 +65,20 @@ public record MyBatisDatabaseColumn(
             boolean foreignKey,
             int position) {
         this(name, typeName, jdbcType, nullable, primaryKey, foreignKey,
-                false, Optional.empty(), position);
+                false, false, Optional.empty(), position, Optional.empty());
+    }
+
+    public MyBatisDatabaseColumn(
+            @NotNull String name,
+            @NotNull String typeName,
+            int jdbcType,
+            boolean nullable,
+            boolean primaryKey,
+            boolean foreignKey,
+            boolean autoIncrement,
+            @NotNull Optional<String> comment,
+            int position) {
+        this(name, typeName, jdbcType, nullable, primaryKey, foreignKey,
+                autoIncrement, false, comment, position, Optional.empty());
     }
 }

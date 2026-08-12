@@ -2,7 +2,7 @@
 
 > 阶段：S5 动态 SQL 编译器与字符级源位置映射
 > 日期：2026-08-11
-> 状态：开发完成，待 S5 最终统一验收
+> 状态：开发完成，当前候选本地统一门已通过，待 S5 远端与实机验收
 
 ## 目标
 
@@ -27,6 +27,7 @@
 | S5-B | `if`、`choose/when/otherwise`、`where`、`set`、`trim` | 开发完成，待统一验收 | 嵌套标签、空分支、前后缀覆盖、无组合爆炸测试 |
 | S5-C | `foreach`、`bind`、`include`、property 替换、跨 namespace 与循环 | 开发完成，待统一验收 | 作用域、唯一解析、循环/多目标/占位符失败测试；元素类型由 S6 消费 S4 类型模型 |
 | S5-D | 缓存失效、模糊测试、性能、下游回映射 API 与真实 IDE 验收 | 代码与统一数据门完成，待生命周期与副屏 | 随机树、未保存编辑、1000 节点预算、取消、生命周期和副屏交互 |
+| S5-E | `v1` 版本化黄金文件 | 代码、定向测试与当前候选本地统一门已通过 | 三组输入 XML/期望输出固定静态、动态与 include/property/source-map 行为；版本目录不可静默覆盖 |
 
 ## S5-A 验收矩阵
 
@@ -66,8 +67,9 @@
 mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
 mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 ./gradlew check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin
-./scripts/verify-sandbox-lifecycle.sh 20
+./scripts/verify-sandbox-lifecycle.sh 1
+./scripts/verify-sandbox-lifecycle.sh 100
 ./scripts/verify-optional-dependency-isolation.sh
 ```
 
-只有 S5-A～S5-D 全部通过黄金测试、随机动态标签树、性能预算、最低 261 Verifier、当前产物生命周期和副屏真实 IDEA 验收后，S5 才能标记为已验收。
+截至 2026-08-12，S5-A～S5-E 已随当前工作区通过独占本地统一门：722/722 平台测试、整体行覆盖率 15135/17958（84.28%）、各分区覆盖率、最低 `IU-252.28539.54` Verifier、结构、本地化和 SBOM 均通过。新 HEAD 远端门、加固生命周期 1/100、5/5 隔离和副屏真实 IDEA 验收仍是阻断项；全部通过后，S5 才能标记为已验收。

@@ -102,6 +102,88 @@ public class MyBatisMethodNameParserTest {
     }
 
     @Test
+    public void rejectsDuplicateUpdateSubjects() {
+        assertFailure(
+                "updateEmailAndEmailById", MyBatisMethodDiagnosticCode.UNKNOWN_FIELD);
+        assertEquals(List.of("email", "email"), properties(
+                success("findEmailAndEmailById").subjectFields()));
+    }
+
+    @Test
+    public void treatsBatchScopeAsCollectionPredicateInsteadOfBatchVerb() {
+        MyBatisMethodCondition updateCondition = cast(
+                MyBatisMethodCondition.class,
+                success("updateStatusByIdIn").predicate().orElseThrow());
+        MyBatisMethodCondition deleteCondition = cast(
+                MyBatisMethodCondition.class,
+                success("deleteByIdNotIn").predicate().orElseThrow());
+
+        assertEquals(MyBatisMethodComparison.IN, updateCondition.comparison());
+        assertEquals(MyBatisMethodComparison.NOT_IN, deleteCondition.comparison());
+        assertFailure("batchUpdateStatusById", MyBatisMethodDiagnosticCode.UNKNOWN_OPERATION);
+        assertFailure("updateBatchStatusById", MyBatisMethodDiagnosticCode.UNKNOWN_FIELD);
+    }
+
+    @Test
+    public void parsesOnlyExplicitBatchInsertAndCarriesWritableFieldsInAst() {
+        MyBatisMethodField generatedId = new MyBatisMethodField(
+                "id", "Id", "id", "java.lang.Long", Optional.empty(), Types.BIGINT,
+                false, true, false, true);
+        MyBatisMethodField name = field(
+                "name", "Name", "name", "java.lang.String");
+        MyBatisMethodSchema schema = new MyBatisMethodSchema(
+                "users", List.of(generatedId, name));
+
+        MyBatisMethodQuery query = success("insertBatch", schema);
+
+        assertEquals(MyBatisMethodOperation.INSERT_BATCH, query.operation());
+        assertEquals(List.of("name"), properties(query.subjectFields()));
+        assertTrue(query.predicate().isEmpty());
+        assertTrue(query.orders().isEmpty());
+        assertFailure(
+                "insertBatchById", schema,
+                MyBatisMethodDiagnosticCode.UNSUPPORTED_COMBINATION);
+        assertFailure(
+                "insertBatchUsers", schema,
+                MyBatisMethodDiagnosticCode.UNSUPPORTED_COMBINATION);
+        assertFailure("insertAll", schema, MyBatisMethodDiagnosticCode.UNKNOWN_OPERATION);
+    }
+
+    @Test
+    public void rejectsBatchInsertWithOnlyAutoIncrementFields() {
+        MyBatisMethodSchema schema = new MyBatisMethodSchema(
+                "generated_only",
+                List.of(new MyBatisMethodField(
+                        "id", "Id", "id", "java.lang.Long", Optional.empty(),
+                        Types.BIGINT, false, true, false, true)));
+
+        assertFailure(
+                "insertBatch", schema, MyBatisMethodDiagnosticCode.INVALID_SUBJECT);
+    }
+
+    @Test
+    public void rejectsAutoIncrementAndGeneratedUpdateSubjects() {
+        MyBatisMethodField autoIncrementId = new MyBatisMethodField(
+                "id", "Id", "id", "java.lang.Long", Optional.empty(),
+                Types.BIGINT, false, true, false, true, false);
+        MyBatisMethodField generatedDigest = new MyBatisMethodField(
+                "digest", "Digest", "digest", "java.lang.String", Optional.empty(),
+                Types.VARCHAR, false, false, false, false, true);
+        MyBatisMethodSchema schema = new MyBatisMethodSchema(
+                "users", List.of(autoIncrementId, generatedDigest,
+                        field("name", "Name", "name", "java.lang.String")));
+
+        assertFailure(
+                "updateIdByName", schema, MyBatisMethodDiagnosticCode.UNKNOWN_FIELD);
+        assertFailure(
+                "modifyDigestByName", schema, MyBatisMethodDiagnosticCode.UNKNOWN_FIELD);
+        assertEquals(MyBatisMethodOperation.SELECT,
+                success("findIdByName", schema).operation());
+        assertEquals(MyBatisMethodOperation.UPDATE,
+                success("updateNameById", schema).operation());
+    }
+
+    @Test
     public void allowsReadWithoutPredicateButRejectsUnboundedWrites() {
         assertTrue(success("findAllOrderById").predicate().isEmpty());
         assertTrue(success("countAll").predicate().isEmpty());
@@ -219,9 +301,15 @@ public class MyBatisMethodNameParserTest {
     }
 
     private static MyBatisMethodQuery success(String methodName) {
+        return success(methodName, SCHEMA);
+    }
+
+    private static MyBatisMethodQuery success(
+            String methodName,
+            MyBatisMethodSchema schema) {
         MyBatisMethodParseResult.Success success = cast(
                 MyBatisMethodParseResult.Success.class,
-                MyBatisMethodNameParser.parse(methodName, SCHEMA));
+                MyBatisMethodNameParser.parse(methodName, schema));
         return success.query();
     }
 

@@ -3,6 +3,7 @@ package io.github.ns3154.mybatisassistant.generator;
 import com.intellij.openapi.progress.ProgressManager;
 import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
+import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseObjectKind;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import org.jetbrains.annotations.NotNull;
@@ -37,6 +38,10 @@ public final class MyBatisGenerationEngine {
     public static @NotNull MyBatisGenerationBundle generate(
             @NotNull MyBatisGenerationRequest request) {
         ProgressManager.checkCanceled();
+        if (request.table().kind() != MyBatisDatabaseObjectKind.TABLE) {
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.engine.error.table.required", request.table().name()));
+        }
         MyBatisGenerationConfiguration configuration = request.configuration();
         String tableName = request.table().name();
         String logicalTableName = stripPrefix(tableName, configuration.tablePrefix());
@@ -48,7 +53,17 @@ public final class MyBatisGenerationEngine {
             throw new IllegalArgumentException(MyBatisAssistantBundle.message(
                     "generator.engine.error.columns.empty", tableName));
         }
+        validateSqlIdentifiers(request, columns);
         validatePropertyNames(columns);
+        Optional<ColumnModel> generatedPrimaryKey = columns.stream()
+                .filter(column -> column.column.primaryKey() && column.column.generated())
+                .findFirst();
+        if (configuration.templateGroup() == MyBatisGenerationTemplateGroup.MYBATIS_PLUS
+                && generatedPrimaryKey.isPresent()) {
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.engine.error.plus.generated.primary.key",
+                    generatedPrimaryKey.orElseThrow().column.name()));
+        }
 
         List<MyBatisGeneratedArtifact> artifacts = new ArrayList<>();
         for (MyBatisGenerationArtifactKind kind : MyBatisGenerationArtifactKind.values()) {
@@ -66,6 +81,20 @@ public final class MyBatisGenerationEngine {
         return new MyBatisGenerationBundle(entityName, artifacts);
     }
 
+    private static void validateSqlIdentifiers(
+            @NotNull MyBatisGenerationRequest request,
+            @NotNull List<ColumnModel> columns) {
+        request.table().catalog().ifPresent(catalog -> sqlIdentifier(
+                catalog, request.dialect(), request.configuration()));
+        request.table().schema().ifPresent(schema -> sqlIdentifier(
+                schema, request.dialect(), request.configuration()));
+        sqlIdentifier(request.table().name(), request.dialect(), request.configuration());
+        for (ColumnModel column : columns) {
+            ProgressManager.checkCanceled();
+            sqlIdentifier(column.column.name(), request.dialect(), request.configuration());
+        }
+    }
+
     private static @NotNull MyBatisGeneratedArtifact entity(
             @NotNull MyBatisGenerationRequest request,
             @NotNull String entityName,
@@ -79,6 +108,9 @@ public final class MyBatisGenerationEngine {
             imports.add("com.baomidou.mybatisplus.annotation.TableField");
             imports.add("com.baomidou.mybatisplus.annotation.TableId");
             imports.add("com.baomidou.mybatisplus.annotation.TableName");
+            if (columns.stream().anyMatch(column -> column.column.generated())) {
+                imports.add("com.baomidou.mybatisplus.annotation.FieldStrategy");
+            }
             if (columns.stream().anyMatch(column -> column.column.autoIncrement()
                     && column.column.primaryKey())) {
                 imports.add("com.baomidou.mybatisplus.annotation.IdType");
@@ -97,7 +129,8 @@ public final class MyBatisGenerationEngine {
         }
         if (plus) {
             declaration.append("@TableName(\"")
-                    .append(javaString(request.table().name()))
+                    .append(javaString(qualifiedTable(
+                            request.table(), request.dialect(), configuration)))
                     .append("\")\n");
         }
         declaration.append("public class ").append(entityName).append(" {\n");
@@ -109,7 +142,7 @@ public final class MyBatisGenerationEngine {
                 members.append(indent(javaDoc(column.column.comment().orElseThrow()), 1));
             }
             if (plus) {
-                appendPlusFieldAnnotation(members, column);
+                appendPlusFieldAnnotation(members, column, request);
             }
             members.append("    private ").append(column.type.simpleType()).append(' ')
                     .append(column.propertyName).append(";\n\n");
@@ -177,8 +210,7 @@ public final class MyBatisGenerationEngine {
                         .append("    int deleteByPrimaryKey(")
                         .append(parameterDeclaration(keys)).append(");\n");
             }
-            if (!keys.isEmpty()
-                    && columns.stream().anyMatch(column -> !column.column.primaryKey())) {
+            if (!keys.isEmpty() && hasWritableUpdateColumn(columns)) {
                 members.append("\n    int updateByPrimaryKey(")
                         .append(entityName).append(" entity);\n");
             }
@@ -251,8 +283,7 @@ public final class MyBatisGenerationEngine {
                         .append(parameterNames(keys)).append(");\n")
                         .append("    }\n");
             }
-            if (!keys.isEmpty()
-                    && columns.stream().anyMatch(column -> !column.column.primaryKey())) {
+            if (!keys.isEmpty() && hasWritableUpdateColumn(columns)) {
                 members.append("\n    public int update(").append(entityName)
                         .append(" entity) {\n")
                         .append("        return mapper.updateByPrimaryKey(entity);\n")
@@ -286,7 +317,8 @@ public final class MyBatisGenerationEngine {
         String entityPackage = configuration.basePackage() + ".entity." + entityName;
         String baseId = markerBase(configuration, entityName, "xml");
         String header = "<mapper namespace=\"" + xmlAttribute(mapperPackage) + "\">\n";
-        String table = qualifiedTable(request.table(), request.dialect(), configuration);
+        String table = xmlText(qualifiedTable(
+                request.table(), request.dialect(), configuration));
         List<ColumnModel> keys = primaryKeys(columns);
         StringBuilder body = new StringBuilder();
         if (configuration.generateComments()) {
@@ -313,6 +345,7 @@ public final class MyBatisGenerationEngine {
                 .append(columns.stream()
                         .map(column -> sqlIdentifier(
                                 column.column.name(), request.dialect(), configuration))
+                        .map(MyBatisGenerationEngine::xmlText)
                         .collect(java.util.stream.Collectors.joining(", ")))
                 .append("\n    </sql>\n\n")
                 .append("    <select id=\"selectAll\" resultMap=\"BaseResultMap\">\n")
@@ -353,7 +386,7 @@ public final class MyBatisGenerationEngine {
             @NotNull List<ColumnModel> keys,
             @NotNull String table) {
         List<ColumnModel> inserted = columns.stream()
-                .filter(column -> !column.column.autoIncrement())
+                .filter(column -> !column.column.autoIncrement() && !column.column.generated())
                 .toList();
         Optional<ColumnModel> generatedKey = keys.stream()
                 .filter(column -> column.column.autoIncrement())
@@ -370,6 +403,7 @@ public final class MyBatisGenerationEngine {
             body.append(" (")
                     .append(inserted.stream().map(column -> sqlIdentifier(
                                     column.column.name(), request.dialect(), request.configuration()))
+                            .map(MyBatisGenerationEngine::xmlText)
                             .collect(java.util.stream.Collectors.joining(", ")))
                     .append(") VALUES (")
                     .append(inserted.stream().map(column -> parameter(column, false))
@@ -399,6 +433,7 @@ public final class MyBatisGenerationEngine {
                                         column.column.name(),
                                         request.dialect(),
                                         request.configuration()))
+                                .map(MyBatisGenerationEngine::xmlText)
                                 .collect(java.util.stream.Collectors.joining(", ")))
                         .append(") VALUES (")
                         .append(defaults.stream().map(ignored -> "DEFAULT")
@@ -420,15 +455,15 @@ public final class MyBatisGenerationEngine {
             return;
         }
         List<ColumnModel> updated = columns.stream()
-                .filter(column -> !column.column.primaryKey() && !column.column.autoIncrement())
+                .filter(MyBatisGenerationEngine::isWritableUpdateColumn)
                 .toList();
         if (updated.isEmpty()) {
             return;
         }
         body.append("\n    <update id=\"updateByPrimaryKey\">\n")
                 .append("        UPDATE ").append(table).append(" SET ")
-                .append(updated.stream().map(column -> sqlIdentifier(
-                                column.column.name(), request.dialect(), request.configuration())
+                .append(updated.stream().map(column -> xmlText(sqlIdentifier(
+                                column.column.name(), request.dialect(), request.configuration()))
                                 + " = " + parameter(column, false))
                         .collect(java.util.stream.Collectors.joining(", ")))
                 .append(" WHERE ").append(whereClause(keys, request))
@@ -457,8 +492,8 @@ public final class MyBatisGenerationEngine {
     private static @NotNull String whereClause(
             @NotNull List<ColumnModel> keys,
             @NotNull MyBatisGenerationRequest request) {
-        return keys.stream().map(column -> sqlIdentifier(
-                        column.column.name(), request.dialect(), request.configuration())
+        return keys.stream().map(column -> xmlText(sqlIdentifier(
+                        column.column.name(), request.dialect(), request.configuration()))
                         + " = " + parameter(column, false))
                 .collect(java.util.stream.Collectors.joining(" AND "));
     }
@@ -479,20 +514,28 @@ public final class MyBatisGenerationEngine {
 
     private static void appendPlusFieldAnnotation(
             @NotNull StringBuilder members,
-            @NotNull ColumnModel column) {
+            @NotNull ColumnModel column,
+            @NotNull MyBatisGenerationRequest request) {
+        String databaseColumn = sqlIdentifier(
+                column.column.name(), request.dialect(), request.configuration());
         if (column.column.primaryKey()) {
             members.append("    @TableId(value = \"")
-                    .append(javaString(column.column.name())).append('"');
+                    .append(javaString(databaseColumn)).append('"');
             if (column.column.autoIncrement()) {
                 members.append(", type = IdType.AUTO");
             }
             members.append(")\n");
             return;
         }
-        if (!column.column.name().equals(column.propertyName)
+        if (column.column.generated()
+                || !databaseColumn.equals(column.propertyName)
                 || column.override.typeHandler().isPresent()) {
             members.append("    @TableField(value = \"")
-                    .append(javaString(column.column.name())).append('"');
+                    .append(javaString(databaseColumn)).append('"');
+            if (column.column.generated()) {
+                members.append(", insertStrategy = FieldStrategy.NEVER, "
+                        + "updateStrategy = FieldStrategy.NEVER");
+            }
             column.override.typeHandler().ifPresent(handler -> members
                     .append(", typeHandler = ")
                     .append(simpleName(handler)).append(".class"));
@@ -543,6 +586,16 @@ public final class MyBatisGenerationEngine {
         return columns.stream().filter(column -> column.column.primaryKey()).toList();
     }
 
+    private static boolean hasWritableUpdateColumn(@NotNull List<ColumnModel> columns) {
+        return columns.stream().anyMatch(MyBatisGenerationEngine::isWritableUpdateColumn);
+    }
+
+    private static boolean isWritableUpdateColumn(@NotNull ColumnModel column) {
+        return !column.column.primaryKey()
+                && !column.column.autoIncrement()
+                && !column.column.generated();
+    }
+
     private static @NotNull String markerBase(
             @NotNull MyBatisGenerationConfiguration configuration,
             @NotNull String entityName,
@@ -585,17 +638,38 @@ public final class MyBatisGenerationEngine {
             @NotNull MyBatisDatabaseTable table,
             @NotNull MyBatisSqlDialect dialect,
             @NotNull MyBatisGenerationConfiguration configuration) {
-        String prefix = table.schema().map(schema -> sqlIdentifier(
-                schema, dialect, configuration) + ".").orElse("");
-        return prefix + sqlIdentifier(table.name(), dialect, configuration);
+        List<String> parts = new ArrayList<>(3);
+        switch (dialect) {
+            case GENERIC, SQL_SERVER, H2 -> {
+                table.catalog().ifPresent(parts::add);
+                table.schema().ifPresent(parts::add);
+            }
+            case MYSQL, SQLITE -> table.catalog()
+                    .or(() -> table.schema())
+                    .ifPresent(parts::add);
+            case POSTGRESQL, ORACLE, DAMENG -> table.schema().ifPresent(parts::add);
+        }
+        parts.add(table.name());
+        return parts.stream()
+                .map(part -> sqlIdentifier(part, dialect, configuration))
+                .collect(java.util.stream.Collectors.joining("."));
     }
 
     private static @NotNull String sqlIdentifier(
             @NotNull String name,
             @NotNull MyBatisSqlDialect dialect,
             @NotNull MyBatisGenerationConfiguration configuration) {
-        if (!configuration.escapeSqlKeywords()
-                || isPlainSqlIdentifier(name) && !SQL_KEYWORDS.contains(name.toLowerCase(Locale.ROOT))) {
+        if (name.contains("${") || name.contains("#{")) {
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.sql.identifier.mybatis.token", name));
+        }
+        boolean plainNonKeyword = isPlainSqlIdentifier(name)
+                && !SQL_KEYWORDS.contains(name.toLowerCase(Locale.ROOT));
+        if (!configuration.escapeSqlKeywords()) {
+            if (!plainNonKeyword) {
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "generator.error.sql.identifier.unescaped", name));
+            }
             return name;
         }
         return switch (dialect) {
@@ -673,6 +747,9 @@ public final class MyBatisGenerationEngine {
             types.add("com.baomidou.mybatisplus.annotation.TableField");
             types.add("com.baomidou.mybatisplus.annotation.TableId");
             types.add("com.baomidou.mybatisplus.annotation.TableName");
+            if (columns.stream().anyMatch(column -> column.column.generated())) {
+                types.add("com.baomidou.mybatisplus.annotation.FieldStrategy");
+            }
             if (columns.stream().anyMatch(column -> column.column.autoIncrement()
                     && column.column.primaryKey())) {
                 types.add("com.baomidou.mybatisplus.annotation.IdType");
@@ -755,17 +832,47 @@ public final class MyBatisGenerationEngine {
     }
 
     private static @NotNull String javaDoc(@NotNull String value) {
-        String safe = value.replace("*/", "* /").replace('\r', ' ').replace('\n', ' ');
+        String safe = value.replace("\\", "&#92;")
+                .replace("*/", "* /")
+                .replace('\r', ' ')
+                .replace('\n', ' ');
         return "/**\n * " + safe + "\n */\n";
     }
 
     private static @NotNull String xmlComment(@NotNull String value) {
-        return value.replace("--", "- -").replace('\r', ' ').replace('\n', ' ');
+        StringBuilder safe = new StringBuilder(value.length());
+        boolean previousHyphen = false;
+        for (int offset = 0; offset < value.length();) {
+            int codePoint = value.codePointAt(offset);
+            offset += Character.charCount(codePoint);
+            if (!isXml10Character(codePoint) || codePoint == '\r' || codePoint == '\n') {
+                safe.append(' ');
+                previousHyphen = false;
+                continue;
+            }
+            if (codePoint == '-' && previousHyphen) {
+                safe.append(' ');
+            }
+            safe.appendCodePoint(codePoint);
+            previousHyphen = codePoint == '-';
+        }
+        return safe.toString();
+    }
+
+    private static boolean isXml10Character(int codePoint) {
+        return codePoint == '\t' || codePoint == '\n' || codePoint == '\r'
+                || codePoint >= 0x20 && codePoint <= 0xD7FF
+                || codePoint >= 0xE000 && codePoint <= 0xFFFD
+                || codePoint >= 0x10000 && codePoint <= 0x10FFFF;
     }
 
     private static @NotNull String xmlAttribute(@NotNull String value) {
         return value.replace("&", "&amp;").replace("\"", "&quot;")
                 .replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    private static @NotNull String xmlText(@NotNull String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     private static @NotNull String javaString(@NotNull String value) {

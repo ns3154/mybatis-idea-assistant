@@ -18,6 +18,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 /**
  * 在统一后台、取消和超时边界内聚合所有元数据提供方。
@@ -30,6 +31,7 @@ public final class MyBatisDatabaseMetadataService {
     private final AtomicReference<CompletableFuture<MyBatisDatabaseMetadataResult>> refreshInFlight =
             new AtomicReference<>();
     private final AtomicLong cacheGeneration = new AtomicLong();
+    private long snapshotGeneration;
 
     public MyBatisDatabaseMetadataService(@NotNull Project project) {
         this.project = project;
@@ -49,6 +51,31 @@ public final class MyBatisDatabaseMetadataService {
     }
 
     /**
+     * 返回当前已发布快照及其服务内世代。每次发布或失效都会推进世代。
+     */
+    public synchronized @NotNull Optional<VersionedLoaded> latestVersioned() {
+        MyBatisDatabaseMetadataResult.Loaded loaded = latest.get();
+        return loaded == null
+                ? Optional.empty()
+                : Optional.of(new VersionedLoaded(snapshotGeneration, loaded));
+    }
+
+    /**
+     * 仅当指定世代仍是当前已发布快照时执行操作。
+     *
+     * <p>操作在与发布、失效相同的同步边界内运行，调用方不得执行阻塞 I/O。
+     * 这为需要把外部元数据校验与一个短写操作线性化的调用方提供租约。</p>
+     */
+    public synchronized boolean withCurrentVersion(
+            long expectedGeneration,
+            @NotNull Predicate<MyBatisDatabaseMetadataResult.Loaded> operation) {
+        MyBatisDatabaseMetadataResult.Loaded loaded = latest.get();
+        return loaded != null
+                && snapshotGeneration == expectedGeneration
+                && operation.test(loaded);
+    }
+
+    /**
      * 丢弃已完成快照并取消统一刷新；失效前启动的后台结果不得重新写回缓存。
      */
     public void invalidate() {
@@ -56,6 +83,7 @@ public final class MyBatisDatabaseMetadataService {
         synchronized (this) {
             cacheGeneration.incrementAndGet();
             latest.set(null);
+            snapshotGeneration++;
             inFlight = refreshInFlight.getAndSet(null);
         }
         if (inFlight != null && !inFlight.isDone()) {
@@ -206,6 +234,21 @@ public final class MyBatisDatabaseMetadataService {
             MyBatisDatabaseMetadataResult.Loaded loaded) {
         if (cacheGeneration.get() == generation) {
             latest.set(loaded);
+            snapshotGeneration++;
+        }
+    }
+
+    /**
+     * 元数据服务当前发布物的不可变世代视图。
+     */
+    public record VersionedLoaded(
+            long generation,
+            @NotNull MyBatisDatabaseMetadataResult.Loaded loaded) {
+        public VersionedLoaded {
+            if (generation < 0) {
+                throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                        "database.error.snapshot.generation.negative"));
+            }
         }
     }
 

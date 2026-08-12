@@ -43,8 +43,11 @@ public final class MyBatisJoinSqlGenerator {
                 }
                 requireField(source, relation.sourceField(), relation.sourceAlias());
                 requireField(join.targetSchema(), relation.targetField(), join.targetAlias());
-                if (!isForeignKeyToPrimaryKey(
-                        relation.sourceField(), relation.targetField())) {
+                if (!MyBatisJoinRelationshipVerifier.isVerifiedForeignKeyToPrimaryKey(
+                        source,
+                        relation.sourceField(),
+                        join.targetSchema(),
+                        relation.targetField())) {
                     throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
                             "methodsql.join.error.relation.unverified",
                             relation.sourceAlias(), relation.sourceField().propertyName(),
@@ -79,14 +82,15 @@ public final class MyBatisJoinSqlGenerator {
                         .map(selection -> selection(selection, request))
                         .collect(Collectors.joining(", ")))
                 .append(" FROM ")
-                .append(identifier(request.baseSchema().tableName(), request.dialect(),
-                        request.escapeIdentifiers()))
+                .append(MyBatisSqlIdentifierRenderer.qualifiedTable(
+                        request.baseSchema(), request.dialect(), request.escapeIdentifiers()))
                 .append(' ')
                 .append(identifier(request.baseAlias(), request.dialect(),
                         request.escapeIdentifiers()));
         for (MyBatisJoinSpec join : request.joins()) {
             sql.append(' ').append(joinKeyword(join.type())).append(' ')
-                    .append(identifier(join.targetSchema().tableName(), request.dialect(),
+                    .append(MyBatisSqlIdentifierRenderer.qualifiedTable(
+                            join.targetSchema(), request.dialect(),
                             request.escapeIdentifiers()))
                     .append(' ')
                     .append(identifier(join.targetAlias(), request.dialect(),
@@ -139,13 +143,6 @@ public final class MyBatisJoinSqlGenerator {
         }
     }
 
-    private static boolean isForeignKeyToPrimaryKey(
-            @NotNull MyBatisMethodField first,
-            @NotNull MyBatisMethodField second) {
-        return first.foreignKey() && second.primaryKey()
-                || second.foreignKey() && first.primaryKey();
-    }
-
     private static void requireAlias(@NotNull String value, @NotNull String role) {
         if (!value.matches("[A-Za-z_][A-Za-z0-9_]*")) {
             throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
@@ -180,14 +177,6 @@ public final class MyBatisJoinSqlGenerator {
             @NotNull String value,
             @NotNull MyBatisSqlDialect dialect,
             boolean escape) {
-        if (!escape) {
-            return value;
-        }
-        return switch (dialect) {
-            case MYSQL -> "`" + value.replace("`", "``") + "`";
-            case SQL_SERVER -> "[" + value.replace("]", "]]" ) + "]";
-            case GENERIC, POSTGRESQL, ORACLE, SQLITE, DAMENG, H2 ->
-                    "\"" + value.replace("\"", "\"\"") + "\"";
-        };
+        return MyBatisSqlIdentifierRenderer.identifier(value, dialect, escape);
     }
 }

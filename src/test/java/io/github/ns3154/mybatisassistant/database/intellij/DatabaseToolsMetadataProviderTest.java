@@ -2,9 +2,11 @@ package io.github.ns3154.mybatisassistant.database.intellij;
 
 import com.intellij.database.Dbms;
 import com.intellij.database.model.DasColumn;
+import com.intellij.database.model.DasForeignKey;
 import com.intellij.database.model.DasModel;
 import com.intellij.database.model.DasObject;
 import com.intellij.database.model.DasTable;
+import com.intellij.database.model.MultiRef;
 import com.intellij.database.model.ObjectKind;
 import com.intellij.database.psi.DbDataSource;
 import com.intellij.database.psi.DbPsiFacade;
@@ -26,8 +28,10 @@ import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataService
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataProvider;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseRequest;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseSnapshot;
+import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
 import io.github.ns3154.mybatisassistant.database.MyBatisMetadataFreshness;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
+import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationConfiguration;
 
 import java.time.Duration;
 import java.lang.reflect.Proxy;
@@ -115,24 +119,60 @@ public final class DatabaseToolsMetadataProviderTest extends BasePlatformTestCas
     public void testSnapshotPreservesNamespacesKeysTypesOrderAndFreshness() {
         DasObject catalog = object("catalog", ObjectKind.DATABASE, null);
         DasObject schema = object("public", ObjectKind.SCHEMA, catalog);
+        DasTable[] tableHolder = new DasTable[1];
         DasColumn userId = column(
-                "user_id", 2, schema, DasTypeCategory.STRING, "VARCHAR", false);
+                "user_id", 2, schema, tableHolder,
+                DasTypeCategory.STRING, "VARCHAR", false);
         DasColumn id = column(
-                "id", 1, schema, DasTypeCategory.INTEGER, "BIGINT", true);
+                "id", 1, schema, tableHolder,
+                DasTypeCategory.INTEGER, "BIGINT", true);
+        DasColumn computedName = column(
+                "computed_name", 3, schema, tableHolder,
+                DasTypeCategory.STRING, "VARCHAR", false);
+        DasTable roles = proxy(DasTable.class, (ignored, method, arguments) -> switch (
+                method.getName()) {
+            case "getName" -> "roles";
+            case "getKind" -> ObjectKind.TABLE;
+            case "getDasParent" -> schema;
+            case "getDasChildren" -> JBIterable.empty();
+            case "isSystem", "isTemporary", "isQuoted" -> false;
+            default -> defaultValue(method.getReturnType());
+        });
+        DasForeignKey foreignKey = proxy(
+                DasForeignKey.class,
+                (ignored, method, arguments) -> switch (method.getName()) {
+                    case "getName" -> "fk_users_role";
+                    case "getKind" -> ObjectKind.FOREIGN_KEY;
+                    case "getColumnsRef" -> multiRef("user_id");
+                    case "getRefColumns" -> multiRef("id");
+                    case "getRefTableName" -> "roles";
+                    case "getRefTableSchema" -> "public";
+                    case "getRefTableCatalog" -> "catalog";
+                    case "getRefTable" -> roles;
+                    case "isQuoted" -> false;
+                    default -> defaultValue(method.getReturnType());
+                });
         DasTable table = proxy(DasTable.class, (ignored, method, arguments) -> switch (
                 method.getName()) {
             case "getName" -> "users";
             case "getKind" -> ObjectKind.TABLE;
             case "getDasParent" -> schema;
             case "getDasChildren" -> arguments[0] == ObjectKind.COLUMN
-                    ? JBIterable.of(userId, id)
-                    : JBIterable.empty();
+                    ? JBIterable.of(userId, id, computedName)
+                    : arguments[0] == ObjectKind.FOREIGN_KEY
+                            ? JBIterable.of(foreignKey)
+                            : JBIterable.empty();
             case "getColumnAttrs" -> arguments[0] == id
-                    ? Set.of(DasColumn.Attribute.PRIMARY_KEY)
-                    : Set.of(DasColumn.Attribute.FOREIGN_KEY);
+                    ? Set.of(
+                            DasColumn.Attribute.PRIMARY_KEY,
+                            DasColumn.Attribute.AUTO_GENERATED)
+                    : arguments[0] == computedName
+                            ? Set.of(DasColumn.Attribute.COMPUTED)
+                            : Set.of(DasColumn.Attribute.FOREIGN_KEY);
             case "isSystem", "isTemporary", "isQuoted" -> false;
             default -> defaultValue(method.getReturnType());
         });
+        tableHolder[0] = table;
         DasModel model = proxy(DasModel.class, (ignored, method, arguments) -> switch (
                 method.getName()) {
             case "traverser" -> JBTreeTraverser.<DasObject>from(value -> List.of())
@@ -162,7 +202,7 @@ public final class DatabaseToolsMetadataProviderTest extends BasePlatformTestCas
         assertEquals(Optional.of("catalog"), snapshot.tables().getFirst().catalog());
         assertEquals(Optional.of("public"), snapshot.tables().getFirst().schema());
         assertEquals(
-                List.of("id", "user_id"),
+                List.of("id", "user_id", "computed_name"),
                 snapshot.tables().getFirst().columns().stream()
                         .map(MyBatisDatabaseColumn::name)
                         .toList());
@@ -170,10 +210,84 @@ public final class DatabaseToolsMetadataProviderTest extends BasePlatformTestCas
         assertEquals(Types.BIGINT, primary.jdbcType());
         assertTrue(primary.primaryKey());
         assertFalse(primary.nullable());
+        assertTrue(primary.autoIncrement());
+        assertFalse(primary.generated());
         MyBatisDatabaseColumn foreign = snapshot.tables().getFirst().columns().get(1);
         assertEquals(Types.VARCHAR, foreign.jdbcType());
         assertTrue(foreign.foreignKey());
         assertTrue(foreign.nullable());
+        var reference = foreign.foreignKeyReference().orElseThrow();
+        assertEquals(Optional.of("catalog"), reference.catalog());
+        assertEquals(Optional.of("public"), reference.schema());
+        assertEquals("roles", reference.table());
+        assertEquals("id", reference.column());
+        assertEquals(1, reference.columnCount());
+        MyBatisDatabaseColumn computed = snapshot.tables().getFirst().columns().get(2);
+        assertFalse(computed.autoIncrement());
+        assertTrue(computed.generated());
+    }
+
+    public void testCompositeDatabaseToolsForeignKeyFailsClosedForJoin() {
+        DasObject catalog = object("catalog", ObjectKind.DATABASE, null);
+        DasObject schema = object("public", ObjectKind.SCHEMA, catalog);
+        DasTable[] tableHolder = new DasTable[1];
+        DasColumn tenantId = column(
+                "tenant_id", 1, schema, tableHolder,
+                DasTypeCategory.INTEGER, "BIGINT", true);
+        DasColumn roleId = column(
+                "role_id", 2, schema, tableHolder,
+                DasTypeCategory.INTEGER, "BIGINT", true);
+        DasForeignKey foreignKey = proxy(
+                DasForeignKey.class,
+                (ignored, method, arguments) -> switch (method.getName()) {
+                    case "getName" -> "fk_tenant_user_role";
+                    case "getKind" -> ObjectKind.FOREIGN_KEY;
+                    case "getColumnsRef" -> multiRef("tenant_id", "role_id");
+                    case "getRefColumns" -> multiRef("tenant_id", "id");
+                    case "getRefTableName" -> "roles";
+                    case "getRefTableSchema" -> "public";
+                    case "getRefTableCatalog" -> "catalog";
+                    case "getRefTable" -> null;
+                    case "isQuoted" -> false;
+                    default -> defaultValue(method.getReturnType());
+                });
+        DasTable source = proxy(DasTable.class, (ignored, method, arguments) -> switch (
+                method.getName()) {
+            case "getName" -> "users";
+            case "getKind" -> ObjectKind.TABLE;
+            case "getDasParent" -> schema;
+            case "getDasChildren" -> arguments[0] == ObjectKind.COLUMN
+                    ? JBIterable.of(tenantId, roleId)
+                    : arguments[0] == ObjectKind.FOREIGN_KEY
+                            ? JBIterable.of(foreignKey)
+                            : JBIterable.empty();
+            case "getColumnAttrs" -> Set.of(DasColumn.Attribute.FOREIGN_KEY);
+            case "isSystem", "isTemporary", "isQuoted" -> false;
+            default -> defaultValue(method.getReturnType());
+        });
+        tableHolder[0] = source;
+
+        var sourceModel = DatabaseToolsMetadataProvider.table(
+                source, new EmptyProgressIndicator());
+        assertEquals(List.of(2, 2), sourceModel.columns().stream()
+                .map(column -> column.foreignKeyReference().orElseThrow().columnCount())
+                .toList());
+        var targetModel = new MyBatisDatabaseTable(
+                Optional.of("catalog"), Optional.of("public"), "roles",
+                List.of(
+                        new MyBatisDatabaseColumn(
+                                "tenant_id", "BIGINT", Types.BIGINT,
+                                false, true, false, 0),
+                        new MyBatisDatabaseColumn(
+                                "id", "BIGINT", Types.BIGINT,
+                                false, true, false, 1)));
+
+        org.junit.Assert.assertThrows(IllegalArgumentException.class, () ->
+                MyBatisDatabaseJoinGenerateAction.model(
+                        sourceModel,
+                        targetModel,
+                        MyBatisSqlDialect.POSTGRESQL,
+                        MyBatisGenerationConfiguration.standard("com.example")));
     }
 
     private static DasObject object(String name, ObjectKind kind, DasObject parent) {
@@ -190,6 +304,7 @@ public final class DatabaseToolsMetadataProviderTest extends BasePlatformTestCas
             String name,
             int position,
             DasObject parent,
+            DasTable[] tableHolder,
             DasTypeCategory category,
             String specification,
             boolean notNull) {
@@ -214,10 +329,22 @@ public final class DatabaseToolsMetadataProviderTest extends BasePlatformTestCas
             case "getName" -> name;
             case "getKind" -> ObjectKind.COLUMN;
             case "getDasParent" -> parent;
+            case "getTable" -> tableHolder[0];
             case "getDasType" -> type;
             case "getPosition" -> (short) position;
             case "isNotNull" -> notNull;
             case "isQuoted" -> false;
+            default -> defaultValue(method.getReturnType());
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private static MultiRef<?> multiRef(String... names) {
+        List<String> values = List.of(names);
+        return proxy(MultiRef.class, (ignored, method, arguments) -> switch (method.getName()) {
+            case "names" -> values;
+            case "size" -> values.size();
+            case "resolveObjects" -> List.of();
             default -> defaultValue(method.getReturnType());
         });
     }

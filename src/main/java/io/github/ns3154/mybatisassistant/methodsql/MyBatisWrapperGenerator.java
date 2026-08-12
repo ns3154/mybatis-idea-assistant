@@ -4,6 +4,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,9 +21,12 @@ public final class MyBatisWrapperGenerator {
     public static @NotNull MyBatisWrapperGeneration generate(
             @NotNull MyBatisWrapperGenerationRequest request) {
         validateVersion(request.framework(), request.frameworkVersion());
+        validateCanonicalRequest(request);
         validateOperation(request);
+        validateTableIdentity(request);
         List<MyBatisMethodCondition> conditions = conditions(request.query().predicate());
         validateOptionalIndexes(request.optionalConditionIndexes(), conditions);
+        validateOptionalWrite(request, conditions);
         if (!request.optionalConditionIndexes().isEmpty()
                 && request.query().predicate().filter(MyBatisWrapperGenerator::containsOr)
                         .isPresent()) {
@@ -32,26 +36,59 @@ public final class MyBatisWrapperGenerator {
         Map<MyBatisMethodCondition, List<MyBatisMethodParameter>> parameters =
                 conditionParameters(request, conditions);
         String wrapperType = wrapperType(request);
-        StringBuilder code = new StringBuilder(wrapperType).append(" wrapper = ")
+        JavaNameAllocator names = new JavaNameAllocator(
+                request.methodGeneration().parameters());
+        String wrapperVariable = names.allocate("wrapper");
+        Counter counter = new Counter(names);
+        StringBuilder code = new StringBuilder();
+        appendRuntimeParameterGuard(code, request, conditions, parameters);
+        code.append(wrapperType).append(' ').append(wrapperVariable).append(" = ")
                 .append(initializer(request)).append(";\n");
-        appendSelection(code, request);
-        appendUpdates(code, request);
+        appendSelection(code, request, wrapperVariable);
+        appendUpdates(code, request, wrapperVariable);
         if (request.query().predicate().isPresent()) {
-            code.append("wrapper")
+            code.append(wrapperVariable)
                     .append(predicateCalls(
                             request.query().predicate().orElseThrow(),
                             request,
                             parameters,
-                            new Counter()))
+                            counter))
                     .append(";\n");
         }
-        appendOrders(code, request);
-        appendFlexLimit(code, request);
-        return new MyBatisWrapperGeneration(wrapperType, "wrapper", code.toString());
+        appendOrders(code, request, wrapperVariable);
+        appendFlexLimit(code, request, wrapperVariable);
+        return new MyBatisWrapperGeneration(wrapperType, wrapperVariable, code.toString());
+    }
+
+    private static void validateCanonicalRequest(
+            @NotNull MyBatisWrapperGenerationRequest request) {
+        MyBatisMethodParseResult reparsed = MyBatisMethodNameParser.parse(
+                request.query().methodName(), request.schema());
+        if (!(reparsed instanceof MyBatisMethodParseResult.Success success)
+                || !success.query().equals(request.query())) {
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.wrapper.error.ast.noncanonical"));
+        }
+        MyBatisMethodGeneration expected = MyBatisMethodSqlGenerator.generate(
+                new MyBatisMethodGenerationRequest(
+                        request.schema(),
+                        request.query(),
+                        request.dialect(),
+                        request.entityType(),
+                        request.escapeIdentifiers(),
+                        request.optionalConditionIndexes()));
+        if (!expected.equals(request.methodGeneration())) {
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.wrapper.error.generation.mismatch"));
+        }
     }
 
     private static void validateOperation(@NotNull MyBatisWrapperGenerationRequest request) {
         MyBatisMethodOperation operation = request.query().operation();
+        if (operation == MyBatisMethodOperation.INSERT_BATCH) {
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.wrapper.error.batch.insert"));
+        }
         if (operation == MyBatisMethodOperation.SUM
                 || operation == MyBatisMethodOperation.AVERAGE
                 || operation == MyBatisMethodOperation.MINIMUM
@@ -64,10 +101,37 @@ public final class MyBatisWrapperGenerator {
             throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
                     "methodsql.wrapper.error.flex.update"));
         }
+        if (request.framework() == MyBatisWrapperFramework.MYBATIS_FLEX
+                && operation == MyBatisMethodOperation.DELETE) {
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.wrapper.error.flex.delete"));
+        }
         if (request.framework() == MyBatisWrapperFramework.MYBATIS_PLUS
                 && (request.query().limit().isPresent() || request.query().paged())) {
             throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
                     "methodsql.wrapper.error.plus.page"));
+        }
+    }
+
+    private static void validateTableIdentity(
+            @NotNull MyBatisWrapperGenerationRequest request) {
+        if (request.framework() == MyBatisWrapperFramework.MYBATIS_PLUS
+                && (request.schema().catalog().isPresent()
+                        || request.schema().schema().isPresent())) {
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.wrapper.error.plus.schema.table",
+                    java.util.stream.Stream.concat(
+                                    request.schema().catalog().stream(),
+                                    request.schema().schema().stream())
+                            .collect(Collectors.joining(".")),
+                    request.schema().tableName()));
+        }
+        if (request.framework() == MyBatisWrapperFramework.MYBATIS_PLUS
+                && !MyBatisSqlIdentifierRenderer.isPlainNonKeyword(
+                        request.schema().tableName())) {
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.wrapper.error.plus.table.identifier",
+                    request.schema().tableName()));
         }
     }
 
@@ -91,8 +155,11 @@ public final class MyBatisWrapperGenerator {
     private static @NotNull String initializer(
             @NotNull MyBatisWrapperGenerationRequest request) {
         if (request.framework() == MyBatisWrapperFramework.MYBATIS_FLEX) {
-            return "com.mybatisflex.core.query.QueryWrapper.create().from(\""
-                    + javaString(request.schema().tableName()) + "\")";
+            String table = MyBatisSqlIdentifierRenderer.qualifiedTable(
+                    request.schema(), request.dialect(), request.escapeIdentifiers());
+            return "com.mybatisflex.core.query.QueryWrapper.create().from("
+                    + "new com.mybatisflex.core.query.RawQueryTable(\""
+                    + javaString(table) + "\"))";
         }
         String type = request.query().operation() == MyBatisMethodOperation.UPDATE
                 ? "com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper"
@@ -102,35 +169,42 @@ public final class MyBatisWrapperGenerator {
 
     private static void appendSelection(
             @NotNull StringBuilder code,
-            @NotNull MyBatisWrapperGenerationRequest request) {
+            @NotNull MyBatisWrapperGenerationRequest request,
+            @NotNull String wrapperVariable) {
         if (request.query().operation() != MyBatisMethodOperation.SELECT
                 || request.query().subjectFields().isEmpty()) {
             return;
         }
         if (request.framework() == MyBatisWrapperFramework.MYBATIS_PLUS) {
             List<String> columns = request.query().subjectFields().stream()
-                    .map(field -> "\"" + javaString(field.columnName()) + "\"")
+                    .map(field -> "\"" + javaString(
+                            wrapperColumn(field.columnName(), request)) + "\"")
                     .collect(Collectors.toCollection(ArrayList::new));
             if (request.query().distinct()) {
                 columns.set(0, "\"DISTINCT "
-                        + javaString(request.query().subjectFields().get(0).columnName()) + "\"");
+                        + javaString(wrapperColumn(
+                                request.query().subjectFields().get(0).columnName(), request))
+                        + "\"");
             }
-            code.append("wrapper.select(").append(String.join(", ", columns)).append(");\n");
+            code.append(wrapperVariable).append(".select(")
+                    .append(String.join(", ", columns)).append(");\n");
             return;
         }
         List<String> columns = request.query().subjectFields().stream()
-                .map(field -> flexColumn(field.columnName()))
+                .map(field -> flexColumn(field.columnName(), request))
                 .collect(Collectors.toCollection(ArrayList::new));
         if (request.query().distinct()) {
             columns.set(0, "com.mybatisflex.core.query.QueryMethods.distinct("
                     + columns.get(0) + ")");
         }
-        code.append("wrapper.select(").append(String.join(", ", columns)).append(");\n");
+        code.append(wrapperVariable).append(".select(")
+                .append(String.join(", ", columns)).append(");\n");
     }
 
     private static void appendUpdates(
             @NotNull StringBuilder code,
-            @NotNull MyBatisWrapperGenerationRequest request) {
+            @NotNull MyBatisWrapperGenerationRequest request,
+            @NotNull String wrapperVariable) {
         if (request.query().operation() != MyBatisMethodOperation.UPDATE) {
             return;
         }
@@ -138,10 +212,11 @@ public final class MyBatisWrapperGenerator {
                 .stream()
                 .filter(parameter -> parameter.role() == MyBatisMethodParameterRole.UPDATE_VALUE)
                 .toList();
-        code.append("wrapper");
+        code.append(wrapperVariable);
         for (int index = 0; index < request.query().subjectFields().size(); index++) {
             MyBatisMethodField field = request.query().subjectFields().get(index);
-            code.append(".set(\"").append(javaString(field.columnName())).append("\", ")
+            code.append(".set(\"").append(javaString(
+                    wrapperColumn(field.columnName(), request))).append("\", ")
                     .append(updateParameters.get(index).name()).append(')');
         }
         code.append(";\n");
@@ -161,11 +236,20 @@ public final class MyBatisWrapperGenerator {
         for (int index = 1; index < orGroups.size(); index++) {
             MyBatisMethodPredicate group = orGroups.get(index);
             List<MyBatisMethodCondition> groupConditions = conditions(Optional.of(group));
+            if (request.framework() == MyBatisWrapperFramework.MYBATIS_FLEX) {
+                String name = counter.next();
+                calls.append(".or((java.util.function.Consumer<"
+                        + "com.mybatisflex.core.query.QueryWrapper>) ")
+                        .append(name).append(" -> ").append(name);
+                appendAndGroup(calls, group, request, parameters, counter, name);
+                calls.append(')');
+                continue;
+            }
             if (groupConditions.size() == 1) {
                 calls.append(".or()");
                 appendCondition(calls, groupConditions.get(0), request, parameters, counter);
             } else {
-                String name = "group" + counter.next();
+                String name = counter.next();
                 calls.append(".or(").append(name).append(" -> ").append(name);
                 appendAndGroup(calls, group, request, parameters, counter, name);
                 calls.append(')');
@@ -203,7 +287,8 @@ public final class MyBatisWrapperGenerator {
         if (optional && request.framework() == MyBatisWrapperFramework.MYBATIS_PLUS) {
             arguments.add(present);
         }
-        arguments.add("\"" + javaString(condition.field().columnName()) + "\"");
+        arguments.add("\"" + javaString(
+                wrapperColumn(condition.field().columnName(), request)) + "\"");
         switch (condition.comparison()) {
             case IS_NULL, IS_NOT_NULL -> {
                 // 无值参数。
@@ -216,8 +301,8 @@ public final class MyBatisWrapperGenerator {
             }
             default -> arguments.add(values.get(0).name());
         }
-        if (optional && request.framework() == MyBatisWrapperFramework.MYBATIS_FLEX) {
-            arguments.add(present);
+        if (request.framework() == MyBatisWrapperFramework.MYBATIS_FLEX) {
+            arguments.add(optional ? present : "true");
         }
         target.append(String.join(", ", arguments)).append(')');
     }
@@ -248,16 +333,19 @@ public final class MyBatisWrapperGenerator {
 
     private static void appendOrders(
             @NotNull StringBuilder code,
-            @NotNull MyBatisWrapperGenerationRequest request) {
+            @NotNull MyBatisWrapperGenerationRequest request,
+            @NotNull String wrapperVariable) {
         for (MyBatisMethodOrder order : request.query().orders()) {
             if (request.framework() == MyBatisWrapperFramework.MYBATIS_PLUS) {
-                code.append("wrapper.")
+                code.append(wrapperVariable).append('.')
                         .append(order.direction() == MyBatisMethodOrder.Direction.ASCENDING
                                 ? "orderByAsc" : "orderByDesc")
-                        .append("(\"").append(javaString(order.field().columnName()))
+                        .append("(\"").append(javaString(
+                                wrapperColumn(order.field().columnName(), request)))
                         .append("\");\n");
             } else {
-                code.append("wrapper.orderBy(").append(flexColumn(order.field().columnName()))
+                code.append(wrapperVariable).append(".orderBy(").append(flexColumn(
+                                order.field().columnName(), request))
                         .append(order.direction() == MyBatisMethodOrder.Direction.ASCENDING
                                 ? ".asc()" : ".desc()")
                         .append(");\n");
@@ -267,12 +355,14 @@ public final class MyBatisWrapperGenerator {
 
     private static void appendFlexLimit(
             @NotNull StringBuilder code,
-            @NotNull MyBatisWrapperGenerationRequest request) {
+            @NotNull MyBatisWrapperGenerationRequest request,
+            @NotNull String wrapperVariable) {
         if (request.framework() != MyBatisWrapperFramework.MYBATIS_FLEX) {
             return;
         }
         if (request.query().limit().isPresent()) {
-            code.append("wrapper.limit(").append(request.query().limit().orElseThrow())
+            code.append(wrapperVariable).append(".limit(")
+                    .append(request.query().limit().orElseThrow())
                     .append(");\n");
         }
         if (request.query().paged()) {
@@ -282,7 +372,8 @@ public final class MyBatisWrapperGenerator {
             MyBatisMethodParameter size = request.methodGeneration().parameters().stream()
                     .filter(parameter -> parameter.role() == MyBatisMethodParameterRole.PAGE_SIZE)
                     .findFirst().orElseThrow();
-            code.append("wrapper.limit(").append(size.name()).append(").offset(")
+            code.append(wrapperVariable).append(".limit(")
+                    .append(size.name()).append(").offset(")
                     .append(offset.name()).append(");\n");
         }
     }
@@ -326,16 +417,76 @@ public final class MyBatisWrapperGenerator {
         }
     }
 
+    private static void validateOptionalWrite(
+            @NotNull MyBatisWrapperGenerationRequest request,
+            @NotNull List<MyBatisMethodCondition> conditions) {
+        boolean conditionalWrite = request.query().operation() == MyBatisMethodOperation.UPDATE
+                || request.query().operation() == MyBatisMethodOperation.DELETE;
+        if (conditionalWrite && !conditions.isEmpty()
+                && request.optionalConditionIndexes().size() == conditions.size()) {
+            throw new IllegalArgumentException(MyBatisMethodSqlMessages.message(
+                    "methodsql.wrapper.error.write.all.optional"));
+        }
+    }
+
+    private static void appendRuntimeParameterGuard(
+            @NotNull StringBuilder code,
+            @NotNull MyBatisWrapperGenerationRequest request,
+            @NotNull List<MyBatisMethodCondition> conditions,
+            @NotNull Map<MyBatisMethodCondition, List<MyBatisMethodParameter>> parameters) {
+        Set<String> invalidExpressions = new LinkedHashSet<>();
+        for (int index = 0; index < conditions.size(); index++) {
+            MyBatisMethodCondition condition = conditions.get(index);
+            boolean optional = request.optionalConditionIndexes().contains(index);
+            for (MyBatisMethodParameter parameter : parameters.get(condition)) {
+                if (parameter.role() == MyBatisMethodParameterRole.COLLECTION) {
+                    if (optional) {
+                        invalidExpressions.add(parameter.name() + " != null && !"
+                                + parameter.name() + ".isEmpty() && "
+                                + "java.util.Collections.frequency("
+                                + parameter.name() + ", null) != 0");
+                    } else {
+                        invalidExpressions.add(parameter.name() + " == null || "
+                                + parameter.name() + ".isEmpty() || "
+                                + "java.util.Collections.frequency("
+                                + parameter.name() + ", null) != 0");
+                    }
+                } else if (!optional && !isPrimitive(parameter.javaType())) {
+                    invalidExpressions.add(parameter.name() + " == null");
+                }
+            }
+        }
+        if (invalidExpressions.isEmpty()) {
+            return;
+        }
+        code.append("if (").append(String.join(" || ", invalidExpressions)).append(") {\n")
+                .append("    throw new IllegalArgumentException(\"")
+                .append(javaString(MyBatisMethodSqlMessages.message(
+                        "methodsql.wrapper.error.condition.parameters.invalid")))
+                .append("\");\n}\n");
+    }
+
     private static @NotNull String presentExpression(
             @NotNull List<MyBatisMethodParameter> values) {
         if (values.size() == 2) {
-            return values.get(0).name() + " != null && " + values.get(1).name() + " != null";
+            return values.stream()
+                    .map(value -> isPrimitive(value.javaType())
+                            ? "true" : value.name() + " != null")
+                    .collect(Collectors.joining(" && "));
         }
         MyBatisMethodParameter value = values.get(0);
         if (value.role() == MyBatisMethodParameterRole.COLLECTION) {
-            return value.name() + " != null && !" + value.name() + ".isEmpty()";
+            return value.name() + " != null && !" + value.name() + ".isEmpty() && "
+                    + "java.util.Collections.frequency(" + value.name() + ", null) == 0";
         }
-        return value.name() + " != null";
+        return isPrimitive(value.javaType()) ? "true" : value.name() + " != null";
+    }
+
+    private static boolean isPrimitive(@NotNull String javaType) {
+        return switch (javaType) {
+            case "boolean", "byte", "short", "int", "long", "float", "double", "char" -> true;
+            default -> false;
+        };
     }
 
     private static @NotNull List<MyBatisMethodCondition> conditions(
@@ -369,9 +520,18 @@ public final class MyBatisWrapperGenerator {
                 || junction.children().stream().anyMatch(MyBatisWrapperGenerator::containsOr);
     }
 
-    private static @NotNull String flexColumn(@NotNull String column) {
+    private static @NotNull String wrapperColumn(
+            @NotNull String column,
+            @NotNull MyBatisWrapperGenerationRequest request) {
+        return MyBatisSqlIdentifierRenderer.identifier(
+                column, request.dialect(), request.escapeIdentifiers());
+    }
+
+    private static @NotNull String flexColumn(
+            @NotNull String column,
+            @NotNull MyBatisWrapperGenerationRequest request) {
         return "com.mybatisflex.core.query.QueryMethods.column(\""
-                + javaString(column) + "\")";
+                + javaString(wrapperColumn(column, request)) + "\")";
     }
 
     private static @NotNull String javaString(@NotNull String value) {
@@ -379,12 +539,46 @@ public final class MyBatisWrapperGenerator {
                 .replace("\n", "\\n").replace("\r", "\\r");
     }
 
+    private static final class JavaNameAllocator {
+        private final Set<String> names = new LinkedHashSet<>();
+
+        private JavaNameAllocator(@NotNull List<MyBatisMethodParameter> parameters) {
+            parameters.stream().map(MyBatisMethodParameter::name).forEach(names::add);
+        }
+
+        private @NotNull String allocate(@NotNull String preferred) {
+            if (names.add(preferred)) {
+                return preferred;
+            }
+            for (int suffix = 2; ; suffix++) {
+                String candidate = preferred + suffix;
+                if (names.add(candidate)) {
+                    return candidate;
+                }
+            }
+        }
+
+        private boolean reserve(@NotNull String candidate) {
+            return names.add(candidate);
+        }
+    }
+
     private static final class Counter {
+        private final JavaNameAllocator names;
         private int lambdaIndex;
         private int conditionIndex;
 
-        private int next() {
-            return ++lambdaIndex;
+        private Counter(@NotNull JavaNameAllocator names) {
+            this.names = names;
+        }
+
+        private @NotNull String next() {
+            for (;;) {
+                String candidate = "group" + ++lambdaIndex;
+                if (names.reserve(candidate)) {
+                    return candidate;
+                }
+            }
         }
 
         private int conditionIndex() {

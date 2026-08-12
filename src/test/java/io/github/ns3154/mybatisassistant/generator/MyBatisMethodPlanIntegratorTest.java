@@ -50,6 +50,46 @@ public final class MyBatisMethodPlanIntegratorTest extends BasePlatformTestCase 
                 entry(integrated, MyBatisGenerationArtifactKind.MAPPER).status());
     }
 
+    public void testIntegratesBatchInsertAndRejectsExistingManualInsert() throws Exception {
+        MyBatisDatabaseTable table = table(Types.VARCHAR);
+        MyBatisGenerationBundle bundle = bundle(table);
+        MyBatisGenerationPlan base = MyBatisGenerationPlanner.plan(
+                getProject(), root, List.of(bundle));
+
+        MyBatisGenerationPlan integrated = MyBatisMethodPlanIntegrator.integrate(
+                getProject(), base, method(table, "insertBatch"));
+
+        assertFalse(describe(integrated), integrated.hasConflicts());
+        assertTrue(proposed(integrated, MyBatisGenerationArtifactKind.MAPPER)
+                .contains("int insertBatch("));
+        assertTrue(proposed(integrated, MyBatisGenerationArtifactKind.XML)
+                .contains("<insert id=\"insertBatch\""));
+
+        for (MyBatisGeneratedArtifact artifact : bundle.artifacts()) {
+            String text = artifact.content();
+            if (artifact.kind() == MyBatisGenerationArtifactKind.MAPPER) {
+                text = text.replace("\n}\n", "\n    int insertBatch(java.util.List x);\n}\n");
+            }
+            if (artifact.kind() == MyBatisGenerationArtifactKind.XML) {
+                text = text.replace("\n</mapper>\n",
+                        "\n    <insert id=\"insertBatch\">SELECT 1</insert>\n</mapper>\n");
+            }
+            write(artifact.relativePath(), text);
+        }
+
+        MyBatisGenerationPlan conflict = MyBatisMethodPlanIntegrator.integrate(
+                getProject(),
+                MyBatisGenerationPlanner.plan(getProject(), root, List.of(bundle)),
+                method(table, "insertBatch"));
+
+        assertEquals(MyBatisSafeMergeConflictCode.METHOD_DECLARATION_EXISTS,
+                entry(conflict, MyBatisGenerationArtifactKind.MAPPER)
+                        .conflictCode().orElseThrow());
+        assertEquals(MyBatisSafeMergeConflictCode.METHOD_DECLARATION_EXISTS,
+                entry(conflict, MyBatisGenerationArtifactKind.XML)
+                        .conflictCode().orElseThrow());
+    }
+
     public void testRepeatedIntegrationIsUnchangedAndSchemaRegenerationKeepsMethod() {
         MyBatisDatabaseTable firstTable = table(Types.VARCHAR);
         MyBatisGenerationBundle firstBundle = bundle(firstTable);

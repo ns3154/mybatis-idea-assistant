@@ -1,0 +1,86 @@
+format=dynamic-sql-golden-v1
+fixture="iteration-and-include"
+statement="findBatch"
+  result=COMPILED
+  diagnostics=0
+  root:
+    sequence children=7
+      text:
+        value="\n        "
+        source-map virtual-length=9 segments=1
+          segment kind=EXACT virtual=[0,9) source=iteration-and-include.xml:[260,269)
+      bind source=iteration-and-include.xml:[269,319)
+        binding name="pattern" kind=BIND source=iteration-and-include.xml:[281,288)
+          initializer text="'%' + keyword + '%'" source=iteration-and-include.xml:[297,316)
+      text:
+        value="\n        select\n        "
+        source-map virtual-length=24 segments=1
+          segment kind=EXACT virtual=[0,24) source=iteration-and-include.xml:[319,343)
+      include namespace="golden.v1.BatchMapper" fragment="Selected" source=iteration-and-include.xml:[343,438) fragment-source=iteration-and-include.xml:[94,232)
+        properties=1
+          binding name="alias" kind=INCLUDE_PROPERTY source=iteration-and-include.xml:[398,403)
+            initializer text="user" source=iteration-and-include.xml:[412,416)
+        expanded-body:
+          sequence children=3
+            text:
+              value="\n        "
+              source-map virtual-length=9 segments=1
+                segment kind=EXACT virtual=[0,9) source=iteration-and-include.xml:[113,122)
+            include namespace="golden.v1.BatchMapper" fragment="Columns" source=iteration-and-include.xml:[122,221) fragment-source=iteration-and-include.xml:[47,89)
+              properties=1
+                binding name="prefix" kind=INCLUDE_PROPERTY source=iteration-and-include.xml:[176,182)
+                  initializer text="user" source=iteration-and-include.xml:[191,199)
+              expanded-body:
+                text:
+                  value="user_id, name"
+                  source-map virtual-length=13 segments=2
+                    segment kind=SYNTHETIC virtual=[0,4) source=iteration-and-include.xml:[191,199)
+                    segment kind=EXACT virtual=[4,13) source=iteration-and-include.xml:[74,83)
+            text:
+              value="\n    "
+              source-map virtual-length=5 segments=1
+                segment kind=EXACT virtual=[0,5) source=iteration-and-include.xml:[221,226)
+      text:
+        value="\n        from users\n        "
+        source-map virtual-length=28 segments=1
+          segment kind=EXACT virtual=[0,28) source=iteration-and-include.xml:[438,466)
+      trim kind=WHERE prefix="WHERE" suffix="" prefix-overrides="AND |OR " suffix-overrides="" source=iteration-and-include.xml:[466,723)
+        body:
+          sequence children=3
+            text:
+              value="\n            "
+              source-map virtual-length=13 segments=1
+                segment kind=EXACT virtual=[0,13) source=iteration-and-include.xml:[473,486)
+            foreach open="(" close=")" separator=" or " nullable=true source=iteration-and-include.xml:[486,706)
+              collection text="items" source=iteration-and-include.xml:[507,512)
+              bindings=2
+                binding name="item" kind=FOREACH_ITEM source=iteration-and-include.xml:[520,524)
+                  initializer=<none>
+                binding name="position" kind=FOREACH_INDEX source=iteration-and-include.xml:[533,541)
+                  initializer=<none>
+              body:
+                sequence children=3
+                  text:
+                    value="\n                "
+                    source-map virtual-length=17 segments=1
+                      segment kind=EXACT virtual=[0,17) source=iteration-and-include.xml:[616,633)
+                  if source=iteration-and-include.xml:[633,683)
+                    condition text="item != null" source=iteration-and-include.xml:[643,655)
+                    body:
+                      text:
+                        value="#{position} = #{item}"
+                        source-map virtual-length=21 segments=1
+                          segment kind=EXACT virtual=[0,21) source=iteration-and-include.xml:[657,678)
+                  text:
+                    value="\n            "
+                    source-map virtual-length=13 segments=1
+                      segment kind=EXACT virtual=[0,13) source=iteration-and-include.xml:[683,696)
+            text:
+              value="\n        "
+              source-map virtual-length=9 segments=1
+                segment kind=EXACT virtual=[0,9) source=iteration-and-include.xml:[706,715)
+      text:
+        value="\n    "
+        source-map virtual-length=5 segments=1
+          segment kind=EXACT virtual=[0,5) source=iteration-and-include.xml:[723,728)
+  static-sql=<dynamic>

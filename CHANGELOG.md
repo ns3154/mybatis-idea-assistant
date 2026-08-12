@@ -22,3 +22,9 @@
 - 增加 Linux、macOS、Windows 三系统无界面回归，以及 100 万行、2000 Mapper、10000 statement 性能压力门。
 - 修复 MCP statement 预览在 Undo 后可能读取陈旧 PSI 范围的问题，并增加 CodeQL Java/Kotlin 安全扫描。
 - 修复 JDBC 与 MCP 测试夹具写死 Unix 绝对路径导致 Windows 回归失败的问题。
+- 为 ResultMap 增加直接 `column` 补全；仅在 READY 元数据、唯一单表目标和可写 Java 属性均可证明时，为缺失映射提供保守 Quick Fix。
+- 为动态 SQL 增加 `v1` 版本化黄金文件，固定普通文本、动态标签、include/property 与字符级 source map 的代表行为。
+- 明确方法名批量生成采用 set-based SQL，而不是 JDBC `ExecutorType.BATCH`：支持 `insertBatch(Collection<Entity>)` 单条 set-based 插入 statement（Oracle 为 `INSERT ALL`）与集合 `IN/NOT IN`；集合输入失败关闭，并拒绝所有谓词均可省略的 update/delete。
+- 增加 Java 21 + Spring Boot 4.1.0 四模块 Gradle 样例、五类数据库版本化 SQL 文本夹具，以及 1024 表、1024 Mapper、5120 statement 的确定性生成夹具。
+- 加固生命周期与可选依赖隔离脚本：执行真实 Inspection，校验 MCP 回环/鉴权/端口释放、精确进程残留、项目零改写及版本化严重日志白名单；历史 100/100 仅保留为旧脚本基线。
+- 拆分 GitHub 草稿 Release 与 Marketplace 发布链，增加候选 SHA、标签、必需检查、制品身份、签名、校验和与来源证明守门；发布环境、标签保护和 immutable releases 已配置，真实 secret、环境审批与首次 Marketplace 人工上传仍待执行。

@@ -2,7 +2,7 @@
 
 > 日期：2026-08-12
 > 分支：`codex/s12-productization`
-> 状态：本地统一自动门与远端矩阵通过；签名发布和副屏实机待最终收口
+> 状态：原 S12 自动门与远端矩阵保留；发布链加固已通过 2026-08-12 当前工作区本地统一门，新 HEAD 远端、真实签名、Marketplace 和副屏实机待收口
 
 ## 已验证实现
 
@@ -11,8 +11,11 @@
 - 工具：Mapper、statement、参数、引用、数据源/schema 有界只读；CRUD、statement、JUnit 只形成预览，确认使用一次性短期 token、复核 TOCTOU，并复用单个 IDE Command、Undo 和失败恢复。
 - 产品化：中英文资源键对称；全部生产 Java 源码完成资源化，并由 `verifyLocalizedUserInterface` 全目录阻止新增硬编码中文字符串；明暗 SVG 图标、Apache-2.0 LICENSE/NOTICE、隐私说明、第三方清单、发布升级/回滚说明已加入。
 - 发布链：MCP `serverInfo.version` 读取实际插件描述符；CycloneDX 1.6 SBOM 固定版本、许可证和 VCS，去除时间/随机/CI 字段；签名与 Marketplace 凭据只读 CI secret，缺失时发布失败但本地构建不受影响。
+- 发布链增量：严格校验标签/版本/渠道和 CHANGELOG；以候选 SHA 复核必需检查；签名现有精确 ZIP 后验证签名、归档身份、SHA-256 和来源证明；先创建 GitHub 草稿 Release，再由独立 Marketplace 工作流发布同一个已签名 ZIP，成功复核后才公开 GitHub Release。
 
-## 本地自动化证据
+## 原 S12 自动化证据快照
+
+本节 634 个测试、覆盖率、ZIP、SBOM 和远端运行属于发布链加固前的阶段快照，不得当作当前候选的数字。当前候选的统一本地证据单独记录于下节，新 HEAD 统一 CI、三系统、兼容矩阵和 CodeQL 仍待。
 
 执行：
 
@@ -35,7 +38,18 @@ go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
 - GitHub Actions [持续集成 #31566640300](https://github.com/ns3154/mybatis-idea-assistant/actions/runs/31566640300) 全绿，远端重新执行双 Maven 语料、634 个平台测试、覆盖率、项目/插件结构、最低 2026.1 GA Verifier，并上传 ZIP 与验证报告。
 - GitHub Actions [兼容矩阵 #31566645932](https://github.com/ns3154/mybatis-idea-assistant/actions/runs/31566645932) 的 IntelliJ IDEA 2026.1、2026.2 与 Android Studio 2026.1.2.10 三个作业全部通过。
 
+## 2026-08-12 当前候选本地证据
+
+- 独占执行 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m25s）；101 个测试套件中的 722/722 平台测试通过，失败、错误和跳过均为 0。
+- 整体行覆盖率为 15135/17958（84.28%）；各分区覆盖率、Checkstyle、SBOM、`verifyLocalizedUserInterface`、项目与插件结构均通过。
+- Java/MyBatis 样例 8/8、语义语料 11/11、Gradle Spring 四模块 2/2 及 `bootJar` 通过；最低 `IU-252.28539.54` Verifier 为 `Compatible`。
+- 临时密钥签名、验签、篡改拒绝、归档身份以及 shell/生命周期/发布静态契约均通过；本地候选 ZIP SHA-256 为 `85992cb50b0656c4745aac9eda68f0b18ec2d8ba64099c3caebdab1d423a87e9`。
+- 这些签名证据使用临时密钥，只验证失败关闭与制品契约，不代表生产证书、Environment 审批或 Marketplace 发布已完成。
+
 ## 仍未验收
 
-- 当前未提供 `CERTIFICATE_CHAIN`、`PRIVATE_KEY`、`PRIVATE_KEY_PASSWORD` 和 `PUBLISH_TOKEN`，因此只验证了失败关闭配置，没有生成真实签名包或发布 Marketplace。
+- GitHub 已配置 `release-signing`、`release-github`、`marketplace-preview`、`marketplace-production` 四个受保护环境、`v*` 标签规则和 immutable releases；这些是治理配置，不等同于已发布。
+- 当前 Environment 尚未配置 `CERTIFICATE_CHAIN`、`PRIVATE_KEY`、`PRIVATE_KEY_PASSWORD` 和 `PUBLISH_TOKEN`，因此没有生成真实密钥签名包或发布 Marketplace。签名三项应只写入 `release-signing`；`PUBLISH_TOKEN` 应分别写入需要使用的 Marketplace 环境，禁止粘贴到对话或提交到仓库。
+- Marketplace 首次上传仍需人工创建/初始化条目并决定是否 `Hidden`。首次人工包必须使用不会被后续自动化复用的唯一版本；同一版本不能覆盖重传。`Hidden` 只能在首次上传时选择，公开后不能重新隐藏，因此上线决定需单独审批。
+- 正式发布运行时仍需维护者批准签名、GitHub Release 和对应 Marketplace 环境；环境批准、真实签名验证、来源证明与 Marketplace 接收结果尚无证据。
 - 按用户要求不占用主屏；当前无副屏，未运行 `runIde`、IDE 生命周期脚本、真实 MCP 客户端、设置页、安装、升级、降级、禁用和卸载验收。

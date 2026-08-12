@@ -26,17 +26,14 @@ public final class MyBatisCreateTableParser {
     private static final Pattern HEADER = Pattern.compile(
             "\\G\\s*CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?",
             Pattern.CASE_INSENSITIVE);
-    private static final Pattern CONSTRAINT_START = Pattern.compile(
-            "(?i)^(?:CONSTRAINT\\s+[^\\s]+\\s+)?"
-                    + "(PRIMARY\\s+KEY|FOREIGN\\s+KEY|UNIQUE|KEY|INDEX|CHECK)\\b");
     private static final Pattern TYPE_END = Pattern.compile(
             "(?i)\\s+(?=NOT\\s+NULL\\b|NULL\\b|PRIMARY\\s+KEY\\b|FOREIGN\\s+KEY\\b|"
                     + "DEFAULT\\b|COMMENT\\b|REFERENCES\\b|CHECK\\b|COLLATE\\b|"
-                    + "GENERATED\\b|AUTO_INCREMENT\\b|IDENTITY\\b|UNIQUE\\b)");
-    private static final Pattern PRIMARY_KEY = Pattern.compile(
-            "(?i)PRIMARY\\s+KEY\\s*\\(([^)]*)\\)");
-    private static final Pattern FOREIGN_KEY = Pattern.compile(
-            "(?i)FOREIGN\\s+KEY\\s*\\(([^)]*)\\)");
+                    + "GENERATED\\b|AS\\b|AUTO_INCREMENT\\b|IDENTITY\\b|UNIQUE\\b)");
+    private static final Pattern PRIMARY_KEY_COLUMNS_START = Pattern.compile(
+            "(?i)PRIMARY\\s+KEY\\s*\\(");
+    private static final Pattern FOREIGN_KEY_COLUMNS_START = Pattern.compile(
+            "(?i)FOREIGN\\s+KEY\\s*\\(");
     private static final Pattern COMMENT = Pattern.compile(
             "(?is)\\bCOMMENT\\s*(?:=\\s*)?'((?:''|[^'])*)'");
 
@@ -56,13 +53,19 @@ public final class MyBatisCreateTableParser {
                     MyBatisAssistantBundle.message(
                             "sqltool.conversion.error.ddl.comment.unclosed"));
         }
+        if (containsUnsupportedDollarQuote(ddl)) {
+            return failure(MyBatisDdlDiagnosticCode.UNSUPPORTED_DEFINITION, 0,
+                    MyBatisAssistantBundle.message(
+                            "sqltool.conversion.error.ddl.column.unsupported",
+                            safeDefinition(ddl)));
+        }
         Matcher header = HEADER.matcher(ddl);
         if (!header.find()) {
             return failure(MyBatisDdlDiagnosticCode.NOT_CREATE_TABLE, 0,
                     MyBatisAssistantBundle.message(
                             "sqltool.conversion.error.ddl.not.create.table"));
         }
-        Identifier tableIdentifier = qualifiedIdentifier(ddl, header.end());
+        QualifiedIdentifier tableIdentifier = qualifiedIdentifier(ddl, header.end());
         if (tableIdentifier == null) {
             return failure(MyBatisDdlDiagnosticCode.MALFORMED_DDL, header.end(),
                     MyBatisAssistantBundle.message(
@@ -102,7 +105,7 @@ public final class MyBatisCreateTableParser {
     }
 
     private static MyBatisCreateTableParseResult buildTable(
-            Identifier tableIdentifier,
+            QualifiedIdentifier tableIdentifier,
             List<String> definitions,
             String tail) {
         Set<String> primaryKeys = new LinkedHashSet<>();
@@ -110,10 +113,25 @@ public final class MyBatisCreateTableParser {
         List<String> columnDefinitions = new ArrayList<>();
         for (String definition : definitions) {
             ProgressManager.checkCanceled();
-            Matcher constraint = CONSTRAINT_START.matcher(definition.strip());
-            if (constraint.find()) {
-                collectColumns(PRIMARY_KEY.matcher(definition), primaryKeys);
-                collectColumns(FOREIGN_KEY.matcher(definition), foreignKeys);
+            ConstraintKind constraintKind = constraintKind(definition.strip());
+            if (constraintKind == ConstraintKind.INVALID) {
+                return failure(MyBatisDdlDiagnosticCode.UNSUPPORTED_DEFINITION, 0,
+                        MyBatisAssistantBundle.message(
+                                "sqltool.conversion.error.ddl.column.unsupported",
+                                safeDefinition(definition)));
+            }
+            if (constraintKind != ConstraintKind.NONE) {
+                boolean parsed = constraintKind != ConstraintKind.PRIMARY_KEY
+                        || collectColumns(definition, PRIMARY_KEY_COLUMNS_START, primaryKeys);
+                parsed = parsed && (constraintKind != ConstraintKind.FOREIGN_KEY
+                        || collectColumns(
+                                definition, FOREIGN_KEY_COLUMNS_START, foreignKeys));
+                if (!parsed) {
+                    return failure(MyBatisDdlDiagnosticCode.UNSUPPORTED_DEFINITION, 0,
+                            MyBatisAssistantBundle.message(
+                                    "sqltool.conversion.error.ddl.column.unsupported",
+                                    safeDefinition(definition)));
+                }
             } else {
                 columnDefinitions.add(definition);
             }
@@ -146,12 +164,52 @@ public final class MyBatisCreateTableParser {
                         primaryKeys.contains(draft.normalizedName()),
                         foreignKeys.contains(draft.normalizedName())))
                 .toList();
-        QualifiedName qualified = qualifiedName(tableIdentifier.text);
+        QualifiedName qualified = qualifiedName(tableIdentifier.segments);
         Optional<String> comment = comment(tail);
         MyBatisDatabaseTable table = new MyBatisDatabaseTable(
-                Optional.empty(), qualified.schema, qualified.name, comment, columns);
+                qualified.catalog, qualified.schema, qualified.name, comment, columns);
         return new MyBatisCreateTableParseResult.Success(
                 table, warnings, !warnings.isEmpty());
+    }
+
+    private static ConstraintKind constraintKind(String definition) {
+        Identifier token = identifier(definition, 0);
+        if (token == null) {
+            return ConstraintKind.NONE;
+        }
+        int cursor = token.end;
+        boolean namedConstraint = isKeyword(token, "CONSTRAINT");
+        if (namedConstraint) {
+            Identifier name = identifier(definition, cursor);
+            if (name == null) {
+                return ConstraintKind.INVALID;
+            }
+            token = identifier(definition, name.end);
+            if (token == null) {
+                return ConstraintKind.INVALID;
+            }
+            cursor = token.end;
+        }
+        if (isKeyword(token, "PRIMARY") || isKeyword(token, "FOREIGN")) {
+            Identifier key = identifier(definition, cursor);
+            if (key == null || !isKeyword(key, "KEY")) {
+                return ConstraintKind.INVALID;
+            }
+            return isKeyword(token, "PRIMARY")
+                    ? ConstraintKind.PRIMARY_KEY : ConstraintKind.FOREIGN_KEY;
+        }
+        if (isKeyword(token, "UNIQUE") || isKeyword(token, "KEY")
+                || isKeyword(token, "INDEX") || isKeyword(token, "CHECK")) {
+            return ConstraintKind.OTHER;
+        }
+        return namedConstraint ? ConstraintKind.INVALID : ConstraintKind.NONE;
+    }
+
+    private static boolean isKeyword(Identifier identifier, String expected) {
+        String text = identifier.text;
+        return !text.isEmpty()
+                && text.charAt(0) != '"' && text.charAt(0) != '`' && text.charAt(0) != '['
+                && text.equalsIgnoreCase(expected);
     }
 
     private static ColumnDraft column(
@@ -167,6 +225,10 @@ public final class MyBatisCreateTableParser {
         if (remainder.isEmpty()) {
             return null;
         }
+        if (remainder.matches("(?is)^AS\\b.*")) {
+            // SQL Server 等方言允许省略计算列类型；无法可靠推导 JDBC 类型时拒绝转换。
+            return null;
+        }
         Matcher typeEnd = TYPE_END.matcher(remainder);
         String typeName = typeEnd.find()
                 ? remainder.substring(0, typeEnd.start()).strip()
@@ -175,19 +237,32 @@ public final class MyBatisCreateTableParser {
             return null;
         }
         String modifiers = remainder.substring(typeName.length());
+        String semanticModifiers = maskQuotedContent(modifiers);
         int jdbcType = jdbcType(typeName);
         if (jdbcType == Types.OTHER) {
             warnings.add(MyBatisAssistantBundle.message(
                     "sqltool.conversion.warning.ddl.type.unknown",
                     unquote(name.text), typeName));
         }
-        boolean primary = contains(modifiers, "PRIMARY\\s+KEY");
-        boolean foreign = contains(modifiers, "REFERENCES\\b");
-        boolean nullable = !primary && !contains(modifiers, "NOT\\s+NULL");
-        boolean autoIncrement = contains(modifiers,
-                "AUTO_INCREMENT\\b|AUTOINCREMENT\\b|IDENTITY\\b|GENERATED\\s+.+IDENTITY\\b")
+        boolean primary = contains(semanticModifiers, "PRIMARY\\s+KEY");
+        boolean foreign = contains(semanticModifiers, "REFERENCES\\b");
+        boolean nullable = !primary && !contains(semanticModifiers, "NOT\\s+NULL");
+        boolean generatedIdentity = contains(semanticModifiers,
+                "GENERATED\\s+(?:(?:ALWAYS|BY\\s+DEFAULT(?:\\s+ON\\s+NULL)?)\\s+)?"
+                        + "AS\\s+IDENTITY\\b");
+        boolean identity = generatedIdentity || contains(semanticModifiers,
+                "(?:^|\\s)IDENTITY\\s*(?:\\([^)]*\\))?"
+                        + "(?:\\s+NOT\\s+FOR\\s+REPLICATION)?"
+                        + "(?=\\s*(?:$|NOT\\s+NULL\\b|NULL\\b|PRIMARY\\s+KEY\\b|"
+                        + "UNIQUE\\b|COMMENT\\b))");
+        boolean autoIncrement = contains(semanticModifiers,
+                "AUTO_INCREMENT\\b|AUTOINCREMENT\\b")
+                || identity
                 || typeName.equalsIgnoreCase("SERIAL")
                 || typeName.equalsIgnoreCase("BIGSERIAL");
+        boolean generated = (contains(semanticModifiers, "GENERATED\\b")
+                && !generatedIdentity)
+                || semanticModifiers.matches("(?is)^\\s*AS\\b.*");
         return new ColumnDraft(
                 unquote(name.text),
                 typeName,
@@ -196,6 +271,7 @@ public final class MyBatisCreateTableParser {
                 primary,
                 foreign,
                 autoIncrement,
+                generated,
                 comment(modifiers),
                 position);
     }
@@ -351,33 +427,40 @@ public final class MyBatisCreateTableParser {
         return new Identifier(source.substring(cursor, end), end);
     }
 
-    private static Identifier qualifiedIdentifier(String source, int start) {
+    private static QualifiedIdentifier qualifiedIdentifier(String source, int start) {
         Identifier first = identifier(source, start);
         if (first == null) {
             return null;
         }
-        StringBuilder text = new StringBuilder(first.text);
+        List<String> segments = new ArrayList<>(3);
+        segments.add(unquote(first.text));
         int end = first.end;
         while (true) {
             int dot = skipWhitespace(source, end);
             if (dot >= source.length() || source.charAt(dot) != '.') {
-                return new Identifier(text.toString(), end);
+                return new QualifiedIdentifier(segments, end);
             }
             Identifier next = identifier(source, dot + 1);
-            if (next == null) {
+            if (next == null || segments.size() == 3) {
                 return null;
             }
-            text.append('.').append(next.text);
+            segments.add(unquote(next.text));
             end = next.end;
         }
     }
 
-    private static QualifiedName qualifiedName(String identifier) {
-        String[] parts = identifier.split("\\.");
-        String name = unquote(parts[parts.length - 1]);
-        Optional<String> schema = parts.length > 1
-                ? Optional.of(unquote(parts[parts.length - 2])) : Optional.empty();
-        return new QualifiedName(schema, name);
+    private static QualifiedName qualifiedName(List<String> segments) {
+        return switch (segments.size()) {
+            case 1 -> new QualifiedName(
+                    Optional.empty(), Optional.empty(), segments.getFirst());
+            case 2 -> new QualifiedName(
+                    Optional.empty(), Optional.of(segments.getFirst()), segments.get(1));
+            case 3 -> new QualifiedName(
+                    Optional.of(segments.getFirst()), Optional.of(segments.get(1)),
+                    segments.get(2));
+            default -> throw new IllegalStateException(
+                    "Unexpected qualified identifier segment count");
+        };
     }
 
     private static String unquote(String identifier) {
@@ -394,13 +477,37 @@ public final class MyBatisCreateTableParser {
         return value;
     }
 
-    private static void collectColumns(Matcher matcher, Set<String> target) {
+    private static boolean collectColumns(
+            String definition,
+            Pattern startPattern,
+            Set<String> target) {
+        Matcher matcher = startPattern.matcher(definition);
         if (!matcher.find()) {
-            return;
+            return false;
         }
-        for (String name : matcher.group(1).split(",")) {
-            target.add(unquote(name).toLowerCase(Locale.ROOT));
+        int cursor = matcher.end();
+        boolean found = false;
+        while (cursor < definition.length()) {
+            Identifier identifier = identifier(definition, cursor);
+            if (identifier == null) {
+                return false;
+            }
+            target.add(unquote(identifier.text).toLowerCase(Locale.ROOT));
+            found = true;
+            cursor = skipWhitespace(definition, identifier.end);
+            if (cursor >= definition.length()) {
+                return false;
+            }
+            char delimiter = definition.charAt(cursor);
+            if (delimiter == ')') {
+                return found;
+            }
+            if (delimiter != ',') {
+                return false;
+            }
+            cursor++;
         }
+        return false;
     }
 
     private static Optional<String> comment(String text) {
@@ -412,6 +519,38 @@ public final class MyBatisCreateTableParser {
     private static boolean contains(String text, String expression) {
         return Pattern.compile(expression, Pattern.CASE_INSENSITIVE | Pattern.DOTALL)
                 .matcher(text).find();
+    }
+
+    private static String maskQuotedContent(String text) {
+        StringBuilder masked = new StringBuilder(text);
+        char closing = 0;
+        for (int index = 0; index < text.length(); index++) {
+            char current = text.charAt(index);
+            char next = index + 1 < text.length() ? text.charAt(index + 1) : 0;
+            if (closing != 0) {
+                if (current == closing && next == closing) {
+                    masked.setCharAt(index, ' ');
+                    masked.setCharAt(index + 1, ' ');
+                    index++;
+                } else if (current == closing) {
+                    masked.setCharAt(index, ' ');
+                    closing = 0;
+                } else {
+                    masked.setCharAt(index, ' ');
+                    if (current == '\\' && next != 0) {
+                        masked.setCharAt(index + 1, ' ');
+                        index++;
+                    }
+                }
+            } else if (current == '\'' || current == '"' || current == '`') {
+                masked.setCharAt(index, ' ');
+                closing = current;
+            } else if (current == '[') {
+                masked.setCharAt(index, ' ');
+                closing = ']';
+            }
+        }
+        return masked.toString();
     }
 
     private static boolean containsAdditionalStatement(String tail) {
@@ -434,6 +573,49 @@ public final class MyBatisCreateTableParser {
             }
         }
         return false;
+    }
+
+    private static boolean containsUnsupportedDollarQuote(String source) {
+        char quote = 0;
+        for (int index = 0; index < source.length(); index++) {
+            char current = source.charAt(index);
+            char next = index + 1 < source.length() ? source.charAt(index + 1) : 0;
+            if (quote != 0) {
+                if (current == quote && next == quote) {
+                    index++;
+                } else if (current == quote) {
+                    quote = 0;
+                } else if (current == '\\' && next != 0) {
+                    index++;
+                }
+                continue;
+            }
+            if (current == '\'' || current == '"' || current == '`') {
+                quote = current;
+                continue;
+            }
+            if (current == '[') {
+                quote = ']';
+                continue;
+            }
+            if (current != '$' || index > 0 && isIdentifierPart(source.charAt(index - 1))) {
+                continue;
+            }
+            int delimiterEnd = source.indexOf('$', index + 1);
+            if (delimiterEnd < 0) {
+                continue;
+            }
+            String tag = source.substring(index + 1, delimiterEnd);
+            if (tag.isEmpty() || tag.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isIdentifierPart(char character) {
+        return Character.isLetterOrDigit(character)
+                || character == '_' || character == '$';
     }
 
     private static String stripSqlComments(String source) {
@@ -536,7 +718,24 @@ public final class MyBatisCreateTableParser {
     private record Identifier(String text, int end) {
     }
 
-    private record QualifiedName(Optional<String> schema, String name) {
+    private record QualifiedIdentifier(List<String> segments, int end) {
+        private QualifiedIdentifier {
+            segments = List.copyOf(segments);
+        }
+    }
+
+    private record QualifiedName(
+            Optional<String> catalog,
+            Optional<String> schema,
+            String name) {
+    }
+
+    private enum ConstraintKind {
+        NONE,
+        INVALID,
+        PRIMARY_KEY,
+        FOREIGN_KEY,
+        OTHER
     }
 
     private record ColumnDraft(
@@ -547,6 +746,7 @@ public final class MyBatisCreateTableParser {
             boolean primaryKey,
             boolean foreignKey,
             boolean autoIncrement,
+            boolean generated,
             Optional<String> comment,
             int position) {
         private String normalizedName() {
@@ -557,7 +757,8 @@ public final class MyBatisCreateTableParser {
             boolean primary = primaryKey || tablePrimary;
             return new MyBatisDatabaseColumn(
                     name, typeName, jdbcType, primary ? false : nullable,
-                    primary, foreignKey || tableForeign, autoIncrement, comment, position);
+                    primary, foreignKey || tableForeign, autoIncrement, generated,
+                    comment, position);
         }
     }
 }

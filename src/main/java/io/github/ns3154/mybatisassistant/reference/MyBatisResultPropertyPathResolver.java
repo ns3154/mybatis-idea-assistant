@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -112,6 +113,39 @@ final class MyBatisResultPropertyPathResolver {
                         : MyBatisParameterPathResolution.Status.FOUND,
                 List.copyOf(targets),
                 variants.stream().sorted().toList());
+    }
+
+    static @NotNull Optional<List<String>> rootWritableProperties(
+            @NotNull XmlTag resultMap) {
+        ProgressManager.checkCanceled();
+        if (!resultMap.isValid()
+                || resultMap.getProject().isDisposed()
+                || !resultMap.getProject().isOpen()
+                || DumbService.isDumb(resultMap.getProject())
+                || resultMapRoot(resultMap) != resultMap) {
+            return Optional.empty();
+        }
+        TypeState root = resultMapTypes(resultMap, new LinkedHashSet<>());
+        if (root.unknown() || root.types().size() != 1) {
+            return Optional.empty();
+        }
+        PsiType type = root.types().getFirst();
+        List<String> properties = MyBatisJavaPropertyResolver.variants(
+                        type,
+                        MyBatisJavaPropertyAccess.WRITE).stream()
+                .filter(name -> {
+                    ProgressManager.checkCanceled();
+                    MyBatisJavaPropertyResolution resolution =
+                            MyBatisJavaPropertyResolver.resolve(
+                                    type,
+                                    name,
+                                    MyBatisJavaPropertyAccess.WRITE);
+                    return !resolution.unknown() && resolution.targets().size() == 1;
+                })
+                .distinct()
+                .sorted()
+                .toList();
+        return Optional.of(properties);
     }
 
     private static @NotNull MyBatisParameterPathResolution resolvePath(

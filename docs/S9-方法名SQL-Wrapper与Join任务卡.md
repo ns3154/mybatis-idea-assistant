@@ -2,7 +2,7 @@
 
 > 阶段：S9 确定性方法语法、SQL/XML、Wrapper 与显式 Join
 > 日期：2026-08-12
-> 状态：开发完成，待最终统一质量门与副屏验收
+> 状态：原 S9 能力开发完成；set-based 批量与失败关闭增量已随当前候选通过本地统一门，待远端与副屏验收
 
 ## 目标
 
@@ -11,10 +11,12 @@
 ## 固定边界
 
 - 方法名最长 512 个字符；字段词元来自确定 schema，不做编辑距离、大小写近似或目录猜测；
-- 支持查询、更新、删除、计数、存在性、聚合、字段投影、And/Or、比较、排序、Distinct、First/Top 与分页；更新和删除必须含有条件；
+- 支持查询、更新、删除、计数、存在性、聚合、字段投影、And/Or、比较、排序、Distinct、First/Top、分页和显式 set-based 批量；更新和删除必须含有不可整体省略的条件；
+- “批量”不指 JDBC `ExecutorType.BATCH`：`insertBatch(Collection<Entity>)` 生成一条 set-based 插入 statement（Oracle 使用 `INSERT ALL`），集合 `IN/NOT IN` 条件生成 `<foreach>`；插件不隐式切换 MyBatis ExecutorType；
+- null/空集合必须失败关闭：`IN/NOT IN` 生成 `1 = 0`，`insertBatch` 在动态 SQL 绑定阶段抛异常；update/delete 的 WHERE 若所有谓词都可能被动态省略，则在计划阶段拒绝；
 - 返回类型、`@Param`、集合、范围、分页参数和 XML 占位符由 AST 推导；实体类型必须是安全的 Java 全限定名；
-- 动态可选条件只允许 AND 条件树；OR 中省略单个条件会改变逻辑，直接拒绝；
-- MyBatis-Plus 与 Flex 必须由用户显式选择框架和版本；Plus 最低 3.5，Flex 最低 1.7.2；不探测类路径；
+- 动态可选条件只允许 AND 条件树；OR 中省略单个条件会改变逻辑，直接拒绝。该能力目前只在核心生成 API 与固定语料中覆盖，Database Tools 动作尚未提供可选条件选择；
+- MyBatis-Plus 与 Flex 必须由用户显式选择框架和版本，不探测类路径；输入语法能识别 Plus 3.5.x 和 Flex 1.7.2+ 的 1.x，但当前交付验证/接受范围只锁定 Plus 3.5.17 与 Flex 1.11.8，不得向其他版本外推；
 - Plus 分页不使用 `last` 拼接；Flex 更新和聚合 Wrapper 暂不生成；两框架相反的 `likeLeft/likeRight` 语义分别适配；
 - Join 只接受用户所选两张同数据源、非 LOADING 表，关系必须是一侧外键和另一侧主键；不按列名猜测；
 - MySQL 拒绝 FULL JOIN；SQLite 因版本差异只提供 INNER/LEFT；输出字段必须显式选择且标签唯一；
@@ -26,8 +28,8 @@
 | 批次 | 内容 | 当前状态 | 退出证据 |
 |---|---|---|---|
 | S9-A | 确定性方法语法、字段词典、歧义与位置化诊断 | 代码与自动化完成 | 大字段词典重复解析、取消、非法语法、超长、条件与排序测试 |
-| S9-B | Mapper 方法、静态/动态 XML、方言 limit/page 与类型推导 | 代码与自动化完成 | Java/XML PSI、真实 MyBatis/H2、六方言、读写与聚合测试 |
-| S9-C | Plus/Flex Wrapper 适配 | 代码与自动化完成 | 锁定 Plus 3.5.17/Flex 1.11.8 编译语料、版本/能力拒绝测试 |
+| S9-B | Mapper 方法、静态/动态 XML、set-based 批量、方言 limit/page 与类型推导 | 批量增量已随当前候选通过本地统一门 | Java/XML PSI、真实 MyBatis/H2、单条 set-based 插入 statement、IN/NOT IN 集合失败关闭、全可选写谓词拒绝、六方言、读写与聚合测试 |
+| S9-C | Plus/Flex Wrapper 适配 | 锁定版本自动门完成 | `MyBatisWrapperGeneratedCompileFixtureTest` 与 Maven 样例逐字绑定当前生成器输出，Plus 3.5.17/Flex 1.11.8 真实编译运行 5/5；不外推其他版本 |
 | S9-D | 显式 Join、预览动作与 S8 安全写入集成 | 代码与自动化完成，待副屏 | FK/PK 身份、链式/复合关系、方言、动作注册、冲突和原子计划测试 |
 
 ## 验收矩阵
@@ -36,20 +38,21 @@
 |---|---|---|---|
 | S9-01 | 同一方法名和 schema 重复解析 | 每次得到相等且唯一的 AST | 任意多种合法切分均返回歧义诊断 |
 | S9-02 | select/get/find/query 与投影 | 集合、单值 Optional 或 Map 返回类型和确定 SQL | 未知字段、非法操作组合或不安全类型不生成 |
-| S9-03 | update/delete | 显式 SET、`@Param` 和有条件 WHERE | 无条件写 SQL 必须拒绝 |
-| S9-04 | 动态条件 | AND 树生成 `<where>/<if>`，集合生成 `<foreach>` | OR 动态省略、无参条件动态化必须拒绝 |
+| S9-03 | update/delete | 显式 SET、`@Param` 和不可整体省略的有条件 WHERE | 无条件写 SQL、或所有 WHERE 谓词均可省略的写计划必须拒绝 |
+| S9-04 | 动态/集合条件 | AND 树生成 `<where>/<if>`；IN/NOT IN 集合生成带 null/空失败关闭分支的 `<foreach>` | OR 动态省略、无参条件动态化必须拒绝；null/空集合不得生成非法 SQL 或恒真写条件 |
+| S9-04B | 批量插入 | `insertBatch(Collection<Entity>)` 生成一个 Mapper 参数和一条 set-based 插入 statement | null/空/含 null 元素在动态 SQL 绑定阶段失败；不自动分片，不承诺任意集合大小、跨驱动原子性或零副作用；不是 JDBC `ExecutorType.BATCH` |
 | S9-05 | limit/page 与方言 | MySQL/PostgreSQL/SQLite/H2、Oracle/Generic、SQL Server 各自合法语法 | SQL Server 无 OrderBy 分页拒绝；不静默降级通用语法 |
-| S9-06 | Wrapper | Plus/Flex 生成结果在锁定真实依赖下编译 | 不支持版本/操作明确拒绝，不输出 `last` 或错误 Like API |
+| S9-06 | Wrapper | Plus/Flex 锁定版本直接编译当前生成器输出 | 已覆盖引用标识符、`IN/NOT_IN`、`BETWEEN`、单/多 OR 分组及 Flex `RawQueryTable`；不支持版本/操作明确拒绝 |
 | S9-07 | Join | 用户选择 FK↔PK、类型和字段后只读预览 SQL | 无证据关系、跨数据源、重复别名/标签和不支持方言停止 |
 | S9-08 | Mapper/XML 写入 | 全量预览后在一个命令中更新独立方法区 | 手改方法区、已有手写声明、目标缺失或并发变化零写入 |
 | S9-09 | 可选依赖 | Database Tools 存在时注册三个 S9 动作 | 禁用数据库插件后核心解析和生成类仍可加载 |
-| S9-10 | 统一门 | 测试、覆盖率、语料、结构、261 Verifier 与 ZIP 全绿 | 历史报告不能替代当前代码；副屏 UI 未验不得标为已验收 |
+| S9-10 | 统一门 | 测试、覆盖率、语料、结构、最低 252 Verifier 与 ZIP 全绿 | 历史报告不能替代当前代码；副屏 UI 未验不得标为已验收 |
 
 ## 统一门禁
 
 - `methodsql` 核心行覆盖率不得低于 85%，整体不得低于 70%；
-- 真实 MyBatis/H2 样例必须运行生成形态的查询、IN、动态条件、更新和计数；
-- Plus/Flex 语料必须在锁定真实版本下编译；
-- 最低 IDEA 2026.1 GA Plugin Verifier 不得出现兼容、内部 API 或实验 API 阻断；
-- 当前产物仍需 20/20 生命周期、5/5 可选依赖隔离和副屏 Database Tools 三个动作的实机复核；
+- 真实 MyBatis/H2 样例必须运行生成形态的查询、集合失败关闭、动态条件、set-based 插入、更新和计数；NOT IN 及目标数据库特有方言仍需各自语料/实库门；
+- `MyBatisWrapperGeneratedCompileFixtureTest` 必须先证明 Maven 编译语料与当前生成器输出逐字一致，再由 Maven 在 Plus 3.5.17/Flex 1.11.8 真实依赖下编译运行 5/5；该证据不外推其他版本；
+- 最低 IDEA 2025.2.6.2（`IU-252.28539.54`）Plugin Verifier 不得出现兼容、内部 API 或实验 API 阻断；
+- 原 S9 快照已有独立自动门；set-based 批量增量已随 2026-08-12 当前工作区通过独占本地统一门（722/722，15135/17958，84.28%，最低 `IU-252.28539.54` Verifier `Compatible`）；新 HEAD 远端门、加固生命周期 1/100、5/5 可选依赖隔离和副屏 Database Tools 三个动作的实机复核仍待；
 - 上述门全部关闭前，S9 状态保持“开发完成，待最终统一验收”。

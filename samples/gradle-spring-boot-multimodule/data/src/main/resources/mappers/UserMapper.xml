@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.mybatisideaassistant.samples.gradle.data.mapper.UserMapper">
+    <resultMap id="userMap" type="io.github.mybatisideaassistant.samples.gradle.domain.User">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="status" column="status"
+                javaType="io.github.mybatisideaassistant.samples.gradle.domain.UserStatus"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        id, name, status
+    </sql>
+
+    <select id="findById" resultMap="userMap">
+        select <include refid="baseColumns"/>
+        from sample_user
+        where id = #{id}
+    </select>
+
+    <select id="find" resultMap="userMap">
+        select <include refid="baseColumns"/>
+        from sample_user
+        <where>
+            <if test="criteria != null and criteria.name != null and criteria.name != ''">
+                and name like concat('%', #{criteria.name}, '%')
+            </if>
+            <if test="criteria != null and criteria.status != null">
+                and status = #{criteria.status}
+            </if>
+        </where>
+        order by id
+    </select>
+</mapper>

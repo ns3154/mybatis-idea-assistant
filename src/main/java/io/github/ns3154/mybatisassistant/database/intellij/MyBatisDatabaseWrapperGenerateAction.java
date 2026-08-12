@@ -181,6 +181,8 @@ public final class MyBatisDatabaseWrapperGenerateAction extends AnAction {
                         framework,
                         frameworkVersion,
                         entityType,
+                        dialect,
+                        configuration.escapeSqlKeywords(),
                         Set.of()));
         return new WrapperPreview(
                 method.javaMethod(), method.xmlStatement(), wrapper.code());
