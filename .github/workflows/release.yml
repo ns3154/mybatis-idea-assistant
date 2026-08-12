@@ -53,10 +53,10 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
 
       - name: 恢复 IntelliJ 布局索引缓存
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: .intellijPlatform/layoutIndex
-          key: intellij-layout-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('settings.gradle.kts', 'build.gradle.kts', 'gradle.properties', 'gradle.lockfile') }}
+          key: intellij-layout-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('settings.gradle.kts', 'build.gradle.kts', 'gradle.properties', 'gradle.lockfile') }}
 
       - name: 验证 Gradle 基础设施重试边界
         run: ./scripts/test-gradle-infrastructure-retry.sh

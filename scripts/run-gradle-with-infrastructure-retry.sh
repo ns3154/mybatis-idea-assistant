@@ -18,14 +18,40 @@ is_retryable_failure() {
     ' "${log_file}"
 }
 
+is_layout_index_race() {
+    local log_file="$1"
+
+    awk '
+        index($0, "ClosedFileSystemException") > 0 { closed_file_system = 1 }
+        index($0, "Could not find bundled plugin with ID") > 0 { bundled_plugin_missing = 1 }
+        END { exit !(closed_file_system && bundled_plugin_missing) }
+    ' "${log_file}"
+}
+
+quarantine_layout_index() {
+    local source_directory="$1"
+    local target_directory="$2"
+
+    if [[ ! -d "${source_directory}" ]]; then
+        return 0
+    fi
+    if [[ -e "${target_directory}" ]]; then
+        echo "布局索引隔离目标已存在：${target_directory}" >&2
+        return 1
+    fi
+    mv "${source_directory}" "${target_directory}"
+}
+
 run_gradle_with_infrastructure_retry() {
     local project_root report_root report_dir invocation_id max_attempts
-    local attempt log_file gradle_exit_code delay_seconds
+    local retry_delay_seconds attempt log_file gradle_exit_code delay_seconds force_fresh_layout
+    local -a gradle_command
     project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
     report_root="${project_root}/build/reports/gradle-infrastructure-retry"
     invocation_id="$(date -u '+%Y%m%dT%H%M%SZ')-$$"
     report_dir="${report_root}/${invocation_id}"
     max_attempts="${GRADLE_INFRASTRUCTURE_MAX_ATTEMPTS:-3}"
+    retry_delay_seconds="${GRADLE_INFRASTRUCTURE_RETRY_DELAY_SECONDS:-15}"
 
     if (( $# == 0 )); then
         echo "至少需要提供一个 Gradle 任务或参数" >&2
@@ -35,19 +61,32 @@ run_gradle_with_infrastructure_retry() {
         echo "GRADLE_INFRASTRUCTURE_MAX_ATTEMPTS 必须是 1～3 的整数" >&2
         return 2
     fi
+    if ! [[ "${retry_delay_seconds}" =~ ^[0-9]+$ ]] || (( retry_delay_seconds > 60 )); then
+        echo "GRADLE_INFRASTRUCTURE_RETRY_DELAY_SECONDS 必须是 0～60 的整数" >&2
+        return 2
+    fi
 
     mkdir -p "${report_dir}"
     cd "${project_root}"
 
     attempt=1
+    force_fresh_layout=false
     while (( attempt <= max_attempts )); do
         log_file="${report_dir}/attempt-${attempt}.log"
-        printf 'Gradle 基础设施尝试 %d/%d：./gradlew' "${attempt}" "${max_attempts}"
-        printf ' %q' "$@"
+        gradle_command=(./gradlew)
+        if [[ "${force_fresh_layout}" == "true" ]]; then
+            # 失败的布局扫描可能同时污染当前 daemon、项目布局索引和 configuration cache。
+            # 重试必须使用新的单次 JVM，并绕过上一次失败写出的 configuration cache。
+            gradle_command+=(--no-daemon --no-configuration-cache)
+        fi
+        gradle_command+=("$@")
+
+        printf 'Gradle 基础设施尝试 %d/%d：' "${attempt}" "${max_attempts}"
+        printf ' %q' "${gradle_command[@]}"
         printf '\n'
 
         set +e
-        ./gradlew "$@" 2>&1 | tee "${log_file}"
+        "${gradle_command[@]}" 2>&1 | tee "${log_file}"
         gradle_exit_code=${PIPESTATUS[0]}
         set -e
 
@@ -59,7 +98,14 @@ run_gradle_with_infrastructure_retry() {
             return "${gradle_exit_code}"
         fi
 
-        delay_seconds=$((attempt * 15))
+        if is_layout_index_race "${log_file}"; then
+            quarantine_layout_index \
+                "${project_root}/.intellijPlatform/layoutIndex" \
+                "${report_dir}/failed-layout-index-attempt-${attempt}"
+            force_fresh_layout=true
+        fi
+
+        delay_seconds=$((attempt * retry_delay_seconds))
         echo "检测到已知基础设施故障，${delay_seconds} 秒后进行有界重试" >&2
         sleep "${delay_seconds}"
         attempt=$((attempt + 1))
