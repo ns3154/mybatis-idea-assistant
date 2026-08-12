@@ -636,7 +636,8 @@ public final class MyBatisOgnlSemanticAnalyzer {
         private DecodedOgnl {
             decodedBoundaries = decodedBoundaries.clone();
             if (decodedBoundaries.length != text.length() + 1) {
-                throw new IllegalArgumentException("OGNL 解码边界数量不匹配");
+                throw new IllegalArgumentException(MyBatisOgnlMessages.message(
+                        "ognl.error.decoded.boundaries.mismatch"));
             }
         }
 

@@ -6,7 +6,8 @@ package io.github.ns3154.mybatisassistant.ognl;
 public record MyBatisOgnlRange(int startOffset, int endOffset) {
     public MyBatisOgnlRange {
         if (startOffset < 0 || endOffset < startOffset) {
-            throw new IllegalArgumentException("OGNL 范围必须满足 0 <= start <= end");
+            throw new IllegalArgumentException(MyBatisOgnlMessages.message(
+                    "ognl.error.range.invalid"));
         }
     }
 

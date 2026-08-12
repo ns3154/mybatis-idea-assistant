@@ -10,7 +10,8 @@ public record MyBatisMappedText(
         @NotNull MyBatisSourceMap sourceMap) {
     public MyBatisMappedText {
         if (text.length() != sourceMap.virtualLength()) {
-            throw new IllegalArgumentException("虚拟文本长度必须与 source map 一致");
+            throw new IllegalArgumentException(MyBatisDynamicMessages.message(
+                    "dynamic.error.mapped.text.length"));
         }
     }
 }

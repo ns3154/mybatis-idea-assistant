@@ -10,7 +10,8 @@ import java.util.Optional;
 public record MyBatisTextRange(int startOffset, int endOffset) {
     public MyBatisTextRange {
         if (startOffset < 0 || endOffset < startOffset) {
-            throw new IllegalArgumentException("文本范围必须满足 0 <= start <= end");
+            throw new IllegalArgumentException(MyBatisDynamicMessages.message(
+                    "dynamic.error.text.range.invalid"));
         }
     }
 

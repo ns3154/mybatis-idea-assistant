@@ -81,7 +81,9 @@ public final class MyBatisOgnlLexer {
                 MyBatisOgnlRange range = new MyBatisOgnlRange(start, cursor);
                 diagnostics.add(new MyBatisOgnlDiagnostic(
                         MyBatisOgnlDiagnosticCode.UNEXPECTED_CHARACTER,
-                        "无法识别的 OGNL 字符：" + current,
+                        MyBatisOgnlMessages.message(
+                                "ognl.diagnostic.character.unexpected",
+                                current),
                         range));
                 tokens.add(new MyBatisOgnlToken(
                         MyBatisOgnlTokenKind.BAD_CHARACTER,
@@ -151,7 +153,7 @@ public final class MyBatisOgnlLexer {
         }
         diagnostics.add(new MyBatisOgnlDiagnostic(
                 MyBatisOgnlDiagnosticCode.UNTERMINATED_STRING,
-                "OGNL 字符串缺少结束引号",
+                MyBatisOgnlMessages.message("ognl.diagnostic.string.unterminated"),
                 new MyBatisOgnlRange(quoteOffset, source.length())));
         return source.length();
     }

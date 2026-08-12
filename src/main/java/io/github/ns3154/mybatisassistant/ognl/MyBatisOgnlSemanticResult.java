@@ -22,7 +22,8 @@ public record MyBatisOgnlSemanticResult(
         variants = List.copyOf(variants);
         if (status != MyBatisOgnlSemanticStatus.FOUND
                 && (!types.isEmpty() || !targets.isEmpty())) {
-            throw new IllegalArgumentException("非命中状态不能携带确定类型或目标");
+            throw new IllegalArgumentException(MyBatisOgnlMessages.message(
+                    "ognl.error.semantic.lifecycle.payload"));
         }
     }
 

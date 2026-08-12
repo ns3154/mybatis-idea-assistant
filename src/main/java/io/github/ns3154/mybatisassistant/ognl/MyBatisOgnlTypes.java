@@ -34,7 +34,9 @@ public final class MyBatisOgnlTypes {
     public static @NotNull IElementType token(@NotNull MyBatisOgnlTokenKind kind) {
         IElementType type = TOKENS.get(kind);
         if (type == null) {
-            throw new IllegalArgumentException("没有平台 token 类型：" + kind);
+            throw new IllegalArgumentException(MyBatisOgnlMessages.message(
+                    "ognl.error.platform.token.missing",
+                    kind));
         }
         return type;
     }

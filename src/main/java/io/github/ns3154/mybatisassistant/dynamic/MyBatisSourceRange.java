@@ -10,7 +10,8 @@ public record MyBatisSourceRange(
         @NotNull MyBatisTextRange range) {
     public MyBatisSourceRange {
         if (fileUrl.isBlank()) {
-            throw new IllegalArgumentException("源文件 URL 不能为空");
+            throw new IllegalArgumentException(MyBatisDynamicMessages.message(
+                    "dynamic.error.source.range.url.empty"));
         }
     }
 }

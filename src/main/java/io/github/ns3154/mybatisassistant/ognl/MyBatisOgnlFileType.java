@@ -23,7 +23,7 @@ public final class MyBatisOgnlFileType extends LanguageFileType {
 
     @Override
     public @NotNull String getDescription() {
-        return "MyBatis XML 中的 OGNL 表达式";
+        return MyBatisOgnlMessages.message("ognl.file.type.description");
     }
 
     @Override

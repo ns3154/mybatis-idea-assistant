@@ -16,7 +16,8 @@ public final class MyBatisSourceMap {
             int virtualLength,
             @NotNull List<MyBatisSourceMapSegment> segments) {
         if (virtualLength < 0) {
-            throw new IllegalArgumentException("虚拟 SQL 长度不能为负数");
+            throw new IllegalArgumentException(MyBatisDynamicMessages.message(
+                    "dynamic.error.source.map.negative.length"));
         }
         this.virtualLength = virtualLength;
         this.segments = List.copyOf(segments);
@@ -65,21 +66,25 @@ public final class MyBatisSourceMap {
         int expectedStart = 0;
         for (MyBatisSourceMapSegment segment : segments) {
             if (segment.virtualRange().startOffset() != expectedStart) {
-                throw new IllegalArgumentException("source map 必须连续覆盖整个虚拟 SQL");
+                throw new IllegalArgumentException(MyBatisDynamicMessages.message(
+                        "dynamic.error.source.map.discontinuous"));
             }
             expectedStart = segment.virtualRange().endOffset();
             if (expectedStart > virtualLength) {
-                throw new IllegalArgumentException("source map 超出虚拟 SQL 长度");
+                throw new IllegalArgumentException(MyBatisDynamicMessages.message(
+                        "dynamic.error.source.map.out.of.bounds"));
             }
         }
         if (expectedStart != virtualLength) {
-            throw new IllegalArgumentException("source map 未覆盖整个虚拟 SQL");
+            throw new IllegalArgumentException(MyBatisDynamicMessages.message(
+                    "dynamic.error.source.map.incomplete"));
         }
     }
 
     private void requireVirtualRange(@NotNull MyBatisTextRange range) {
         if (range.endOffset() > virtualLength) {
-            throw new IllegalArgumentException("查询范围超出虚拟 SQL 长度");
+            throw new IllegalArgumentException(MyBatisDynamicMessages.message(
+                    "dynamic.error.source.map.query.out.of.bounds"));
         }
     }
 

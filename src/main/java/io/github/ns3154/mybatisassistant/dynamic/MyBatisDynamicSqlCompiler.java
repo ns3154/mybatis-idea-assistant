@@ -268,7 +268,8 @@ public final class MyBatisDynamicSqlCompiler {
                     diagnostic(
                             context,
                             MyBatisDynamicSqlDiagnosticCode.DUPLICATE_OTHERWISE,
-                            "choose 只能包含一个 otherwise",
+                            MyBatisDynamicMessages.message(
+                                    "dynamic.diagnostic.choose.duplicate.otherwise"),
                             sourceRange(child));
                 } else {
                     otherwise = Optional.of(body);
@@ -277,7 +278,9 @@ public final class MyBatisDynamicSqlCompiler {
                 diagnostic(
                         context,
                         MyBatisDynamicSqlDiagnosticCode.INVALID_CHOOSE_CHILD,
-                        "choose 只允许 when 和 otherwise，实际为：" + child.getName(),
+                        MyBatisDynamicMessages.message(
+                                "dynamic.diagnostic.choose.invalid.child",
+                                child.getName()),
                         sourceRange(child));
             }
         }
@@ -352,7 +355,9 @@ public final class MyBatisDynamicSqlCompiler {
             diagnostic(
                     context,
                     MyBatisDynamicSqlDiagnosticCode.INVALID_INCLUDE_REFID,
-                    "include refid 无法静态确定：" + refid.text(),
+                    MyBatisDynamicMessages.message(
+                            "dynamic.diagnostic.include.refid.not.static",
+                            refid.text()),
                     refid.sourceRange());
             return unresolvedInclude(refid.text(), properties.bindings(), includeRange);
         }
@@ -362,7 +367,9 @@ public final class MyBatisDynamicSqlCompiler {
             diagnostic(
                     context,
                     MyBatisDynamicSqlDiagnosticCode.INVALID_INCLUDE_REFID,
-                    "include refid 格式无效：" + refid.text(),
+                    MyBatisDynamicMessages.message(
+                            "dynamic.diagnostic.include.refid.invalid",
+                            refid.text()),
                     refid.sourceRange());
             return unresolvedInclude(refid.text(), properties.bindings(), includeRange);
         }
@@ -377,8 +384,10 @@ public final class MyBatisDynamicSqlCompiler {
             diagnostic(
                     context,
                     MyBatisDynamicSqlDiagnosticCode.INCLUDE_TARGET_NOT_UNIQUE,
-                    "include 必须唯一解析，实际目标数：" + targets.size()
-                            + "，refid=" + refid.text(),
+                    MyBatisDynamicMessages.message(
+                            "dynamic.diagnostic.include.target.not.unique",
+                            targets.size(),
+                            refid.text()),
                     refid.sourceRange());
             return unresolvedInclude(refid.text(), properties.bindings(), includeRange);
         }
@@ -393,7 +402,9 @@ public final class MyBatisDynamicSqlCompiler {
             diagnostic(
                     context,
                     MyBatisDynamicSqlDiagnosticCode.INCLUDE_CYCLE,
-                    "include 出现循环：" + String.join(" -> ", cycle),
+                    MyBatisDynamicMessages.message(
+                            "dynamic.diagnostic.include.cycle",
+                            String.join(" -> ", cycle)),
                     includeRange);
             return new Compilation(new MyBatisIncludeNode(
                     qualified.namespace(),
@@ -441,7 +452,9 @@ public final class MyBatisDynamicSqlCompiler {
                 diagnostic(
                         context,
                         MyBatisDynamicSqlDiagnosticCode.INVALID_INCLUDE_PROPERTY,
-                        "include 只允许 property 子标签，实际为：" + child.getName(),
+                        MyBatisDynamicMessages.message(
+                                "dynamic.diagnostic.include.property.invalid.child",
+                                child.getName()),
                         sourceRange(child));
                 valid = false;
                 continue;
@@ -452,7 +465,8 @@ public final class MyBatisDynamicSqlCompiler {
                 diagnostic(
                         context,
                         MyBatisDynamicSqlDiagnosticCode.INVALID_INCLUDE_PROPERTY,
-                        "include property name 必须是静态非空名称",
+                        MyBatisDynamicMessages.message(
+                                "dynamic.diagnostic.include.property.name.invalid"),
                         name.sourceRange());
                 valid = false;
                 continue;
@@ -465,7 +479,9 @@ public final class MyBatisDynamicSqlCompiler {
                 diagnostic(
                         context,
                         MyBatisDynamicSqlDiagnosticCode.DUPLICATE_INCLUDE_PROPERTY,
-                        "include property 重复声明：" + name.text(),
+                        MyBatisDynamicMessages.message(
+                                "dynamic.diagnostic.include.property.duplicate",
+                                name.text()),
                         name.sourceRange());
                 valid = false;
             }
@@ -527,7 +543,9 @@ public final class MyBatisDynamicSqlCompiler {
             diagnostic(
                     context,
                     MyBatisDynamicSqlDiagnosticCode.INCLUDE_PROPERTY_CYCLE,
-                    "include property 出现循环：" + String.join(" -> ", cycle),
+                    MyBatisDynamicMessages.message(
+                            "dynamic.diagnostic.include.property.cycle",
+                            String.join(" -> ", cycle)),
                     definition.valueRange());
             return null;
         }
@@ -562,7 +580,9 @@ public final class MyBatisDynamicSqlCompiler {
         diagnostic(
                 context,
                 MyBatisDynamicSqlDiagnosticCode.UNSUPPORTED_DYNAMIC_TAG,
-                "S5 当前尚未编译动态标签：" + tag.getName(),
+                MyBatisDynamicMessages.message(
+                        "dynamic.diagnostic.tag.unsupported",
+                        tag.getName()),
                 sourceRange(tag));
         return new Compilation(compileChildren(tag, context).node(), Optional.empty());
     }
@@ -599,7 +619,10 @@ public final class MyBatisDynamicSqlCompiler {
             diagnostic(
                     context,
                     MyBatisDynamicSqlDiagnosticCode.MISSING_REQUIRED_ATTRIBUTE,
-                    tag.getName() + " 缺少非空 " + attributeName + " 属性",
+                    MyBatisDynamicMessages.message(
+                            "dynamic.diagnostic.attribute.required",
+                            tag.getName(),
+                            attributeName),
                     sourceRange(tag));
             return new ResolvedAttribute("", sourceRange(tag));
         }
@@ -641,7 +664,10 @@ public final class MyBatisDynamicSqlCompiler {
         diagnostic(
                 context,
                 MyBatisDynamicSqlDiagnosticCode.INVALID_BOOLEAN_ATTRIBUTE,
-                tag.getName() + " 的 " + attributeName + " 必须是 true 或 false",
+                MyBatisDynamicMessages.message(
+                        "dynamic.diagnostic.attribute.boolean",
+                        tag.getName(),
+                        attributeName),
                 sourceRange(tag));
         return Optional.empty();
     }
@@ -685,7 +711,8 @@ public final class MyBatisDynamicSqlCompiler {
                 diagnostic(
                         context,
                         MyBatisDynamicSqlDiagnosticCode.MALFORMED_CDATA,
-                        "CDATA 缺少结束标记",
+                        MyBatisDynamicMessages.message(
+                                "dynamic.diagnostic.cdata.unclosed"),
                         new MyBatisSourceRange(fileUrl,
                                 new MyBatisTextRange(sourceStart + cdata,
                                         sourceStart + raw.length())));
@@ -742,7 +769,9 @@ public final class MyBatisDynamicSqlCompiler {
                         diagnostic(
                                 context,
                                 MyBatisDynamicSqlDiagnosticCode.UNRESOLVED_INCLUDE_PROPERTY,
-                                "include property 无法解析：" + name,
+                                MyBatisDynamicMessages.message(
+                                        "dynamic.diagnostic.include.property.unresolved",
+                                        name),
                                 new MyBatisSourceRange(fileUrl,
                                         new MyBatisTextRange(sourceStart + cursor,
                                                 sourceStart + close + 1)));
@@ -773,7 +802,9 @@ public final class MyBatisDynamicSqlCompiler {
                     diagnostic(
                             context,
                             MyBatisDynamicSqlDiagnosticCode.UNKNOWN_XML_ENTITY,
-                            "无法静态解码 XML entity：&" + entityName + ';',
+                            MyBatisDynamicMessages.message(
+                                    "dynamic.diagnostic.xml.entity.unknown",
+                                    entityName),
                             new MyBatisSourceRange(fileUrl,
                                     new MyBatisTextRange(sourceStart + cursor,
                                             sourceStart + close + 1)));
@@ -815,7 +846,9 @@ public final class MyBatisDynamicSqlCompiler {
                     diagnostic(
                             context,
                             MyBatisDynamicSqlDiagnosticCode.UNRESOLVED_INCLUDE_PROPERTY,
-                            "include property 无法解析：" + name,
+                            MyBatisDynamicMessages.message(
+                                    "dynamic.diagnostic.include.property.unresolved",
+                                    name),
                             sourceRange);
                     valid = false;
                 }

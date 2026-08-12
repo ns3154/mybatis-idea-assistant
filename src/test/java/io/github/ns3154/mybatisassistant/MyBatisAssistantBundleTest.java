@@ -1,6 +1,8 @@
 package io.github.ns3154.mybatisassistant;
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import io.github.ns3154.mybatisassistant.dynamic.MyBatisTextRange;
+import io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlLexer;
 import io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettings;
 import io.github.ns3154.mybatisassistant.sqltool.execution.MyBatisSqlExecutionPolicy;
 import io.github.ns3154.mybatisassistant.sqltool.execution.MyBatisSqlExecutionPreparation;
@@ -61,6 +63,11 @@ public final class MyBatisAssistantBundleTest extends BasePlatformTestCase {
         assertEquals("Indent width must be between 1 and 8",
                 ((MyBatisXmlFormatResult.Failure)
                         MyBatisXmlFormatter.format("<mapper/>", 0)).message());
+        assertEquals("Unrecognized OGNL character: ;",
+                MyBatisOgnlLexer.lex(";").diagnostics().getFirst().message());
+        assertEquals("The text range must satisfy 0 <= start <= end",
+                org.junit.Assert.assertThrows(IllegalArgumentException.class,
+                        () -> new MyBatisTextRange(-1, 0)).getMessage());
 
         state.uiLocale = "zh-CN";
         MyBatisAssistantSettings.getInstance().replace(state);
@@ -80,5 +87,10 @@ public final class MyBatisAssistantBundleTest extends BasePlatformTestCase {
         assertEquals("缩进宽度必须在 1 到 8 之间",
                 ((MyBatisXmlFormatResult.Failure)
                         MyBatisXmlFormatter.format("<mapper/>", 0)).message());
+        assertEquals("无法识别的 OGNL 字符：;",
+                MyBatisOgnlLexer.lex(";").diagnostics().getFirst().message());
+        assertEquals("文本范围必须满足 0 <= start <= end",
+                org.junit.Assert.assertThrows(IllegalArgumentException.class,
+                        () -> new MyBatisTextRange(-1, 0)).getMessage());
     }
 }

@@ -32,7 +32,9 @@ public final class MyBatisOgnlParser {
             MyBatisOgnlToken trailing = parser.advance();
             parser.diagnostic(
                     MyBatisOgnlDiagnosticCode.TRAILING_TOKEN,
-                    "表达式结束后存在多余 token：" + trailing.text(),
+                    MyBatisOgnlMessages.message(
+                            "ognl.diagnostic.token.trailing",
+                            trailing.text()),
                     trailing.range());
         }
         return new MyBatisOgnlParseResult(root, parser.tokens, parser.diagnostics);
@@ -44,7 +46,9 @@ public final class MyBatisOgnlParser {
             MyBatisOgnlToken token = current();
             diagnostic(
                     MyBatisOgnlDiagnosticCode.MAXIMUM_NESTING_EXCEEDED,
-                    "OGNL 嵌套深度超过 " + MAXIMUM_NESTING,
+                    MyBatisOgnlMessages.message(
+                            "ognl.diagnostic.nesting.exceeded",
+                            MAXIMUM_NESTING),
                     token.range());
             nesting--;
             if (!at(MyBatisOgnlTokenKind.EOF)) {
@@ -58,7 +62,8 @@ public final class MyBatisOgnlParser {
                 return condition;
             }
             MyBatisOgnlExpression whenTrue = parseConditional();
-            expect(MyBatisOgnlTokenKind.COLON, "三元表达式缺少冒号");
+            expect(MyBatisOgnlTokenKind.COLON, MyBatisOgnlMessages.message(
+                    "ognl.diagnostic.conditional.colon.missing"));
             MyBatisOgnlExpression whenFalse = parseConditional();
             return new MyBatisOgnlExpression.Conditional(
                     condition,
@@ -126,7 +131,8 @@ public final class MyBatisOgnlParser {
         while (true) {
             ProgressManager.checkCanceled();
             if (match(MyBatisOgnlTokenKind.DOT)) {
-                MyBatisOgnlToken name = expectIdentifier("点号后缺少属性或方法名");
+                MyBatisOgnlToken name = expectIdentifier(MyBatisOgnlMessages.message(
+                        "ognl.diagnostic.postfix.name.missing"));
                 if (match(MyBatisOgnlTokenKind.LEFT_PAREN)) {
                     Arguments arguments = parseArguments();
                     result = new MyBatisOgnlExpression.MethodCall(
@@ -150,7 +156,8 @@ public final class MyBatisOgnlParser {
                 MyBatisOgnlExpression index = parseConditional();
                 MyBatisOgnlToken close = expect(
                         MyBatisOgnlTokenKind.RIGHT_BRACKET,
-                        "索引表达式缺少右方括号");
+                        MyBatisOgnlMessages.message(
+                                "ognl.diagnostic.index.bracket.missing"));
                 result = new MyBatisOgnlExpression.Index(
                         result,
                         index,
@@ -199,7 +206,8 @@ public final class MyBatisOgnlParser {
         if (match(MyBatisOgnlTokenKind.LEFT_BRACE)) {
             return parseMapLiteral(hash.range().startOffset());
         }
-        MyBatisOgnlToken name = expectIdentifier("# 后缺少上下文变量名");
+        MyBatisOgnlToken name = expectIdentifier(MyBatisOgnlMessages.message(
+                "ognl.diagnostic.context.name.missing"));
         return new MyBatisOgnlExpression.Name(
                 name.text(),
                 MyBatisOgnlNameKind.CONTEXT,
@@ -222,11 +230,14 @@ public final class MyBatisOgnlParser {
         if (className.isEmpty()) {
             diagnostic(
                     MyBatisOgnlDiagnosticCode.EXPECTED_IDENTIFIER,
-                    "静态成员表达式缺少全限定类名",
+                    MyBatisOgnlMessages.message(
+                            "ognl.diagnostic.static.class.missing"),
                     current().range());
         }
-        expect(MyBatisOgnlTokenKind.AT, "静态成员类名后缺少 @");
-        MyBatisOgnlToken member = expectIdentifier("静态表达式缺少成员名");
+        expect(MyBatisOgnlTokenKind.AT, MyBatisOgnlMessages.message(
+                "ognl.diagnostic.static.separator.missing"));
+        MyBatisOgnlToken member = expectIdentifier(MyBatisOgnlMessages.message(
+                "ognl.diagnostic.static.member.missing"));
         Optional<List<MyBatisOgnlExpression>> arguments = Optional.empty();
         int endOffset = member.range().endOffset();
         if (match(MyBatisOgnlTokenKind.LEFT_PAREN)) {
@@ -247,11 +258,13 @@ public final class MyBatisOgnlParser {
     }
 
     private @NotNull MyBatisOgnlExpression parseTypeLiteral() {
-        MyBatisOgnlToken first = expectIdentifier("instanceof 后缺少全限定类型名");
+        MyBatisOgnlToken first = expectIdentifier(MyBatisOgnlMessages.message(
+                "ognl.diagnostic.instanceof.type.missing"));
         StringBuilder qualifiedName = new StringBuilder(first.text());
         int endOffset = first.range().endOffset();
         while (match(MyBatisOgnlTokenKind.DOT)) {
-            MyBatisOgnlToken part = expectIdentifier("类型限定名的点号后缺少名称");
+            MyBatisOgnlToken part = expectIdentifier(MyBatisOgnlMessages.message(
+                    "ognl.diagnostic.type.part.missing"));
             qualifiedName.append('.').append(part.text());
             endOffset = part.range().endOffset();
         }
@@ -269,7 +282,8 @@ public final class MyBatisOgnlParser {
         MyBatisOgnlExpression expression = parseConditional();
         MyBatisOgnlToken close = expect(
                 MyBatisOgnlTokenKind.RIGHT_PAREN,
-                "分组表达式缺少右括号");
+                MyBatisOgnlMessages.message(
+                        "ognl.diagnostic.group.parenthesis.missing"));
         return new MyBatisOgnlExpression.Group(
                 expression,
                 new MyBatisOgnlRange(
@@ -283,7 +297,8 @@ public final class MyBatisOgnlParser {
                 MyBatisOgnlTokenKind.RIGHT_BRACE);
         MyBatisOgnlToken close = expect(
                 MyBatisOgnlTokenKind.RIGHT_BRACE,
-                "列表字面量缺少右花括号");
+                MyBatisOgnlMessages.message(
+                        "ognl.diagnostic.list.brace.missing"));
         return new MyBatisOgnlExpression.ListLiteral(
                 elements,
                 new MyBatisOgnlRange(
@@ -297,7 +312,8 @@ public final class MyBatisOgnlParser {
                 && !at(MyBatisOgnlTokenKind.EOF)) {
             ProgressManager.checkCanceled();
             MyBatisOgnlExpression key = parseConditional();
-            expect(MyBatisOgnlTokenKind.COLON, "Map 条目缺少冒号");
+            expect(MyBatisOgnlTokenKind.COLON, MyBatisOgnlMessages.message(
+                    "ognl.diagnostic.map.colon.missing"));
             MyBatisOgnlExpression value = parseConditional();
             entries.add(new MyBatisOgnlExpression.MapEntry(
                     key,
@@ -309,7 +325,8 @@ public final class MyBatisOgnlParser {
         }
         MyBatisOgnlToken close = expect(
                 MyBatisOgnlTokenKind.RIGHT_BRACE,
-                "Map 字面量缺少右花括号");
+                MyBatisOgnlMessages.message(
+                        "ognl.diagnostic.map.brace.missing"));
         return new MyBatisOgnlExpression.MapLiteral(
                 entries,
                 new MyBatisOgnlRange(startOffset, close.range().endOffset()));
@@ -320,7 +337,8 @@ public final class MyBatisOgnlParser {
                 MyBatisOgnlTokenKind.RIGHT_PAREN);
         MyBatisOgnlToken close = expect(
                 MyBatisOgnlTokenKind.RIGHT_PAREN,
-                "方法调用缺少右括号");
+                MyBatisOgnlMessages.message(
+                        "ognl.diagnostic.call.parenthesis.missing"));
         return new Arguments(arguments, close.range().endOffset());
     }
 
@@ -351,7 +369,9 @@ public final class MyBatisOgnlParser {
                     token.range());
             case NUMBER -> numberLiteral(token);
             case STRING -> stringLiteral(token);
-            default -> throw new IllegalArgumentException("不是字面量 token：" + token.kind());
+            default -> throw new IllegalArgumentException(MyBatisOgnlMessages.message(
+                    "ognl.error.literal.token.invalid",
+                    token.kind()));
         };
     }
 
@@ -379,7 +399,9 @@ public final class MyBatisOgnlParser {
         } catch (NumberFormatException invalid) {
             diagnostic(
                     MyBatisOgnlDiagnosticCode.INVALID_NUMBER,
-                    "无效数字字面量：" + token.text(),
+                    MyBatisOgnlMessages.message(
+                            "ognl.diagnostic.number.invalid",
+                            token.text()),
                     token.range());
         }
         return new MyBatisOgnlExpression.Literal(
@@ -412,7 +434,8 @@ public final class MyBatisOgnlParser {
             if (++index >= content.length()) {
                 diagnostic(
                         MyBatisOgnlDiagnosticCode.INVALID_ESCAPE,
-                        "字符串末尾存在不完整转义",
+                        MyBatisOgnlMessages.message(
+                                "ognl.diagnostic.escape.incomplete"),
                         new MyBatisOgnlRange(sourceOffset + index - 1, sourceOffset + index));
                 break;
             }
@@ -429,7 +452,9 @@ public final class MyBatisOgnlParser {
                 default -> {
                     diagnostic(
                             MyBatisOgnlDiagnosticCode.INVALID_ESCAPE,
-                            "不支持的字符串转义：\\" + escaped,
+                            MyBatisOgnlMessages.message(
+                                    "ognl.diagnostic.escape.unsupported",
+                                    escaped),
                             new MyBatisOgnlRange(
                                     sourceOffset + index - 1,
                                     sourceOffset + index + 1));
@@ -444,7 +469,8 @@ public final class MyBatisOgnlParser {
         MyBatisOgnlToken token = current();
         diagnostic(
                 MyBatisOgnlDiagnosticCode.EXPECTED_EXPRESSION,
-                "此处需要 OGNL 表达式",
+                MyBatisOgnlMessages.message(
+                        "ognl.diagnostic.expression.expected"),
                 token.range());
         if (!at(MyBatisOgnlTokenKind.EOF)) {
             advance();
