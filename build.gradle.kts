@@ -7,7 +7,9 @@ import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
 import org.gradle.api.plugins.quality.Checkstyle
+import org.gradle.api.tasks.WriteProperties
 import org.gradle.jvm.tasks.Jar
+import org.gradle.language.jvm.tasks.ProcessResources
 import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
 import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
 import org.gradle.testing.jacoco.tasks.JacocoReport
@@ -21,7 +23,9 @@ plugins {
 }
 
 group = "io.github.ns3154.mybatisassistant"
-version = providers.gradleProperty("pluginVersion").orElse("0.1.0-SNAPSHOT").get()
+val configuredPluginVersion = providers.gradleProperty("pluginVersion")
+    .orElse("0.1.0-SNAPSHOT")
+version = configuredPluginVersion.get()
 
 val pluginVerifierIdeVersion = providers.gradleProperty("pluginVerifierIdeVersion").orElse("2026.1")
 val pluginVerifierProduct = providers.gradleProperty("pluginVerifierProduct").orElse("idea")
@@ -120,6 +124,22 @@ intellijPlatform {
 }
 
 tasks {
+    val generatePluginVersionProperties = register<WriteProperties>(
+        "generatePluginVersionProperties",
+    ) {
+        destinationFile.set(layout.buildDirectory.file(
+            "generated/plugin-version/mybatis-assistant-version.properties",
+        ))
+        property("version", configuredPluginVersion)
+        encoding = "UTF-8"
+    }
+
+    named<ProcessResources>("processResources") {
+        from(generatePluginVersionProperties) {
+            into("META-INF")
+        }
+    }
+
     named<Jar>("jar") {
         from(rootProject.file("LICENSE")) {
             into("META-INF")

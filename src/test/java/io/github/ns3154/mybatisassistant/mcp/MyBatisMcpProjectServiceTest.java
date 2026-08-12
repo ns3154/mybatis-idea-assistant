@@ -2,12 +2,10 @@ package io.github.ns3154.mybatisassistant.mcp;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.command.undo.UndoManager;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
@@ -130,8 +128,9 @@ public final class MyBatisMcpProjectServiceTest extends BasePlatformTestCase {
         JsonObject result = json(initialized).getAsJsonObject("result");
         assertEquals(MyBatisMcpProtocolHandler.PROTOCOL_VERSION,
                 result.get("protocolVersion").getAsString());
-        assertEquals(PluginManagerCore.getPlugin(PluginId.getId(
-                        "io.github.ns3154.mybatis-idea-assistant")).getVersion(),
+        assertFalse("构建必须生成确定的插件版本资源",
+                "unknown".equals(MyBatisMcpProtocolHandler.pluginVersion()));
+        assertEquals(MyBatisMcpProtocolHandler.pluginVersion(),
                 result.getAsJsonObject("serverInfo").get("version").getAsString());
 
         assertEquals(404, request(endpoint, "POST", rpc(2, "tools/list", "{}"),

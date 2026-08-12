@@ -14,6 +14,7 @@ import io.github.ns3154.mybatisassistant.database.jdbc.MyBatisJdbcDataSourceMana
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.JComponent;
+import javax.swing.JList;
 import javax.swing.JPanel;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,11 +38,20 @@ final class MyBatisJdbcDataSourcesPanel {
 
     MyBatisJdbcDataSourcesPanel(@NotNull Project project) {
         this.project = project;
-        list.setCellRenderer(SimpleListCellRenderer.create(
-                "",
-                entry -> entry.config.displayName() + "  ·  " + entry.config.dialect()
+        list.setCellRenderer(new SimpleListCellRenderer<>() {
+            @Override
+            public void customize(
+                    @NotNull JList<? extends Entry> source,
+                    Entry entry,
+                    int index,
+                    boolean selected,
+                    boolean hasFocus) {
+                setText(entry == null ? "" : entry.config.displayName()
+                        + "  ·  " + entry.config.dialect()
                         + (entry.config.enabled() ? "" : MyBatisAssistantBundle.message(
-                                "settings.jdbc.source.disabled.suffix"))));
+                                "settings.jdbc.source.disabled.suffix")));
+            }
+        });
         JComponent listPanel = ToolbarDecorator.createDecorator(list)
                 .setAddAction(ignored -> addSource())
                 .setEditAction(ignored -> editSelected())

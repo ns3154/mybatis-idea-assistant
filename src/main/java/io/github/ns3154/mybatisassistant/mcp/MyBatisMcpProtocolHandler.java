@@ -5,24 +5,25 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
-import com.intellij.ide.plugins.IdeaPluginDescriptor;
-import com.intellij.ide.plugins.PluginManagerCore;
-import com.intellij.openapi.extensions.PluginId;
 import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 有界 JSON-RPC MCP 协议处理器；不持有访问令牌。
  */
 final class MyBatisMcpProtocolHandler implements AutoCloseable {
-    private static final String PLUGIN_ID = "io.github.ns3154.mybatis-idea-assistant";
+    private static final String VERSION_RESOURCE =
+            "/META-INF/mybatis-assistant-version.properties";
     static final String PROTOCOL_VERSION = "2025-06-18";
     private static final Duration SESSION_TTL = Duration.ofMinutes(30);
     private static final int MAX_SESSIONS = 64;
@@ -104,9 +105,19 @@ final class MyBatisMcpProtocolHandler implements AutoCloseable {
         return rpcResult(id, result, sessionId);
     }
 
-    private static @NotNull String pluginVersion() {
-        IdeaPluginDescriptor descriptor = PluginManagerCore.getPlugin(PluginId.getId(PLUGIN_ID));
-        return descriptor == null ? "unknown" : descriptor.getVersion();
+    static @NotNull String pluginVersion() {
+        try (InputStream input = MyBatisMcpProtocolHandler.class.getResourceAsStream(
+                VERSION_RESOURCE)) {
+            if (input == null) {
+                return "unknown";
+            }
+            Properties properties = new Properties();
+            properties.load(input);
+            String version = properties.getProperty("version", "").trim();
+            return version.isEmpty() ? "unknown" : version;
+        } catch (IOException ignored) {
+            return "unknown";
+        }
     }
 
     private @NotNull MyBatisMcpHttpResponse toolsList(@Nullable JsonElement id) {

@@ -27,9 +27,10 @@ go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
 
 - Java + MyBatis 样例：6 tests，0 failure/error；语义语料各模块全部成功。
 - IntelliJ Platform：634 tests，0 failure/error/skip；96 个测试套件。
-- 整体行覆盖率：13834/16572，83.48%；S12 产品化核心：1065/1204，88.46%；均高于 70%/85% 阻断线。
-- Checkstyle main/test、插件项目配置、插件结构、Action 工作流语法全部通过；Plugin Verifier 1.409 对最低 IntelliJ IDEA 2026.1 GA（IU-261.22158.277）结论为 `Compatible`，并判定插件大概率可动态启停。
-- ZIP：`dc8d16e6ce322c79bb9bcb0ed48cc0d5199abc2e0c222ccca5e57938393e90b3`；包内只有插件 JAR，JAR 含 LICENSE、NOTICE、明暗图标和中英文资源，不含独立第三方运行时 JAR。
+- 整体行覆盖率：13841/16581，83.48%；S12 产品化核心：1069/1211，88.27%；均高于 70%/85% 阻断线。
+- Checkstyle main/test、插件项目配置、插件结构、Action 工作流语法全部通过；Plugin Verifier 1.409 对最低 IntelliJ IDEA 2026.1 GA（IU-261.22158.277）、当前 2026.1.4（IU-261.26222.65）和下一稳定版 2026.2（IU-262.8665.258）均为纯 `Compatible`，无内部 API/计划移除 API，并判定插件大概率可动态启停。
+- 2026.2 首轮门禁发现 `PluginManagerCore` 内部 API 与 `SimpleListCellRenderer.create` 计划移除 API；已分别改为构建期版本资源和公开 renderer 子类，复跑后两项均归零。
+- ZIP：`3fc63e37b3b57158a6abfb699911d2d1d487aae5953cd6f94183ce4200c16a04`；包内只有插件 JAR，JAR 含 LICENSE、NOTICE、明暗图标、中英文资源和与 Gradle 版本同源的 MCP 版本资源，不含独立第三方运行时 JAR。
 - CycloneDX JSON：`e16f1b2b86b2c0ea5dd1c08cc15a41820ebe3057c336d2a4dc12df75ff951903`；XML：`b32e0ec1b0058caba09147d310e5ebcd4a1dd04f47c7ca7c7c72aae0b3abe906`。连续两次 `--rerun-tasks` 输出哈希一致。
 
 ## 仍未验收
