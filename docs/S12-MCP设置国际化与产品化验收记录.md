@@ -2,7 +2,7 @@
 
 > 日期：2026-08-12
 > 分支：`codex/s12-productization`
-> 状态：本地统一自动门通过；签名发布、远端矩阵与副屏实机待最终收口
+> 状态：本地统一自动门与远端矩阵通过；签名发布和副屏实机待最终收口
 
 ## 已验证实现
 
@@ -32,9 +32,10 @@ go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
 - 2026.2 首轮门禁发现 `PluginManagerCore` 内部 API 与 `SimpleListCellRenderer.create` 计划移除 API；已分别改为构建期版本资源和公开 renderer 子类，复跑后两项均归零。
 - ZIP：`3fc63e37b3b57158a6abfb699911d2d1d487aae5953cd6f94183ce4200c16a04`；包内只有插件 JAR，JAR 含 LICENSE、NOTICE、明暗图标、中英文资源和与 Gradle 版本同源的 MCP 版本资源，不含独立第三方运行时 JAR。
 - CycloneDX JSON：`e16f1b2b86b2c0ea5dd1c08cc15a41820ebe3057c336d2a4dc12df75ff951903`；XML：`b32e0ec1b0058caba09147d310e5ebcd4a1dd04f47c7ca7c7c72aae0b3abe906`。连续两次 `--rerun-tasks` 输出哈希一致。
+- GitHub Actions [持续集成 #31566640300](https://github.com/ns3154/mybatis-idea-assistant/actions/runs/31566640300) 全绿，远端重新执行双 Maven 语料、634 个平台测试、覆盖率、项目/插件结构、最低 2026.1 GA Verifier，并上传 ZIP 与验证报告。
+- GitHub Actions [兼容矩阵 #31566645932](https://github.com/ns3154/mybatis-idea-assistant/actions/runs/31566645932) 的 IntelliJ IDEA 2026.1、2026.2 与 Android Studio 2026.1.2.10 三个作业全部通过。
 
 ## 仍未验收
 
 - 当前未提供 `CERTIFICATE_CHAIN`、`PRIVATE_KEY`、`PRIVATE_KEY_PASSWORD` 和 `PUBLISH_TOKEN`，因此只验证了失败关闭配置，没有生成真实签名包或发布 Marketplace。
 - 按用户要求不占用主屏；当前无副屏，未运行 `runIde`、IDE 生命周期脚本、真实 MCP 客户端、设置页、安装、升级、降级、禁用和卸载验收。
-- 本批仍需运行远端 CI 和兼容矩阵；这些证据未写入本记录前，S12 保持“部分完成”。

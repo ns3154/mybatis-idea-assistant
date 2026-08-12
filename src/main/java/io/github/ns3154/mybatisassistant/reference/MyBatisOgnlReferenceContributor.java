@@ -31,7 +31,7 @@ public final class MyBatisOgnlReferenceContributor extends PsiReferenceContribut
 
     private static final class Provider extends PsiReferenceProvider {
         @Override
-        public PsiReference @NotNull [] getReferencesByElement(
+        public @NotNull PsiReference[] getReferencesByElement(
                 @NotNull PsiElement element,
                 @NotNull ProcessingContext context) {
             ProgressManager.checkCanceled();

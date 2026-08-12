@@ -42,7 +42,7 @@ public final class MyBatisParamRenameHandler implements RenameHandler {
     @Override
     public void invoke(
             @NotNull Project project,
-            PsiElement @NotNull [] elements,
+            @NotNull PsiElement[] elements,
             DataContext dataContext) {
         if (elements.length == 1
                 && elements[0] instanceof PsiLiteralExpression literal

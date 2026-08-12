@@ -24,7 +24,7 @@ public final class MyBatisParameterReference extends PsiPolyVariantReferenceBase
     }
 
     @Override
-    public ResolveResult @NotNull [] multiResolve(boolean incompleteCode) {
+    public @NotNull ResolveResult[] multiResolve(boolean incompleteCode) {
         ProgressManager.checkCanceled();
         MyBatisParameterPathResolution resolution = resolution();
         return resolution.targets().stream()
@@ -42,7 +42,7 @@ public final class MyBatisParameterReference extends PsiPolyVariantReferenceBase
     }
 
     @Override
-    public Object @NotNull [] getVariants() {
+    public @NotNull Object[] getVariants() {
         ProgressManager.checkCanceled();
         return resolution().variants().stream()
                 .map(LookupElementBuilder::create)

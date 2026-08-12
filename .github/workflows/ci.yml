@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build-test-verify:
     name: 构建、测试与兼容验证
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
 
     steps:

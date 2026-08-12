@@ -17,7 +17,7 @@ public final class MyBatisOgnlPsiElement extends ASTWrapperPsiElement
     }
 
     @Override
-    public PsiReference @NotNull [] getReferences() {
+    public @NotNull PsiReference[] getReferences() {
         return PsiReferenceService.getService().getContributedReferences(this);
     }
 }

@@ -30,7 +30,7 @@ public final class MyBatisXmlSymbolRenameProcessor extends RenamePsiElementProce
     public void renameElement(
             @NotNull PsiElement element,
             @NotNull String newName,
-            UsageInfo @NotNull [] usages,
+            @NotNull UsageInfo[] usages,
             RefactoringElementListener listener) throws IncorrectOperationException {
         XmlTag tag = declarationTag(element);
         if (tag == null) {

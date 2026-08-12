@@ -9,7 +9,6 @@ import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -26,6 +25,7 @@ import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationEngine;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationPlan;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationPlanner;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationRequest;
+import io.github.ns3154.mybatisassistant.util.MyBatisReadActionSupport;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -77,7 +77,7 @@ public final class MyBatisDatabaseGenerateAction extends AnAction {
         try {
             MyBatisGenerationPlan plan = ProgressManager.getInstance()
                     .runProcessWithProgressSynchronously(
-                            () -> ReadAction.computeCancellable(() -> buildPlan(
+                            () -> MyBatisReadActionSupport.compute(() -> buildPlan(
                                     project, projectRoot, selected, configuration)),
                             MyBatisAssistantBundle.message("database.generation.progress"),
                             true,
@@ -123,7 +123,7 @@ public final class MyBatisDatabaseGenerateAction extends AnAction {
     private static @NotNull MyBatisGenerationPlan buildPlan(
             @NotNull Project project,
             @NotNull VirtualFile projectRoot,
-            DbTable @NotNull [] selected,
+            @NotNull DbTable[] selected,
             @NotNull MyBatisGenerationConfiguration configuration) {
         ProgressIndicator indicator = ProgressManager.getInstance().getProgressIndicator();
         if (indicator == null) {
@@ -149,7 +149,7 @@ public final class MyBatisDatabaseGenerateAction extends AnAction {
         return MyBatisGenerationPlanner.plan(project, projectRoot, bundles);
     }
 
-    private static DbTable @NotNull [] selectedTables(@NotNull AnActionEvent event) {
+    private static @NotNull DbTable[] selectedTables(@NotNull AnActionEvent event) {
         DbElement[] elements = event.getData(DatabaseView.DB_ELEMENTS);
         if (elements == null || elements.length == 0
                 || Arrays.stream(elements).anyMatch(element -> !(element instanceof DbTable))) {

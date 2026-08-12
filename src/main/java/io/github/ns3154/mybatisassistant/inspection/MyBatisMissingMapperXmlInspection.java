@@ -92,7 +92,7 @@ public final class MyBatisMissingMapperXmlInspection
         return false;
     }
 
-    private static LocalQuickFix @NotNull [] quickFixes(
+    private static @NotNull LocalQuickFix[] quickFixes(
             @NotNull PsiClass mapper,
             @NotNull String namespace) {
         Module module = ModuleUtilCore.findModuleForPsiElement(mapper);

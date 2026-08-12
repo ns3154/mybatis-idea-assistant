@@ -4,7 +4,6 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
@@ -18,6 +17,7 @@ import io.github.ns3154.mybatisassistant.sqltool.testgen.MyBatisJUnitPlatform;
 import io.github.ns3154.mybatisassistant.sqltool.testgen.MyBatisMapperTestGeneration;
 import io.github.ns3154.mybatisassistant.sqltool.testgen.MyBatisMapperTestRequestFactory;
 import io.github.ns3154.mybatisassistant.sqltool.testgen.MyBatisMapperTestSkeletonGenerator;
+import io.github.ns3154.mybatisassistant.util.MyBatisReadActionSupport;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -57,7 +57,7 @@ public final class MyBatisMapperJUnitSkeletonAction extends AnAction {
         MyBatisJUnitPlatform platform = platformDialog.selectedPlatform();
         MyBatisMapperTestRequestFactory.Result extracted = ProgressManager.getInstance()
                 .runProcessWithProgressSynchronously(
-                        () -> ReadAction.computeCancellable(
+                        () -> MyBatisReadActionSupport.compute(
                                 () -> MyBatisMapperTestRequestFactory.create(method, platform)),
                         MyBatisAssistantBundle.message("sqltool.junit.progress"),
                         true,

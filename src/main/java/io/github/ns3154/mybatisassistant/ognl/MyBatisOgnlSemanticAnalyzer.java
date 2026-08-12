@@ -632,7 +632,7 @@ public final class MyBatisOgnlSemanticAnalyzer {
 
     private record DecodedOgnl(
             @NotNull String text,
-            int @NotNull [] decodedBoundaries) {
+            @NotNull int[] decodedBoundaries) {
         private DecodedOgnl {
             decodedBoundaries = decodedBoundaries.clone();
             if (decodedBoundaries.length != text.length() + 1) {

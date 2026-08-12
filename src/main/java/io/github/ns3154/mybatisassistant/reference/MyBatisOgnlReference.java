@@ -38,7 +38,7 @@ public final class MyBatisOgnlReference extends PsiPolyVariantReferenceBase<PsiE
     }
 
     @Override
-    public ResolveResult @NotNull [] multiResolve(boolean incompleteCode) {
+    public @NotNull ResolveResult[] multiResolve(boolean incompleteCode) {
         ProgressManager.checkCanceled();
         return occurrence.result().targets().stream()
                 .filter(PsiElement::isValid)
@@ -56,7 +56,7 @@ public final class MyBatisOgnlReference extends PsiPolyVariantReferenceBase<PsiE
     }
 
     @Override
-    public Object @NotNull [] getVariants() {
+    public @NotNull Object[] getVariants() {
         ProgressManager.checkCanceled();
         return occurrence.result().variants().stream()
                 .map(LookupElementBuilder::create)

@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify-compatibility:
     name: 验证 ${{ matrix.product_name }} ${{ matrix.ide_version }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     concurrency:
       group: ${{ github.workflow }}-${{ matrix.product }}-${{ matrix.ide_version }}
@@ -22,10 +22,16 @@ jobs:
         include:
           - product: idea
             product_name: IntelliJ IDEA
-            ide_version: "2026.1"
+            ide_version: "2025.2.6.2"
           - product: idea
             product_name: IntelliJ IDEA
-            ide_version: "2026.2"
+            ide_version: "2025.3.6"
+          - product: idea
+            product_name: IntelliJ IDEA
+            ide_version: "2026.1.4"
+          - product: idea
+            product_name: IntelliJ IDEA
+            ide_version: "2026.2.0.1"
           - product: android-studio
             product_name: Android Studio
             ide_version: "2026.1.2.10"

@@ -30,7 +30,7 @@ public final class MyBatisKotlinReferenceContributor extends PsiReferenceContrib
 
     private static final class AnnotationParameterReferenceProvider extends PsiReferenceProvider {
         @Override
-        public PsiReference @NotNull [] getReferencesByElement(
+        public @NotNull PsiReference[] getReferencesByElement(
                 @NotNull PsiElement element,
                 @NotNull ProcessingContext context) {
             ProgressManager.checkCanceled();

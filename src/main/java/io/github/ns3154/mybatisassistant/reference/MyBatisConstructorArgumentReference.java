@@ -16,7 +16,7 @@ public final class MyBatisConstructorArgumentReference
     }
 
     @Override
-    public ResolveResult @NotNull [] multiResolve(boolean incompleteCode) {
+    public @NotNull ResolveResult[] multiResolve(boolean incompleteCode) {
         ProgressManager.checkCanceled();
         return resolution().targets().stream()
                 .filter(PsiParameter.class::isInstance)
@@ -25,7 +25,7 @@ public final class MyBatisConstructorArgumentReference
     }
 
     @Override
-    public Object @NotNull [] getVariants() {
+    public @NotNull Object[] getVariants() {
         return resolution().variants().stream()
                 .map(LookupElementBuilder::create)
                 .toArray();

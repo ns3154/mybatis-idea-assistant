@@ -5,11 +5,17 @@ set -euo pipefail
 readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly CYCLE_COUNT="${1:-20}"
 readonly REPORT_DIR="${PROJECT_ROOT}/build/reports/lifecycle"
-readonly SANDBOX_LOG="${PROJECT_ROOT}/build/idea-sandbox/mybatis-idea-assistant/IU-2026.1.4/log/idea.log"
+readonly PLATFORM_VERSION="$(sed -n 's/^platformVersion=//p' "${PROJECT_ROOT}/gradle.properties")"
+readonly SANDBOX_ROOT="${PROJECT_ROOT}/build/idea-sandbox/mybatis-idea-assistant/IU-${PLATFORM_VERSION}"
+readonly SANDBOX_LOG="${SANDBOX_ROOT}/log/idea.log"
 readonly SUMMARY_FILE="${REPORT_DIR}/sandbox-lifecycle.tsv"
 
 if ! [[ "${CYCLE_COUNT}" =~ ^[1-9][0-9]*$ ]]; then
     echo "循环次数必须是正整数：${CYCLE_COUNT}" >&2
+    exit 2
+fi
+if [[ -z "${PLATFORM_VERSION}" ]]; then
+    echo "gradle.properties 缺少 platformVersion" >&2
     exit 2
 fi
 

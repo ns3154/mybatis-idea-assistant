@@ -4,7 +4,6 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
@@ -18,6 +17,7 @@ import io.github.ns3154.mybatisassistant.sqltool.conversion.MyBatisJavaDdlGenera
 import io.github.ns3154.mybatisassistant.sqltool.conversion.MyBatisJavaDdlGenerator;
 import io.github.ns3154.mybatisassistant.sqltool.conversion.MyBatisJavaTableExtractionResult;
 import io.github.ns3154.mybatisassistant.sqltool.conversion.MyBatisJavaTableExtractor;
+import io.github.ns3154.mybatisassistant.util.MyBatisReadActionSupport;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -55,7 +55,7 @@ public final class MyBatisJavaToDdlAction extends AnAction {
             return;
         }
         Preview preview = ProgressManager.getInstance().runProcessWithProgressSynchronously(
-                () -> ReadAction.computeCancellable(
+                () -> MyBatisReadActionSupport.compute(
                         () -> buildPreview(source, dialectDialog.selectedDialect())),
                 MyBatisAssistantBundle.message("sqltool.java.ddl.progress"),
                 true,

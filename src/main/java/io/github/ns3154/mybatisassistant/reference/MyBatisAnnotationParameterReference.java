@@ -29,7 +29,7 @@ public final class MyBatisAnnotationParameterReference
     }
 
     @Override
-    public ResolveResult @NotNull [] multiResolve(boolean incompleteCode) {
+    public @NotNull ResolveResult[] multiResolve(boolean incompleteCode) {
         ProgressManager.checkCanceled();
         return resolution().targets().stream()
                 .map(PsiElementResolveResult::new)
@@ -44,7 +44,7 @@ public final class MyBatisAnnotationParameterReference
     }
 
     @Override
-    public Object @NotNull [] getVariants() {
+    public @NotNull Object[] getVariants() {
         ProgressManager.checkCanceled();
         return resolution().variants().stream()
                 .map(LookupElementBuilder::create)

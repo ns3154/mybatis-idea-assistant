@@ -6,7 +6,6 @@ import com.intellij.database.view.DatabaseView;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -25,6 +24,7 @@ import io.github.ns3154.mybatisassistant.methodsql.MyBatisJoinSqlGenerator;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisJoinType;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodField;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodSchema;
+import io.github.ns3154.mybatisassistant.util.MyBatisReadActionSupport;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -68,7 +68,7 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
         }
         try {
             JoinModel model = ProgressManager.getInstance().runProcessWithProgressSynchronously(
-                    () -> ReadAction.computeCancellable(() -> loadModel(
+                    () -> MyBatisReadActionSupport.compute(() -> loadModel(
                             tables, options.configuration())),
                     MyBatisAssistantBundle.message("database.join.progress.metadata"),
                     true,
@@ -182,7 +182,7 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
     }
 
     private static @NotNull JoinModel loadModel(
-            DbTable @NotNull [] tables,
+            @NotNull DbTable[] tables,
             @NotNull MyBatisGenerationConfiguration configuration) {
         ProgressIndicator indicator = ProgressManager.getInstance().getProgressIndicator();
         if (indicator == null) {
@@ -295,7 +295,7 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
         };
     }
 
-    private static DbTable @NotNull [] selectedTables(@NotNull AnActionEvent event) {
+    private static @NotNull DbTable[] selectedTables(@NotNull AnActionEvent event) {
         DbElement[] elements = event.getData(DatabaseView.DB_ELEMENTS);
         if (elements == null || elements.length == 0
                 || Arrays.stream(elements).anyMatch(element -> !(element instanceof DbTable))) {
@@ -304,7 +304,7 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
         return Arrays.stream(elements).map(DbTable.class::cast).toArray(DbTable[]::new);
     }
 
-    private static boolean validSelection(DbTable @NotNull [] tables) {
+    private static boolean validSelection(@NotNull DbTable[] tables) {
         return tables.length == 2
                 && Arrays.stream(tables).allMatch(table -> table.isValid()
                         && !table.getDataSource().isLoading())

@@ -18,3 +18,6 @@
 - 增加默认关闭的回环 MCP 服务、随机内存令牌、严格传输校验、有界只读工具与 preview→confirm 受控写工具。
 - 增加明暗插件图标、隐私说明、NOTICE、第三方组件清单和发布升级/回滚手册。
 - 增加可复现 CycloneDX 1.6 SBOM、CI secret 注入的插件签名和显式 Marketplace 发布工作流。
+- 将最低编译 SDK 下调到 IntelliJ IDEA 2025.2.6.2，并建立 2025.2、2025.3、2026.1、2026.2 四个稳定大版本兼容矩阵。
+- 增加 Linux、macOS、Windows 三系统无界面回归，以及 100 万行、2000 Mapper、10000 statement 性能压力门。
+- 修复 MCP statement 预览在 Undo 后可能读取陈旧 PSI 范围的问题，并增加 CodeQL Java/Kotlin 安全扫描。

@@ -365,19 +365,8 @@ final class MyBatisMcpWriteTools {
                             ? "mcp.error.mapper.xml.not.found"
                             : "mcp.error.mapper.xml.ambiguous"));
         }
-        XmlTag root = roots.getFirst();
-        for (XmlTag child : root.getSubTags()) {
-            ProgressManager.checkCanceled();
-            if (MyBatisXmlModel.isStatement(child)
-                    && statementId.equals(MyBatisXmlModel.statementId(child))) {
-                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
-                        "mcp.error.statement.exists", statementId));
-            }
-        }
-        VirtualFile file = root.getContainingFile().getVirtualFile();
-        String closingMarkup = "</" + root.getName();
-        int closingOffsetInRoot = root.getText().lastIndexOf(closingMarkup);
-        if (closingOffsetInRoot < 0 || file == null || !file.isWritable()) {
+        VirtualFile file = roots.getFirst().getContainingFile().getVirtualFile();
+        if (file == null || !file.isWritable()) {
             throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
                     "mcp.error.mapper.xml.incomplete.or.readonly"));
         }
@@ -387,6 +376,30 @@ final class MyBatisMcpWriteTools {
                     "mcp.error.mapper.xml.document.unavailable"));
         }
         String original = document.getText();
+        XmlFile current = (XmlFile) PsiFileFactory.getInstance(project).createFileFromText(
+                "McpStatementSource.xml", XmlFileType.INSTANCE, original);
+        XmlTag root = current.getRootTag();
+        if (root == null
+                || PsiTreeUtil.hasErrorElements(current)
+                || !MyBatisXmlModel.isMapperRoot(root)
+                || !namespace.equals(MyBatisXmlModel.namespace(root))) {
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.mapper.xml.incomplete.or.readonly"));
+        }
+        for (XmlTag child : root.getSubTags()) {
+            ProgressManager.checkCanceled();
+            if (MyBatisXmlModel.isStatement(child)
+                    && statementId.equals(MyBatisXmlModel.statementId(child))) {
+                throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                        "mcp.error.statement.exists", statementId));
+            }
+        }
+        String closingMarkup = "</" + root.getName();
+        int closingOffsetInRoot = root.getText().lastIndexOf(closingMarkup);
+        if (closingOffsetInRoot < 0) {
+            throw new MyBatisMcpToolException(MyBatisAssistantBundle.message(
+                    "mcp.error.mapper.xml.incomplete.or.readonly"));
+        }
         String lineSeparator = original.contains("\r\n") ? "\r\n" : "\n";
         int offset = root.getTextRange().getStartOffset() + closingOffsetInRoot;
         String escapedId = StringUtil.escapeXmlEntities(statementId);

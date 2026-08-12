@@ -31,7 +31,7 @@ public final class MyBatisOgnlBindingRenameProcessor extends RenamePsiElementPro
     public void renameElement(
             @NotNull PsiElement element,
             @NotNull String newName,
-            UsageInfo @NotNull [] usages,
+            @NotNull UsageInfo[] usages,
             RefactoringElementListener listener) throws IncorrectOperationException {
         Declaration declaration = declaration(element);
         if (declaration == null || !element.isValid()) {

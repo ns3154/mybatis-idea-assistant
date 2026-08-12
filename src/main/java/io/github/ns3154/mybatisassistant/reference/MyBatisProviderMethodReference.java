@@ -27,7 +27,7 @@ final class MyBatisProviderMethodReference extends PsiPolyVariantReferenceBase<P
     }
 
     @Override
-    public ResolveResult @NotNull [] multiResolve(boolean incompleteCode) {
+    public @NotNull ResolveResult[] multiResolve(boolean incompleteCode) {
         ProgressManager.checkCanceled();
         if (!getElement().isValid() || !providerAnnotation.isValid()) {
             return ResolveResult.EMPTY_ARRAY;

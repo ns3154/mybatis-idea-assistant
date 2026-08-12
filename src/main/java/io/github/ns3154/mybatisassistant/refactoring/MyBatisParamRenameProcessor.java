@@ -30,7 +30,7 @@ public final class MyBatisParamRenameProcessor extends RenamePsiElementProcessor
     public void renameElement(
             @NotNull PsiElement element,
             @NotNull String newName,
-            UsageInfo @NotNull [] usages,
+            @NotNull UsageInfo[] usages,
             RefactoringElementListener listener) throws IncorrectOperationException {
         PsiLiteralExpression literal = (PsiLiteralExpression) element;
         for (UsageInfo usage : usages) {

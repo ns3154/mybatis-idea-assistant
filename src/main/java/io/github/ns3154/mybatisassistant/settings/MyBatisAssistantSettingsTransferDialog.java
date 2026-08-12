@@ -75,7 +75,7 @@ final class MyBatisAssistantSettingsTransferDialog extends DialogWrapper {
     }
 
     @Override
-    protected Action @NotNull [] createActions() {
+    protected @NotNull Action[] createActions() {
         return importMode
                 ? super.createActions()
                 : new Action[]{getOKAction()};

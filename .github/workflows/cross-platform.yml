@@ -1,0 +1,66 @@
+name: 三系统无界面回归
+
+on:
+  schedule:
+    - cron: "41 3 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  headless-regression:
+    name: ${{ matrix.system_name }} 自动化回归
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system_name: Linux
+            runner: ubuntu-24.04
+            gradle: ./gradlew
+          - system_name: macOS
+            runner: macos-15
+            gradle: ./gradlew
+          - system_name: Windows
+            runner: windows-2025
+            gradle: ./gradlew.bat
+
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: 配置 Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: zulu
+          java-version: 21
+
+      - name: 配置 Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+
+      - name: 验证 Java 与完整语义语料
+        run: |
+          mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
+          mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
+
+      - name: 运行无界面质量门
+        run: ${{ matrix.gradle }} check verifyPluginProjectConfiguration verifyPluginStructure
+
+      - name: 上传三系统验证报告
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: cross-platform-reports-${{ matrix.system_name }}
+          path: |
+            build/reports/tests/
+            build/reports/checkstyle/
+            build/reports/jacoco/
+            build/reports/problems/
+            samples/**/target/surefire-reports/
+          if-no-files-found: ignore

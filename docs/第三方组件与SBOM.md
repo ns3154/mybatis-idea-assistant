@@ -10,7 +10,7 @@
 
 | 类别 | 组件 | 用途 | 是否进入插件 ZIP |
 |---|---|---|---|
-| 宿主平台 | IntelliJ Platform 2026.1.4 与内置插件 API | 编译、平台测试和运行宿主 | 否 |
+| 宿主平台 | IntelliJ Platform 2025.2.6.2 与内置插件 API | 最低 SDK 编译、平台测试和运行宿主 | 否 |
 | 构建 | Gradle Wrapper 9.3、IntelliJ Platform Gradle Plugin 2.18.1 | 编译、验证、打包、签名和发布 | 否 |
 | 构建审计 | CycloneDX Gradle Plugin 3.4.1 | 生成 CycloneDX 1.6 SBOM | 否 |
 | 质量 | Checkstyle 13.10.0、JaCoCo 0.8.15 | 静态检查与覆盖率 | 否 |

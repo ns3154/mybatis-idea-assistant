@@ -19,7 +19,7 @@ public final class MyBatisAssistantBundle extends DynamicBundle {
 
     public static @NotNull String message(
             @PropertyKey(resourceBundle = BUNDLE) @NotNull String key,
-            Object @NotNull ... params) {
+            @NotNull Object... params) {
         var application = ApplicationManager.getApplication();
         if (application != null && !application.isDisposed()) {
             String configuredLocale = MyBatisAssistantSettings.getInstance().getUiLocale();

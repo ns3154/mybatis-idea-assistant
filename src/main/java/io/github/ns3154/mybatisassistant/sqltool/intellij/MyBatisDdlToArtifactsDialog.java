@@ -73,7 +73,7 @@ final class MyBatisDdlToArtifactsDialog extends DialogWrapper {
     }
 
     @Override
-    protected Action @NotNull [] createActions() {
+    protected @NotNull Action[] createActions() {
         return new Action[]{convertAction, getCancelAction()};
     }
 

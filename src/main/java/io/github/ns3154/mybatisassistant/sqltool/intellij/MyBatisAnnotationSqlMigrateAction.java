@@ -3,7 +3,6 @@ package io.github.ns3154.mybatisassistant.sqltool.intellij;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
@@ -17,6 +16,7 @@ import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationCommandExecu
 import io.github.ns3154.mybatisassistant.model.MyBatisAnnotationModel;
 import io.github.ns3154.mybatisassistant.model.MyBatisStatementSourceKind;
 import io.github.ns3154.mybatisassistant.sqltool.annotation.MyBatisAnnotationSqlMigrationPlanner;
+import io.github.ns3154.mybatisassistant.util.MyBatisReadActionSupport;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -67,7 +67,7 @@ public final class MyBatisAnnotationSqlMigrateAction extends AnAction {
         PsiDocumentManager.getInstance(project).commitAllDocuments();
         MyBatisAnnotationSqlMigrationPlanner.Result result = ProgressManager.getInstance()
                 .runProcessWithProgressSynchronously(
-                        () -> ReadAction.computeCancellable(
+                        () -> MyBatisReadActionSupport.compute(
                                 () -> MyBatisAnnotationSqlMigrationPlanner.plan(
                                         method,
                                         projectRoot)),

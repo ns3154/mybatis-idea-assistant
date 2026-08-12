@@ -41,7 +41,7 @@ public final class MyBatisXmlReferenceContributor extends PsiReferenceContributo
 
     private static final class MapperAttributeReferenceProvider extends PsiReferenceProvider {
         @Override
-        public PsiReference @NotNull [] getReferencesByElement(
+        public @NotNull PsiReference[] getReferencesByElement(
                 @NotNull com.intellij.psi.PsiElement element,
                 @NotNull ProcessingContext context) {
             ProgressManager.checkCanceled();
@@ -51,7 +51,7 @@ public final class MyBatisXmlReferenceContributor extends PsiReferenceContributo
             return createReferences(value);
         }
 
-        private static PsiReference @NotNull [] createReferences(
+        private static @NotNull PsiReference[] createReferences(
                 @NotNull XmlAttributeValue value) {
             XmlAttribute namespaceAttribute = MyBatisReferenceSupport.exactAttribute(
                     value,
@@ -230,7 +230,7 @@ public final class MyBatisXmlReferenceContributor extends PsiReferenceContributo
             return List.copyOf(references);
         }
 
-        private static PsiReference @NotNull [] resultMapReferences(
+        private static @NotNull PsiReference[] resultMapReferences(
                 @NotNull XmlAttributeValue value,
                 @NotNull String namespace) {
             String rawValue = value.getValue();
@@ -272,7 +272,7 @@ public final class MyBatisXmlReferenceContributor extends PsiReferenceContributo
 
     private static final class MapperTextReferenceProvider extends PsiReferenceProvider {
         @Override
-        public PsiReference @NotNull [] getReferencesByElement(
+        public @NotNull PsiReference[] getReferencesByElement(
                 @NotNull com.intellij.psi.PsiElement element,
                 @NotNull ProcessingContext context) {
             ProgressManager.checkCanceled();

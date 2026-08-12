@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
+import com.intellij.openapi.diagnostic.Logger;
 import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -22,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 有界 JSON-RPC MCP 协议处理器；不持有访问令牌。
  */
 final class MyBatisMcpProtocolHandler implements AutoCloseable {
+    private static final Logger LOG = Logger.getInstance(MyBatisMcpProtocolHandler.class);
     private static final String VERSION_RESOURCE =
             "/META-INF/mybatis-assistant-version.properties";
     static final String PROTOCOL_VERSION = "2025-06-18";
@@ -149,6 +151,7 @@ final class MyBatisMcpProtocolHandler implements AutoCloseable {
         } catch (MyBatisMcpToolException failure) {
             return toolError(id, failure.getMessage());
         } catch (RuntimeException failure) {
+            LOG.warn("MCP tool invocation stopped safely", failure);
             return toolError(id, MyBatisAssistantBundle.message(
                     "mcp.error.tool.stopped"));
         }

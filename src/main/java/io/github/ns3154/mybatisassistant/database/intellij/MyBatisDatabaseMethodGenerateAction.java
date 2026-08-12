@@ -9,7 +9,6 @@ import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -36,6 +35,7 @@ import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodNameParser;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodParseResult;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodQuery;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodSchema;
+import io.github.ns3154.mybatisassistant.util.MyBatisReadActionSupport;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodSqlGenerator;
 import org.jetbrains.annotations.NotNull;
 
@@ -95,7 +95,7 @@ public final class MyBatisDatabaseMethodGenerateAction extends AnAction {
             requireTargets(configuration);
             MyBatisGenerationPlan plan = ProgressManager.getInstance()
                     .runProcessWithProgressSynchronously(
-                            () -> ReadAction.computeCancellable(() -> {
+                            () -> MyBatisReadActionSupport.compute(() -> {
                                 ProgressIndicator indicator = ProgressManager.getInstance()
                                         .getProgressIndicator();
                                 if (indicator == null) {
@@ -201,7 +201,7 @@ public final class MyBatisDatabaseMethodGenerateAction extends AnAction {
         }
     }
 
-    private static DbTable @NotNull [] selectedTables(@NotNull AnActionEvent event) {
+    private static @NotNull DbTable[] selectedTables(@NotNull AnActionEvent event) {
         DbElement[] elements = event.getData(DatabaseView.DB_ELEMENTS);
         if (elements == null || elements.length == 0
                 || Arrays.stream(elements).anyMatch(element -> !(element instanceof DbTable))) {

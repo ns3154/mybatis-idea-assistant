@@ -20,7 +20,7 @@ final class MyBatisNamespaceReference extends PsiPolyVariantReferenceBase<XmlAtt
     }
 
     @Override
-    public ResolveResult @NotNull [] multiResolve(boolean incompleteCode) {
+    public @NotNull ResolveResult[] multiResolve(boolean incompleteCode) {
         ProgressManager.checkCanceled();
         if (!getElement().isValid()) {
             return ResolveResult.EMPTY_ARRAY;

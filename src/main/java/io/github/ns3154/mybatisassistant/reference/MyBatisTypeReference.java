@@ -33,7 +33,7 @@ public final class MyBatisTypeReference extends PsiPolyVariantReferenceBase<XmlA
     }
 
     @Override
-    public ResolveResult @NotNull [] multiResolve(boolean incompleteCode) {
+    public @NotNull ResolveResult[] multiResolve(boolean incompleteCode) {
         ProgressManager.checkCanceled();
         return resolveType().targets().stream()
                 .map(PsiElementResolveResult::new)
@@ -58,7 +58,7 @@ public final class MyBatisTypeReference extends PsiPolyVariantReferenceBase<XmlA
     }
 
     @Override
-    public Object @NotNull [] getVariants() {
+    public @NotNull Object[] getVariants() {
         ProgressManager.checkCanceled();
         return MyBatisTypeAliasResolver.variants(getElement()).stream()
                 .map(LookupElementBuilder::create)

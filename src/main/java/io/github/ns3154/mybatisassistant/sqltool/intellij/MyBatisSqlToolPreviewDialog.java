@@ -41,7 +41,7 @@ final class MyBatisSqlToolPreviewDialog extends DialogWrapper {
     }
 
     @Override
-    protected Action @NotNull [] createActions() {
+    protected @NotNull Action[] createActions() {
         return new Action[]{getOKAction()};
     }
 }

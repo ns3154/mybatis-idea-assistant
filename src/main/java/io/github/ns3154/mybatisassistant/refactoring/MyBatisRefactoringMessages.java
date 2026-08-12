@@ -10,7 +10,7 @@ final class MyBatisRefactoringMessages {
     private MyBatisRefactoringMessages() {
     }
 
-    static @NotNull String message(@NotNull String key, Object @NotNull ... params) {
+    static @NotNull String message(@NotNull String key, @NotNull Object... params) {
         return MyBatisAssistantBundle.message(key, params);
     }
 }

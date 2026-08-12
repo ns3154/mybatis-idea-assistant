@@ -3,7 +3,8 @@
 set -euo pipefail
 
 readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-readonly SANDBOX_ROOT="${PROJECT_ROOT}/build/idea-sandbox/mybatis-idea-assistant/IU-2026.1.4"
+readonly PLATFORM_VERSION="$(sed -n 's/^platformVersion=//p' "${PROJECT_ROOT}/gradle.properties")"
+readonly SANDBOX_ROOT="${PROJECT_ROOT}/build/idea-sandbox/mybatis-idea-assistant/IU-${PLATFORM_VERSION}"
 readonly SANDBOX_LOG="${SANDBOX_ROOT}/log/idea.log"
 readonly DISABLED_PLUGINS_FILE="${SANDBOX_ROOT}/config/disabled_plugins.txt"
 readonly REPORT_DIR="${PROJECT_ROOT}/build/reports/optional-dependency-isolation"
@@ -24,6 +25,11 @@ readonly CASE_PLUGIN_IDS=(
     "com.intellij.database"
     "org.jetbrains.kotlin,com.intellij.spring,org.jetbrains.plugins.yaml,com.intellij.database"
 )
+
+if [[ -z "${PLATFORM_VERSION}" ]]; then
+    echo "gradle.properties 缺少 platformVersion" >&2
+    exit 2
+fi
 
 mkdir -p "${REPORT_DIR}"
 

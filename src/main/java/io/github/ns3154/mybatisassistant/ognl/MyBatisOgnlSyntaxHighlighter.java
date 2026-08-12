@@ -56,7 +56,7 @@ public final class MyBatisOgnlSyntaxHighlighter extends SyntaxHighlighterBase {
     }
 
     @Override
-    public TextAttributesKey @NotNull [] getTokenHighlights(IElementType tokenType) {
+    public @NotNull TextAttributesKey[] getTokenHighlights(IElementType tokenType) {
         if (KEYWORDS.contains(tokenType)) {
             return pack(DefaultLanguageHighlighterColors.KEYWORD);
         }

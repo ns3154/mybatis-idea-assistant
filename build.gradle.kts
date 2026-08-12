@@ -27,7 +27,10 @@ val configuredPluginVersion = providers.gradleProperty("pluginVersion")
     .orElse("0.1.0-SNAPSHOT")
 version = configuredPluginVersion.get()
 
-val pluginVerifierIdeVersion = providers.gradleProperty("pluginVerifierIdeVersion").orElse("2026.1")
+val configuredPlatformVersion = providers.gradleProperty("platformVersion").orElse("2025.2.6.2")
+val configuredSinceBuild = providers.gradleProperty("pluginSinceBuild").orElse("252")
+val pluginVerifierIdeVersion = providers.gradleProperty("pluginVerifierIdeVersion")
+    .orElse("2025.2.6.2")
 val pluginVerifierProduct = providers.gradleProperty("pluginVerifierProduct").orElse("idea")
 
 java {
@@ -56,7 +59,13 @@ dependencies {
     testImplementation("com.h2database:h2:2.3.232")
 
     intellijPlatform {
-        intellijIdea("2026.1.4")
+        val platformVersion = configuredPlatformVersion.get()
+        val platformType = if (platformVersion.startsWith("2025.2")) {
+            IntelliJPlatformType.IntellijIdeaUltimate
+        } else {
+            IntelliJPlatformType.IntellijIdea
+        }
+        create(platformType, configuredPlatformVersion)
         bundledPlugin("com.intellij.java")
         bundledPlugin("com.intellij.database")
         bundledPlugin("org.jetbrains.kotlin")
@@ -83,7 +92,7 @@ intellijPlatform {
         """.trimIndent()
 
         ideaVersion {
-            sinceBuild = "261"
+            sinceBuild = configuredSinceBuild
             // 官方建议 243 及以上不再限制 until-build，避免 IDE 小版本升级后无法安装。
             untilBuild = provider { null }
         }

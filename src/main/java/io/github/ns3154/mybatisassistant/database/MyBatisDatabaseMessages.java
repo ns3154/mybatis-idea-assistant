@@ -10,7 +10,7 @@ public final class MyBatisDatabaseMessages {
     private MyBatisDatabaseMessages() {
     }
 
-    public static @NotNull String message(@NotNull String key, Object @NotNull ... params) {
+    public static @NotNull String message(@NotNull String key, @NotNull Object... params) {
         return MyBatisAssistantBundle.message(key, params);
     }
 }

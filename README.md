@@ -2,7 +2,7 @@
 
 面向 IntelliJ IDEA 的 MyBatis 智能开发助手，采用独立实现路线开发。
 
-当前处于 `0.1.0-SNAPSHOT` 发布候选开发阶段：S0～S11 已形成阶段实现与验收记录，S12 正在收口设置、默认关闭的本地 MCP、国际化、隐私、SBOM、签名和发布链路。正式交付仍以统一质量门、支持矩阵及副屏实机安装/升级/卸载证据为准。
+当前处于 `0.1.0-SNAPSHOT` 发布候选开发阶段：S0～S12 已形成阶段实现与验收记录，S13 正在收口最近四个稳定 IDE 大版本、三系统、百万行性能、生命周期、签名和正式发布链路。正式交付仍以统一质量门、支持矩阵及副屏/独立测试机的实机安装、升级、降级和卸载证据为准。
 
 - 识别 Java Mapper 接口；
 - 识别 MyBatis XML 的 `namespace`；
@@ -47,7 +47,8 @@
 
 ## 开发环境
 
-- IntelliJ IDEA 2026.1 / Build 261
+- IntelliJ IDEA 2025.2.6.2 / Build 252（最低编译 SDK）
+- IntelliJ IDEA 2025.2～2026.2（交付兼容矩阵）
 - Java 21
 - Gradle 9.3 Wrapper
 - IntelliJ Platform Gradle Plugin 2.18.1
@@ -63,6 +64,8 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 ./scripts/verify-optional-dependency-isolation.sh
 ./gradlew runIde
 ```
+
+S13 正式候选需把生命周期命令提升为 `./scripts/verify-sandbox-lifecycle.sh 100`，且只在副屏或独立测试环境运行。
 
 插件 ZIP 生成在 `build/distributions/`。
 
@@ -103,6 +106,11 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 - [S11 Spring、注解、Kotlin、框架与数据库扩展任务卡](docs/S11-Spring注解Kotlin框架与数据库扩展任务卡.md)
 - [S11 Spring、注解、Kotlin、框架与数据库扩展验收记录](docs/S11-Spring注解Kotlin框架与数据库扩展验收记录.md)
 - [S12 MCP、设置、国际化与产品化任务卡](docs/S12-MCP设置国际化与产品化任务卡.md)
+- [S13 性能、可靠性、跨版本与正式交付任务卡](docs/S13-性能可靠性跨版本与正式交付任务卡.md)
+- [S13 性能、可靠性、跨版本与正式交付验收记录](docs/S13-性能可靠性跨版本与正式交付验收记录.md)
+- [安装与首次使用](docs/安装与首次使用.md)
+- [兼容矩阵](docs/兼容矩阵.md)
+- [常见问题与故障排查](docs/常见问题与故障排查.md)
 - [隐私说明](docs/隐私说明.md)
 - [第三方组件与 SBOM](docs/第三方组件与SBOM.md)
 - [发布、升级与回滚](docs/发布升级与回滚.md)
