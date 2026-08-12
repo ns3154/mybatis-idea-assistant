@@ -1,7 +1,7 @@
 # S11 Spring、注解、Kotlin、框架与数据库扩展验收记录
 
 > 日期：2026-08-12
-> 当前结论：注解 SQL、Spring 注入、Kotlin K2、框架模型与数据库兼容代码均完成本地自动化；Android Studio 远端验证、隔离和实机尚未完成
+> 当前结论：注解 SQL、Spring 注入、Kotlin K2、框架模型与数据库兼容代码均完成本地及远端自动化；隔离和实机尚未完成
 
 ## 已实现范围
 
@@ -37,12 +37,12 @@
 - 当前框架切面 GitHub Actions run `31553833658` 在 6 分 45 秒内通过两个 Maven 语料、601 个平台测试、全部覆盖率门、261 Verifier、ZIP 与报告上传。
 - 框架文档最终提交 GitHub Actions run `31554267962` 在 6 分 47 秒内通过；当前 S11-F 本地整体覆盖 12517/14962（83.66%），Community JDBC 核心 271/306（88.56%），新增 85% 独立硬门。
 - 当前 S11-F 已通过 `check`、项目配置、插件结构和 IDEA 2026.1 GA Verifier；Verifier 1.409 结论为 `Compatible`，并判定可动态启停。Java + MyBatis + H2 为 6/6，语义语料 Spring 2/2、Kotlin 1/1、框架 3/3、六方言 2/2；ZIP 为 1,293,736 字节，SHA-256 为 `d8f8fa8bbb33bd5aaed0ae5b31fa6bf80f9bd51ef6da06b25e9cec046521f84b`。
+- 当前 S11-F 提交的 GitHub Actions run `31556596528` 在 6 分 47 秒内通过；远端兼容矩阵 run `31556638831` 的 IDEA 2026.1、IDEA 2026.2 与 Android Studio 2026.1.2.10 三档 Verifier 均通过。
 
 ## 尚未关闭的验收项
 
 - 当前产物 20/20 生命周期与 Kotlin、Spring、YAML、Database Tools、全部禁用共 5/5 可选依赖隔离；
 - 在真实副屏 IDEA 2026.1 验证注解参数补全/检查、双文件迁移预览与一次 Undo、Spring 字段和构造器参数 gutter；
-- 当前 S11-F 提交的 GitHub Actions 与 Android Studio 2026.1.2 远端 Verifier 尚待推送后重跑；
 - Community JDBC 真实对话框、驱动选择、连接结果及 Android Studio 安装/索引/导航需在可用副屏上实机验收。
 
 没有可用副屏时不启动 IDEA、`runIde`、生命周期脚本或 Computer Use。上述项目关闭前，S11 只能标记“部分完成”。
