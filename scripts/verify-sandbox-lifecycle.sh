@@ -4,10 +4,13 @@ set -euo pipefail
 
 readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly CYCLE_COUNT="${1:-20}"
+readonly PROJECT_PATH_INPUT="${2:-}"
+readonly REBUILD_INDEXES="${3:-false}"
 readonly REPORT_DIR="${PROJECT_ROOT}/build/reports/lifecycle"
 readonly PLATFORM_VERSION="$(sed -n 's/^platformVersion=//p' "${PROJECT_ROOT}/gradle.properties")"
 readonly SANDBOX_ROOT="${PROJECT_ROOT}/build/idea-sandbox/mybatis-idea-assistant/IU-${PLATFORM_VERSION}"
 readonly SANDBOX_LOG="${SANDBOX_ROOT}/log/idea.log"
+readonly SANDBOX_INDEX_DIR="${SANDBOX_ROOT}/system/index"
 readonly SUMMARY_FILE="${REPORT_DIR}/sandbox-lifecycle.tsv"
 
 if ! [[ "${CYCLE_COUNT}" =~ ^[1-9][0-9]*$ ]]; then
@@ -18,9 +21,44 @@ if [[ -z "${PLATFORM_VERSION}" ]]; then
     echo "gradle.properties 缺少 platformVersion" >&2
     exit 2
 fi
+if [[ "${REBUILD_INDEXES}" != "true" && "${REBUILD_INDEXES}" != "false" ]]; then
+    echo "索引重建参数只能是 true 或 false：${REBUILD_INDEXES}" >&2
+    exit 2
+fi
+
+PROJECT_PATH=""
+PROJECT_NAME=""
+if [[ -n "${PROJECT_PATH_INPUT}" ]]; then
+    if [[ "${PROJECT_PATH_INPUT}" = /* ]]; then
+        candidate_project_path="${PROJECT_PATH_INPUT}"
+    else
+        candidate_project_path="${PROJECT_ROOT}/${PROJECT_PATH_INPUT}"
+    fi
+    if [[ ! -d "${candidate_project_path}" ]]; then
+        echo "生命周期项目目录不存在：${candidate_project_path}" >&2
+        exit 2
+    fi
+    PROJECT_PATH="$(cd "${candidate_project_path}" && pwd)"
+    case "${PROJECT_PATH}" in
+        "${PROJECT_ROOT}"/*) ;;
+        *)
+            echo "生命周期项目必须位于当前仓库内：${PROJECT_PATH}" >&2
+            exit 2
+            ;;
+    esac
+    PROJECT_NAME="$(basename "${PROJECT_PATH}")"
+fi
+
+case "${SANDBOX_INDEX_DIR}" in
+    "${PROJECT_ROOT}"/build/idea-sandbox/*/system/index) ;;
+    *)
+        echo "拒绝使用不安全的沙箱索引目录：${SANDBOX_INDEX_DIR}" >&2
+        exit 2
+        ;;
+esac
 
 mkdir -p "${REPORT_DIR}"
-printf 'cycle\tstart_line\tshutdown_line\tplugin_loaded\tplugin_error_count\texit_code\n' > "${SUMMARY_FILE}"
+printf 'cycle\tstart_line\tshutdown_line\tplugin_loaded\tproject_opened\tindex_scan_completed\tindex_rebuilt\tproject_disposed\tplugin_error_count\texit_code\n' > "${SUMMARY_FILE}"
 
 cd "${PROJECT_ROOT}"
 ./gradlew prepareSandbox >/dev/null
@@ -51,7 +89,16 @@ for ((cycle = 1; cycle <= CYCLE_COUNT; cycle++)); do
     : > "${SANDBOX_LOG}"
     start_line=$(( $(wc -l < "${SANDBOX_LOG}") + 1 ))
 
-    ./gradlew runIde >"${cycle_output}" 2>&1 &
+    if [[ "${REBUILD_INDEXES}" == "true" ]]; then
+        # 仅删除当前仓库 build 下的沙箱索引；每轮都要求真实项目重新完成索引扫描。
+        rm -rf -- "${SANDBOX_INDEX_DIR}"
+    fi
+
+    run_ide_command=(./gradlew runIde)
+    if [[ -n "${PROJECT_PATH}" ]]; then
+        run_ide_command+=("--args=${PROJECT_PATH}")
+    fi
+    "${run_ide_command[@]}" >"${cycle_output}" 2>&1 &
     run_pid=$!
 
     if ! wait_for_pattern "Loaded custom plugins: MyBatis Assistant" "${start_line}" 90; then
@@ -59,6 +106,22 @@ for ((cycle = 1; cycle <= CYCLE_COUNT; cycle++)); do
         wait "${run_pid}" 2>/dev/null || true
         echo "第 ${cycle} 次启动未在 90 秒内加载插件，详见 ${cycle_output}" >&2
         exit 1
+    fi
+
+    if [[ -n "${PROJECT_PATH}" ]]; then
+        if ! wait_for_pattern "Project ${PROJECT_NAME} was added to the list of open projects" \
+            "${start_line}" 120; then
+            kill "${run_pid}" 2>/dev/null || true
+            wait "${run_pid}" 2>/dev/null || true
+            echo "第 ${cycle} 次启动未在 120 秒内打开项目 ${PROJECT_NAME}，详见 ${cycle_output}" >&2
+            exit 1
+        fi
+        if ! wait_for_pattern "Scanning completed for [${PROJECT_NAME}]" "${start_line}" 180; then
+            kill "${run_pid}" 2>/dev/null || true
+            wait "${run_pid}" 2>/dev/null || true
+            echo "第 ${cycle} 次启动未在 180 秒内完成项目索引扫描，详见 ${cycle_output}" >&2
+            exit 1
+        fi
     fi
 
     ./gradlew runIde --args=exit >>"${cycle_output}" 2>&1
@@ -85,19 +148,52 @@ for ((cycle = 1; cycle <= CYCLE_COUNT; cycle++)); do
     if grep -q -- "Loaded custom plugins: MyBatis Assistant" "${cycle_slice}"; then
         plugin_loaded=1
     fi
+    project_opened=1
+    index_scan_completed=1
+    index_rebuilt=1
+    project_disposed=1
+    if [[ -n "${PROJECT_PATH}" ]]; then
+        if ! grep -Fq -- \
+            "Project ${PROJECT_NAME} was added to the list of open projects" "${cycle_slice}"; then
+            project_opened=0
+        fi
+        if ! grep -Fq -- "Scanning completed for [${PROJECT_NAME}]" "${cycle_slice}"; then
+            index_scan_completed=0
+        fi
+        if [[ "${REBUILD_INDEXES}" == "true" ]] && ! grep -Fq -- \
+            "Full scanning on startup will NOT be skipped for project [${PROJECT_NAME}]" \
+            "${cycle_slice}"; then
+            index_rebuilt=0
+        fi
+        if ! grep -Fq -- \
+            "Project ${PROJECT_NAME} is removed from the list of initializing and open projects. Project was disposed." \
+            "${cycle_slice}"; then
+            project_disposed=0
+        fi
+    fi
     plugin_error_count="$(grep -E -c \
         'ERROR .*MyBatis Assistant|PluginException.*io\.github\.ns3154|NoClassDefFoundError.*mybatisassistant|ClassNotFoundException.*mybatisassistant|^[[:space:]]+at io\.github\.ns3154\.mybatisassistant' \
         "${cycle_slice}" || true)"
 
-    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
         "${cycle}" \
         "${start_line}" \
         "${shutdown_line}" \
         "${plugin_loaded}" \
+        "${project_opened}" \
+        "${index_scan_completed}" \
+        "${index_rebuilt}" \
+        "${project_disposed}" \
         "${plugin_error_count}" \
         "${run_exit_code}" >> "${SUMMARY_FILE}"
 
-    if (( run_exit_code != 0 || plugin_loaded != 1 || plugin_error_count != 0 )); then
+    if (( run_exit_code != 0 \
+        || plugin_loaded != 1 \
+        || project_opened != 1 \
+        || index_scan_completed != 1 \
+        || index_rebuilt != 1 \
+        || project_disposed != 1 \
+        || plugin_error_count != 0 )); then
         echo "第 ${cycle} 次生命周期失败，详见 ${cycle_slice}" >&2
         exit 1
     fi
