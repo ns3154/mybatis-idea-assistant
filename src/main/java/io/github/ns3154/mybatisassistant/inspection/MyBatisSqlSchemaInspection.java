@@ -18,6 +18,7 @@ import com.intellij.psi.util.TypeConversionUtil;
 import com.intellij.psi.xml.XmlAttribute;
 import com.intellij.psi.xml.XmlAttributeValue;
 import com.intellij.psi.xml.XmlTag;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataService;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseSnapshot;
@@ -101,7 +102,9 @@ public final class MyBatisSqlSchemaInspection extends LocalInspectionTool {
                 holder.registerProblem(
                         columnValue,
                         valueRange(columnValue),
-                        "数据库元数据中不存在 ResultMap 列：" + columnValue.getValue().trim());
+                        MyBatisAssistantBundle.message(
+                                "inspection.sql.schema.resultmap.column.missing",
+                                columnValue.getValue().trim()));
                 continue;
             }
             if (columns.size() == 1) {
@@ -199,9 +202,11 @@ public final class MyBatisSqlSchemaInspection extends LocalInspectionTool {
             holder.registerProblem(
                     propertyValue,
                     valueRange(propertyValue),
-                    "Java 属性类型 " + javaType + " 与数据库列 "
-                            + column.name() + " 的 JDBC 类型 "
-                            + column.typeName() + " 不匹配");
+                    MyBatisAssistantBundle.message(
+                            "inspection.sql.schema.property.type.mismatch",
+                            javaType,
+                            column.name(),
+                            column.typeName()));
         }
     }
 
@@ -388,12 +393,19 @@ public final class MyBatisSqlSchemaInspection extends LocalInspectionTool {
     }
 
     private static @NotNull String message(@NotNull MyBatisSqlSymbolOccurrence occurrence) {
-        String symbol = occurrence.kind() == MyBatisSqlSymbolKind.TABLE ? "表" : "列";
         String qualifiedName = occurrence.qualifier()
                 .map(qualifier -> qualifier + "." + occurrence.name())
                 .orElse(occurrence.name());
-        return occurrence.status() == MyBatisSqlSymbolStatus.MISSING
-                ? "数据库元数据中不存在" + symbol + "：" + qualifiedName
-                : "数据库元数据中存在多个" + symbol + "候选：" + qualifiedName;
+        String key;
+        if (occurrence.kind() == MyBatisSqlSymbolKind.TABLE) {
+            key = occurrence.status() == MyBatisSqlSymbolStatus.MISSING
+                    ? "inspection.sql.schema.table.missing"
+                    : "inspection.sql.schema.table.ambiguous";
+        } else {
+            key = occurrence.status() == MyBatisSqlSymbolStatus.MISSING
+                    ? "inspection.sql.schema.column.missing"
+                    : "inspection.sql.schema.column.ambiguous";
+        }
+        return MyBatisAssistantBundle.message(key, qualifiedName);
     }
 }

@@ -5,6 +5,7 @@ import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.openapi.components.StoragePathMacros;
 import com.intellij.openapi.project.Project;
+import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMessages;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataService;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import org.jetbrains.annotations.NotNull;
@@ -61,7 +62,9 @@ public final class MyBatisJdbcDataSourceManager
         SettingsState updated = new SettingsState();
         for (MyBatisJdbcDataSourceConfig dataSource : dataSources) {
             if (!ids.add(dataSource.id())) {
-                throw new IllegalArgumentException("JDBC 数据源标识不能重复：" + dataSource.id());
+                throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                        "database.error.jdbc.id.duplicate",
+                        dataSource.id()));
             }
             updated.sources.add(SourceState.from(dataSource));
         }

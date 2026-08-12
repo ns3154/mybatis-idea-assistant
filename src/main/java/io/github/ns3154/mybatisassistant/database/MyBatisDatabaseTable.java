@@ -16,7 +16,8 @@ public record MyBatisDatabaseTable(
         @NotNull List<MyBatisDatabaseColumn> columns) {
     public MyBatisDatabaseTable {
         if (name.isBlank()) {
-            throw new IllegalArgumentException("表名不能为空");
+            throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                    "database.error.table.name.empty"));
         }
         comment = comment.filter(value -> !value.isBlank());
         columns = List.copyOf(columns);

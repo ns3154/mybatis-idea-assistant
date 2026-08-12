@@ -19,13 +19,15 @@ public record MyBatisDatabaseColumn(
         int position) {
     public MyBatisDatabaseColumn {
         if (name.isBlank()) {
-            throw new IllegalArgumentException("列名不能为空");
+            throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                    "database.error.column.name.empty"));
         }
         if (typeName.isBlank()) {
             typeName = "UNKNOWN";
         }
         if (position < 0) {
-            throw new IllegalArgumentException("列位置不能为负数");
+            throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                    "database.error.column.position.negative"));
         }
         comment = comment.filter(value -> !value.isBlank());
     }

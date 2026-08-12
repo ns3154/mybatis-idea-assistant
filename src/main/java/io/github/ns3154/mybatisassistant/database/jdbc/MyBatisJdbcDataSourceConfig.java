@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.database.jdbc;
 
+import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMessages;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import org.jetbrains.annotations.NotNull;
 
@@ -35,23 +36,31 @@ public record MyBatisJdbcDataSourceConfig(
             "(?i)^jdbc:oracle:thin:(?!@)[^@]+@");
 
     public MyBatisJdbcDataSourceConfig {
-        id = requireText(id, "数据源标识不能为空");
-        displayName = requireText(displayName, "数据源名称不能为空");
-        jdbcUrl = requireText(jdbcUrl, "JDBC URL 不能为空");
+        id = requireText(id, MyBatisDatabaseMessages.message(
+                "database.error.jdbc.id.empty"));
+        displayName = requireText(displayName, MyBatisDatabaseMessages.message(
+                "database.error.jdbc.name.empty"));
+        jdbcUrl = requireText(jdbcUrl, MyBatisDatabaseMessages.message(
+                "database.error.jdbc.url.empty"));
         if (!jdbcUrl.startsWith("jdbc:")) {
-            throw new IllegalArgumentException("JDBC URL 必须以 jdbc: 开头");
+            throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                    "database.error.jdbc.url.prefix"));
         }
         if (URL_CREDENTIAL_PROPERTY.matcher(jdbcUrl).find()
                 || URL_AUTHORITY_USER_INFO.matcher(jdbcUrl).find()
                 || ORACLE_THIN_USER_INFO.matcher(jdbcUrl).find()) {
-            throw new IllegalArgumentException("JDBC URL 不得包含用户名或密码，请使用独立字段和 PasswordSafe");
+            throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                    "database.error.jdbc.url.credentials"));
         }
-        driverClassName = requireText(driverClassName, "JDBC 驱动类不能为空");
+        driverClassName = requireText(driverClassName, MyBatisDatabaseMessages.message(
+                "database.error.jdbc.driver.class.empty"));
         if (!JAVA_CLASS_NAME.matcher(driverClassName).matches()) {
-            throw new IllegalArgumentException("JDBC 驱动类必须是完整 Java 类名");
+            throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                    "database.error.jdbc.driver.class.invalid"));
         }
         if (dialect == MyBatisSqlDialect.GENERIC) {
-            throw new IllegalArgumentException("Community JDBC 必须显式选择数据库方言");
+            throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                    "database.error.jdbc.dialect.required"));
         }
         driverJarPaths = driverJarPaths.stream()
                 .map(path -> normalizeDriverPath(path))
@@ -72,17 +81,21 @@ public record MyBatisJdbcDataSourceConfig(
 
     private static @NotNull String normalizeDriverPath(@NotNull String value) {
         try {
-            Path path = Path.of(requireText(value, "JDBC 驱动路径不能为空")).normalize();
+            Path path = Path.of(requireText(value, MyBatisDatabaseMessages.message(
+                    "database.error.jdbc.driver.path.empty"))).normalize();
             if (!path.isAbsolute()) {
-                throw new IllegalArgumentException("JDBC 驱动路径必须是绝对路径");
+                throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                        "database.error.jdbc.driver.path.absolute"));
             }
             if (!path.getFileName().toString().toLowerCase(java.util.Locale.ROOT)
                     .endsWith(".jar")) {
-                throw new IllegalArgumentException("JDBC 驱动路径必须指向 JAR 文件");
+                throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                        "database.error.jdbc.driver.path.jar"));
             }
             return path.toString();
         } catch (InvalidPathException failure) {
-            throw new IllegalArgumentException("JDBC 驱动路径无效", failure);
+            throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                    "database.error.jdbc.driver.path.invalid"), failure);
         }
     }
 

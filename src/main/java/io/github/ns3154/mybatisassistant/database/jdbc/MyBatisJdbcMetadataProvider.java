@@ -4,6 +4,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
+import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMessages;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataProvider;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseRequest;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseSnapshot;
@@ -101,7 +102,9 @@ public final class MyBatisJdbcMetadataProvider implements MyBatisDatabaseMetadat
                     System.nanoTime() & Long.MAX_VALUE,
                     tables);
         } catch (SQLException | IOException | ReflectiveOperationException failure) {
-            throw new IllegalStateException("Community JDBC 元数据读取失败：" + config.displayName(),
+            throw new IllegalStateException(MyBatisDatabaseMessages.message(
+                    "database.error.jdbc.metadata.read",
+                    config.displayName()),
                     failure);
         }
     }
@@ -119,7 +122,8 @@ public final class MyBatisJdbcMetadataProvider implements MyBatisDatabaseMetadat
         }
         Connection connection = driver.connect(config.jdbcUrl(), properties);
         if (connection == null) {
-            throw new SQLException("所选 JDBC 驱动不接受当前 URL");
+            throw new SQLException(MyBatisDatabaseMessages.message(
+                    "database.error.jdbc.driver.rejects.url"));
         }
         return connection;
     }
@@ -134,7 +138,8 @@ public final class MyBatisJdbcMetadataProvider implements MyBatisDatabaseMetadat
         for (String driverJarPath : config.driverJarPaths()) {
             Path path = Path.of(driverJarPath);
             if (!Files.isRegularFile(path) || !Files.isReadable(path)) {
-                throw new IOException("JDBC 驱动 JAR 不存在或不可读");
+                throw new IOException(MyBatisDatabaseMessages.message(
+                        "database.error.jdbc.driver.jar.unreadable"));
             }
             urls.add(path.toUri().toURL());
         }
@@ -154,7 +159,8 @@ public final class MyBatisJdbcMetadataProvider implements MyBatisDatabaseMetadat
             throws ReflectiveOperationException {
         Object instance = driverClass.getDeclaredConstructor().newInstance();
         if (!(instance instanceof Driver driver)) {
-            throw new IllegalArgumentException("配置的驱动类未实现 java.sql.Driver");
+            throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                    "database.error.jdbc.driver.interface"));
         }
         return driver;
     }

@@ -81,7 +81,8 @@ public final class MyBatisDatabaseMetadataService {
             @NotNull MyBatisDatabaseRequest request,
             @NotNull Duration timeout) {
         if (timeout.isNegative() || timeout.isZero()) {
-            throw new IllegalArgumentException("元数据超时必须大于零");
+            throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                    "database.error.metadata.timeout.nonpositive"));
         }
         if (project.isDisposed() || !project.isOpen()) {
             return CompletableFuture.completedFuture(new MyBatisDatabaseMetadataResult.Unavailable(
@@ -125,7 +126,8 @@ public final class MyBatisDatabaseMetadataService {
             long generation) {
         try {
             if (ApplicationManager.getApplication().isDispatchThread()) {
-                throw new IllegalStateException("元数据提供方不得在 EDT 调用");
+                throw new IllegalStateException(MyBatisDatabaseMessages.message(
+                        "database.error.metadata.provider.edt"));
             }
             List<MyBatisDatabaseMetadataProvider> providers =
                     MyBatisDatabaseMetadataProvider.EP_NAME.getExtensionList();

@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.sql;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.dynamic.MyBatisBindNode;
 import io.github.ns3154.mybatisassistant.dynamic.MyBatisChooseNode;
 import io.github.ns3154.mybatisassistant.dynamic.MyBatisDynamicSqlNode;
@@ -81,7 +82,8 @@ public final class MyBatisVirtualSqlBuilder {
         if (possibleBranches > 1) {
             context.diagnostics.add(new MyBatisVirtualSqlDiagnostic(
                     MyBatisVirtualSqlDiagnosticCode.CHOOSE_BRANCHES_COLLAPSED,
-                    "choose 仅生成一个有序代表分支",
+                    MyBatisAssistantBundle.message(
+                            "sql.virtual.diagnostic.choose.collapsed"),
                     chooseNode.sourceRange()));
         }
         if (!chooseNode.branches().isEmpty()) {
@@ -150,7 +152,8 @@ public final class MyBatisVirtualSqlBuilder {
                 appendDecoded(output, text.substring(marker), source);
                 context.diagnostics.add(new MyBatisVirtualSqlDiagnostic(
                         MyBatisVirtualSqlDiagnosticCode.MALFORMED_PARAMETER_PLACEHOLDER,
-                        "MyBatis 参数占位符缺少右花括号",
+                        MyBatisAssistantBundle.message(
+                                "sql.virtual.diagnostic.parameter.brace.missing"),
                         source));
                 return;
             }
@@ -179,7 +182,8 @@ public final class MyBatisVirtualSqlBuilder {
         List<MyBatisSourceMapping> mappings = mappedText.sourceMap()
                 .sourceMappings(new MyBatisTextRange(start, end));
         if (mappings.isEmpty()) {
-            throw new IllegalArgumentException("虚拟 SQL 占位符缺少源映射");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "sql.virtual.error.parameter.source.missing"));
         }
         MyBatisSourceRange first = mappings.getFirst().sourceRange();
         int sourceStart = first.range().startOffset();

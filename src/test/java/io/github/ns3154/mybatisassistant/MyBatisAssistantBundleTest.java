@@ -1,14 +1,17 @@
 package io.github.ns3154.mybatisassistant;
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
 import io.github.ns3154.mybatisassistant.dynamic.MyBatisTextRange;
 import io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlLexer;
+import io.github.ns3154.mybatisassistant.resolve.MyBatisStatementResolution;
 import io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettings;
 import io.github.ns3154.mybatisassistant.sqltool.execution.MyBatisSqlExecutionPolicy;
 import io.github.ns3154.mybatisassistant.sqltool.execution.MyBatisSqlExecutionPreparation;
 import io.github.ns3154.mybatisassistant.sqltool.format.MyBatisXmlFormatResult;
 import io.github.ns3154.mybatisassistant.sqltool.format.MyBatisXmlFormatter;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
 
@@ -68,6 +71,14 @@ public final class MyBatisAssistantBundleTest extends BasePlatformTestCase {
         assertEquals("The text range must satisfy 0 <= start <= end",
                 org.junit.Assert.assertThrows(IllegalArgumentException.class,
                         () -> new MyBatisTextRange(-1, 0)).getMessage());
+        assertEquals("Column name cannot be empty",
+                org.junit.Assert.assertThrows(IllegalArgumentException.class,
+                        () -> new MyBatisDatabaseColumn(
+                                "", "VARCHAR", 12, true, false, false, 0)).getMessage());
+        assertEquals("A multiple-match result requires at least two targets",
+                org.junit.Assert.assertThrows(IllegalArgumentException.class,
+                        () -> new MyBatisStatementResolution.MultipleMatches(
+                                List.of())).getMessage());
 
         state.uiLocale = "zh-CN";
         MyBatisAssistantSettings.getInstance().replace(state);
@@ -92,5 +103,13 @@ public final class MyBatisAssistantBundleTest extends BasePlatformTestCase {
         assertEquals("文本范围必须满足 0 <= start <= end",
                 org.junit.Assert.assertThrows(IllegalArgumentException.class,
                         () -> new MyBatisTextRange(-1, 0)).getMessage());
+        assertEquals("列名不能为空",
+                org.junit.Assert.assertThrows(IllegalArgumentException.class,
+                        () -> new MyBatisDatabaseColumn(
+                                "", "VARCHAR", 12, true, false, false, 0)).getMessage());
+        assertEquals("多候选结果至少需要两个目标",
+                org.junit.Assert.assertThrows(IllegalArgumentException.class,
+                        () -> new MyBatisStatementResolution.MultipleMatches(
+                                List.of())).getMessage());
     }
 }

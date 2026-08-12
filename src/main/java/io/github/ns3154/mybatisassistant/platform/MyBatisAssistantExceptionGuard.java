@@ -3,6 +3,7 @@ package io.github.ns3154.mybatisassistant.platform;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.regex.Pattern;
@@ -26,8 +27,10 @@ public final class MyBatisAssistantExceptionGuard {
             throw canceled;
         } catch (RuntimeException failure) {
             String safeOperationId = SAFE_OPERATION_ID.matcher(operationId).matches() ? operationId : "unknown";
-            LOG.warn("MyBatis Assistant 操作失败：" + safeOperationId
-                    + "，异常类型：" + failure.getClass().getName());
+            LOG.warn(MyBatisAssistantBundle.message(
+                    "platform.operation.failed",
+                    safeOperationId,
+                    failure.getClass().getName()));
             MyBatisAssistantNotifications.notifyUnexpectedError(project);
             return false;
         }

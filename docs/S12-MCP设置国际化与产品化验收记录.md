@@ -2,7 +2,7 @@
 
 > 日期：2026-08-12
 > 分支：`codex/s12-productization`
-> 状态：本地自动化通过；国际化迁移、签名发布与副屏实机待最终收口
+> 状态：生产 Java 源码国际化门通过；全量自动门、签名发布与副屏实机待最终收口
 
 ## 已验证实现
 
@@ -34,7 +34,8 @@ go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
 
 ## 仍未验收
 
-- SQL 工具链、生成器、方法名 SQL/Wrapper/Join、统一语义模型、重构安全诊断、动态 SQL 编译/source map 与 OGNL 词法语法语义诊断已完成资源化并纳入静态门；数据库核心、基础 Inspection 等少量历史诊断仍可能透传固定中文，仍需继续迁移，不得提前宣称全产品英文错误文案完成。
+- 所有插件生产 Java 源码均已纳入统一硬编码中文静态门；SQL 工具链、生成器、方法名 SQL/Wrapper/Join、统一语义模型、重构、动态 SQL、OGNL、数据库核心、基础 Inspection、引用与解析诊断均已迁入中英文资源。
+- 动态切换测试覆盖直接界面、危险确认、SQL 策略/格式化、OGNL 词法、动态来源范围、数据库模型与解析不变量；切换无需重启即可读取新语言。
 - 当前未提供 `CERTIFICATE_CHAIN`、`PRIVATE_KEY`、`PRIVATE_KEY_PASSWORD` 和 `PUBLISH_TOKEN`，因此只验证了失败关闭配置，没有生成真实签名包或发布 Marketplace。
 - 按用户要求不占用主屏；当前无副屏，未运行 `runIde`、IDE 生命周期脚本、真实 MCP 客户端、设置页、安装、升级、降级、禁用和卸载验收。
-- 本批仍需运行远端 CI 和兼容矩阵；这些证据未写入本记录前，S12 保持“部分完成”。
+- 本批仍需运行最终全量本地门、远端 CI 和兼容矩阵；这些证据未写入本记录前，S12 保持“部分完成”。

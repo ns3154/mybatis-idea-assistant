@@ -15,6 +15,7 @@ import com.intellij.psi.PsiPolyVariantReferenceBase;
 import com.intellij.psi.ResolveResult;
 import com.intellij.psi.SmartPointerManager;
 import com.intellij.psi.SmartPsiElementPointer;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlOccurrence;
 import io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlPsiSupport;
 import io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlSemanticResult;
@@ -97,7 +98,8 @@ public final class MyBatisOgnlReference extends PsiPolyVariantReferenceBase<PsiE
             PsiElement fallback = fallbackPointer.getElement();
             if (fallback == null) {
                 throw new com.intellij.util.IncorrectOperationException(
-                        "OGNL 重命名后无法恢复有效 PSI");
+                        MyBatisAssistantBundle.message(
+                                "reference.error.ognl.rename.psi.invalid"));
             }
             return fallback;
         }

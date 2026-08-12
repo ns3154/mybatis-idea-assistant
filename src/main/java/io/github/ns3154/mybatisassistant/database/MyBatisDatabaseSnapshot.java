@@ -16,10 +16,12 @@ public record MyBatisDatabaseSnapshot(
         @NotNull List<MyBatisDatabaseTable> tables) {
     public MyBatisDatabaseSnapshot {
         if (dataSourceId.isBlank() || displayName.isBlank()) {
-            throw new IllegalArgumentException("数据源标识与名称不能为空");
+            throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                    "database.error.snapshot.identity.empty"));
         }
         if (modificationCount < 0) {
-            throw new IllegalArgumentException("修改计数不能为负数");
+            throw new IllegalArgumentException(MyBatisDatabaseMessages.message(
+                    "database.error.snapshot.modification.negative"));
         }
         tables = List.copyOf(tables);
     }
