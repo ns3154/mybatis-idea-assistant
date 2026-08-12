@@ -1,6 +1,7 @@
 name: 三系统无界面回归
 
 on:
+  pull_request:
   schedule:
     - cron: "41 3 * * 3"
   workflow_dispatch:
