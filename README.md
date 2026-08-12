@@ -28,11 +28,12 @@
 - 为 `test`、`when/test` 与 `bind/value` 注入自有 OGNL 语言，提供可恢复语法树、高亮、保守类型推导、引用、补全、Find Usages、作用域内 Rename 和可证明错误检查；分析过程不执行项目代码。
 - 把 S5 动态程序压成有界代表 SQL，并在 Database Tools 可用时接入真实 SQL PSI；`#{}`、`${}`、动态标签、entity 与跨片段位置均可回映射到原 XML；
 - 只在后台读取 Database Tools 已加载模型，统一处理超时、取消、模型失效和多数据源；编辑器线程不连接数据库、不等待 I/O；
+- 在无 Database Tools 的 Community/Android Studio 环境提供项目级 JDBC 元数据适配：驱动 JAR、URL、用户名和 schema 必须显式配置，密码只进入 PasswordSafe，连接与元数据读取只在后台按需发生；
 - 提供 SQL 关键字、常用函数、别名、表列补全，以及不存在/歧义表列、ResultMap 缺列和基础 Java/JDBC 类型不匹配检查；动态标识符、加载中、语法不完整和目标不唯一时保持静默。
 - 从 Database Tools 已加载且由用户明确选择的表生成 Entity、Mapper、Mapper XML 和 Service；支持 Standard/MyBatis-Plus 模板、命名、字段过滤、注释、类型/TypeHandler、自增键与关键字转义；
 - 所有数据库生成先形成全量计划，支持按文件选择、候选文本和原生差异；稳定生成区以 SHA-256 防止覆盖用户修改，区域外手写内容、未保存编辑和 LF/CRLF 均保留；
 - 批量创建与更新由单个命名 IDE Command 承载，执行前复核 TOCTOU 并创建 Local History 标签；写入异常自动回滚，冲突或失败不留半成品，整批支持一次 Undo/Redo。
-- 以确定性方法语法生成 Mapper 方法和静态/动态 XML，覆盖投影、条件、排序、聚合、Top/分页及六类数据库方言；歧义或无条件写操作在生成前拒绝；
+- 以确定性方法语法生成 Mapper 方法和静态/动态 XML，覆盖投影、条件、排序、聚合、Top/分页及 MySQL、PostgreSQL、Oracle、SQL Server、SQLite、达梦六类数据库方言；歧义或无条件写操作在生成前拒绝；
 - 显式选择框架与版本后预览可编译的 MyBatis-Plus/Flex Wrapper，不按类路径猜测，也不使用不安全 SQL 尾部拼接；
 - 从两张同数据源、已加载表中显式选择 FK↔PK、Join 类型和输出字段后预览 Join SQL，不按列名猜测业务关系。
 - 从单条 CREATE TABLE、显式投影 SELECT 或 Java PSI 预览 Entity/Mapper/ResultMap/Java 行模型/六方言 DDL；类型未知时使用明确占位并要求确认，不执行项目代码；

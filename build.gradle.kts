@@ -17,6 +17,7 @@ group = "io.github.ns3154.mybatisassistant"
 version = providers.gradleProperty("pluginVersion").orElse("0.1.0-SNAPSHOT").get()
 
 val pluginVerifierIdeVersion = providers.gradleProperty("pluginVerifierIdeVersion").orElse("2026.1")
+val pluginVerifierProduct = providers.gradleProperty("pluginVerifierProduct").orElse("idea")
 
 java {
     toolchain {
@@ -41,6 +42,7 @@ dependencyLocking {
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    testImplementation("com.h2database:h2:2.3.232")
 
     intellijPlatform {
         intellijIdea("2026.1.4")
@@ -65,7 +67,7 @@ intellijPlatform {
         version = project.version.toString()
         description = """
             <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
-            <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map、OGNL 语言支持、可选 SQL PSI、方言、异步数据库元数据、表列补全与低误报 schema 检查、带全量预览和稳定生成区的数据库代码生成，以及保守转换、幂等格式化、日志 SQL 还原、受控执行与 JUnit 测试骨架。</p>
+            <p>当前开发预览版提供双向精确导航、XML/Java/Kotlin K2 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map、OGNL 语言支持、Spring 显式注入导航、Plus/Flex/TkMapper 统一模型、六数据库方言、可选 Database Tools 与 Community JDBC 元数据、表列补全与低误报 schema 检查、带全量预览和稳定生成区的数据库代码生成，以及保守转换、幂等格式化、日志 SQL 还原、受控执行与 JUnit 测试骨架。</p>
         """.trimIndent()
 
         ideaVersion {
@@ -82,7 +84,13 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            create(IntelliJPlatformType.IntellijIdea, pluginVerifierIdeVersion)
+            val product = pluginVerifierProduct.get()
+            val type = when (product) {
+                "idea" -> IntelliJPlatformType.IntellijIdea
+                "android-studio" -> IntelliJPlatformType.AndroidStudio
+                else -> throw GradleException("不支持的 Plugin Verifier 产品：$product")
+            }
+            create(type, pluginVerifierIdeVersion)
         }
     }
 }
@@ -225,6 +233,11 @@ tasks {
         ),
         "0.85",
     )
+    val databaseCompatibilityCoverage = registerScopedCoverage(
+        "jacocoDatabaseCompatibilityCoverageVerification",
+        listOf("io/github/ns3154/mybatisassistant/database/jdbc/**"),
+        "0.85",
+    )
 
     check {
         dependsOn(
@@ -234,6 +247,7 @@ tasks {
             databaseAdapterCoverage,
             generatorCoverage,
             methodSqlCoverage,
+            databaseCompatibilityCoverage,
             logSqlCoverage,
             frameworkAnnotationsCoverage,
         )

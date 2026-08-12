@@ -77,6 +77,22 @@ public final class MyBatisJavaDdlGeneratorTest extends BasePlatformTestCase {
         assertFalse(ddl.contains("PRIMARY KEY ("));
     }
 
+    public void testGeneratesDamengIdentityAndDoubleQuotedIdentifiers() {
+        MyBatisJavaTableSchema table = new MyBatisJavaTableSchema(
+                "user",
+                Optional.of("SYSDBA"),
+                Optional.empty(),
+                List.of(field("id", "id", "long",
+                        false, true, true, false, null)),
+                List.of());
+
+        String ddl = MyBatisJavaDdlGenerator.generate(
+                table, MyBatisSqlDialect.DAMENG).ddl();
+
+        assertTrue(ddl.contains("CREATE TABLE \"SYSDBA\".\"user\""));
+        assertTrue(ddl.contains("\"id\" BIGINT IDENTITY(1,1) NOT NULL"));
+    }
+
     public void testUnknownJavaTypeRequiresConfirmationAndSafeFallback() {
         MyBatisJavaTableSchema table = new MyBatisJavaTableSchema(
                 "sample", Optional.empty(), Optional.empty(),

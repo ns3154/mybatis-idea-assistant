@@ -5,7 +5,7 @@
 
     <description><![CDATA[
         <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
-        <p>当前开发预览版提供双向精确导航、XML/Java 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map、OGNL 语言支持、可选 SQL PSI、方言、异步数据库元数据、表列补全与低误报 schema 检查、带全量预览和稳定生成区的数据库代码生成，以及保守转换、幂等格式化、日志 SQL 还原、受控执行与 JUnit 测试骨架。</p>
+        <p>当前开发预览版提供双向精确导航、XML/Java/Kotlin K2 引用、参数路径与 ResultMap 属性解析、TypeAlias 引用、保守检查、安全 Quick Fix 与原生重命名、可增量失效的符号化动态 SQL 编译和字符级 source map、OGNL 语言支持、Spring 显式注入导航、Plus/Flex/TkMapper 统一模型、六数据库方言、可选 Database Tools 与 Community JDBC 元数据、表列补全与低误报 schema 检查、带全量预览和稳定生成区的数据库代码生成，以及保守转换、幂等格式化、日志 SQL 还原、受控执行与 JUnit 测试骨架。</p>
     ]]></description>
 
     <extensionPoints>
@@ -24,6 +24,11 @@
     <depends optional="true" config-file="io.github.ns3154.mybatisassistant-withDatabase.xml">com.intellij.database</depends>
 
     <resource-bundle>messages.MyBatisAssistantBundle</resource-bundle>
+
+    <extensions defaultExtensionNs="io.github.ns3154.mybatis-idea-assistant">
+        <databaseMetadataProvider
+                implementation="io.github.ns3154.mybatisassistant.database.jdbc.MyBatisJdbcMetadataProvider"/>
+    </extensions>
 
     <extensions defaultExtensionNs="com.intellij">
         <lang.parserDefinition
@@ -159,12 +164,20 @@
                 serviceImplementation="io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettings"/>
         <projectService
                 serviceImplementation="io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataService"/>
+        <projectService
+                serviceImplementation="io.github.ns3154.mybatisassistant.database.jdbc.MyBatisJdbcDataSourceManager"/>
         <applicationConfigurable
                 parentId="tools"
                 id="io.github.ns3154.mybatisassistant.settings"
                 instance="io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettingsConfigurable"
                 bundle="messages.MyBatisAssistantBundle"
                 key="settings.display.name"/>
+        <projectConfigurable
+                parentId="tools"
+                id="io.github.ns3154.mybatisassistant.settings.jdbc"
+                instance="io.github.ns3154.mybatisassistant.settings.MyBatisJdbcDataSourcesConfigurable"
+                bundle="messages.MyBatisAssistantBundle"
+                key="settings.jdbc.display.name"/>
         <notificationGroup
                 id="MyBatis Assistant"
                 key="notification.group.name"

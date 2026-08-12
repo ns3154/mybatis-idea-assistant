@@ -216,6 +216,27 @@ public class MyBatisJoinSqlGeneratorTest {
                 .getMessage().contains("SQLite 版本差异"));
     }
 
+    @Test
+    public void supportsDamengFullJoinWithDoubleQuotedIdentifiers() {
+        MyBatisJoinGeneration generation = MyBatisJoinSqlGenerator.generate(
+                new MyBatisJoinGenerationRequest(
+                        USERS,
+                        "u",
+                        List.of(new MyBatisJoinSpec(
+                                MyBatisJoinType.FULL,
+                                ROLES,
+                                "r",
+                                List.of(new MyBatisJoinRelation(
+                                        "u", USER_ROLE_ID, ROLE_ID)))),
+                        List.of(new MyBatisJoinSelection(
+                                "u", USER_ID, Optional.of("userId"))),
+                        MyBatisSqlDialect.DAMENG,
+                        true));
+
+        assertTrue(generation.sql().contains(
+                "FULL JOIN \"roles\" \"r\" ON \"u\".\"role_id\" = \"r\".\"id\""));
+    }
+
     private static MyBatisJoinGenerationRequest request(
             List<MyBatisJoinSpec> joins,
             List<MyBatisJoinSelection> selections) {

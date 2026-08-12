@@ -178,6 +178,8 @@ public final class MyBatisSqlPsiServiceTest extends BasePlatformTestCase {
         assertSame(GenericDialect.INSTANCE,
                 MyBatisSqlPsiService.language(MyBatisSqlDialect.SQLITE));
         assertSame(GenericDialect.INSTANCE,
+                MyBatisSqlPsiService.language(MyBatisSqlDialect.DAMENG));
+        assertSame(GenericDialect.INSTANCE,
                 MyBatisSqlPsiService.language(MyBatisSqlDialect.H2));
     }
 

@@ -93,4 +93,30 @@ public final class MyBatisAssistantSettingsTest extends BasePlatformTestCase {
             assertTrue(pluginXml.contains("optional=\"true\""));
         }
     }
+
+    public void testCoreDescriptorKeepsAndroidAndCommunityPathsFreeOfOptionalApis()
+            throws IOException {
+        String core = resource("/META-INF/plugin.xml");
+        String database = resource(
+                "/META-INF/io.github.ns3154.mybatisassistant-withDatabase.xml");
+        String spring = resource(
+                "/META-INF/io.github.ns3154.mybatisassistant-withSpring.xml");
+
+        assertTrue(core.contains("com.intellij.modules.platform"));
+        assertTrue(core.contains("com.intellij.java"));
+        assertTrue(core.contains("com.intellij.modules.xml"));
+        assertTrue(core.contains("MyBatisJdbcMetadataProvider"));
+        assertTrue(core.contains("MyBatisJdbcDataSourcesConfigurable"));
+        assertFalse(core.contains("database.intellij."));
+        assertFalse(core.contains("spring.MyBatisSpring"));
+        assertTrue(database.contains("database.intellij."));
+        assertTrue(spring.contains("spring.MyBatisSpring"));
+    }
+
+    private String resource(String path) throws IOException {
+        try (var input = getClass().getResourceAsStream(path)) {
+            assertNotNull("测试运行时缺少资源：" + path, input);
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
 }

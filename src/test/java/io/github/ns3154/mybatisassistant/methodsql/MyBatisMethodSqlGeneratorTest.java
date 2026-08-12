@@ -161,6 +161,8 @@ public class MyBatisMethodSqlGeneratorTest {
                 .sqlPreview().endsWith("LIMIT 5"));
         assertTrue(generate("findTop5ByStatus", MyBatisSqlDialect.POSTGRESQL, Set.of())
                 .sqlPreview().endsWith("LIMIT 5"));
+        assertTrue(generate("findTop5ByStatus", MyBatisSqlDialect.DAMENG, Set.of())
+                .sqlPreview().endsWith("LIMIT 5"));
         assertTrue(generate("findTop5ByStatus", MyBatisSqlDialect.ORACLE, Set.of())
                 .sqlPreview().endsWith("FETCH FIRST 5 ROWS ONLY"));
         assertTrue(generate("findTop5ByStatus", MyBatisSqlDialect.SQL_SERVER, Set.of())
@@ -173,6 +175,8 @@ public class MyBatisMethodSqlGeneratorTest {
                 "findPagedByStatus", MyBatisSqlDialect.MYSQL, Set.of());
         MyBatisMethodGeneration oracle = generate(
                 "findPagedByStatus", MyBatisSqlDialect.ORACLE, Set.of());
+        MyBatisMethodGeneration dameng = generate(
+                "findPagedByStatus", MyBatisSqlDialect.DAMENG, Set.of());
         MyBatisMethodGeneration sqlServer = generate(
                 "findPagedByStatusOrderById",
                 MyBatisSqlDialect.SQL_SERVER,
@@ -182,6 +186,8 @@ public class MyBatisMethodSqlGeneratorTest {
         assertTrue(mysql.sqlPreview().endsWith("LIMIT #{pageSize} OFFSET #{offset}"));
         assertTrue(oracle.sqlPreview().endsWith(
                 "OFFSET #{offset} ROWS FETCH NEXT #{pageSize} ROWS ONLY"));
+        assertTrue(dameng.sqlPreview().endsWith(
+                "LIMIT #{pageSize} OFFSET #{offset}"));
         assertTrue(sqlServer.sqlPreview().contains(
                 "ORDER BY [id] ASC OFFSET #{offset} ROWS FETCH NEXT #{pageSize} ROWS ONLY"));
         assertTrue(assertThrows(

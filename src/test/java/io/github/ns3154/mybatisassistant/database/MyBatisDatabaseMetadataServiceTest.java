@@ -177,6 +177,8 @@ public final class MyBatisDatabaseMetadataServiceTest extends BasePlatformTestCa
         assertEquals(MyBatisSqlDialect.ORACLE, MyBatisSqlDialect.fromDatabaseId("oracle"));
         assertEquals(MyBatisSqlDialect.SQL_SERVER, MyBatisSqlDialect.fromDatabaseId("sql_server"));
         assertEquals(MyBatisSqlDialect.SQLITE, MyBatisSqlDialect.fromDatabaseId("sqlite"));
+        assertEquals(MyBatisSqlDialect.DAMENG, MyBatisSqlDialect.fromDatabaseId("dm-8"));
+        assertEquals(MyBatisSqlDialect.DAMENG, MyBatisSqlDialect.fromDatabaseId("dameng"));
         assertEquals(MyBatisSqlDialect.H2, MyBatisSqlDialect.fromDatabaseId("h2"));
         assertEquals(MyBatisSqlDialect.GENERIC, MyBatisSqlDialect.fromDatabaseId("custom"));
         assertEquals(MyBatisSqlDialect.GENERIC, MyBatisSqlDialect.fromDatabaseId(null));

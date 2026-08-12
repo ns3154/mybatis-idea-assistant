@@ -168,6 +168,10 @@ public final class DatabaseToolsMetadataProvider implements MyBatisDatabaseMetad
     }
 
     static @NotNull MyBatisSqlDialect dialect(@NotNull Dbms dbms) {
+        MyBatisSqlDialect explicit = dialectName(dbms.getName());
+        if (explicit != MyBatisSqlDialect.GENERIC) {
+            return explicit;
+        }
         if (dbms.isMysql()) {
             return MyBatisSqlDialect.MYSQL;
         }
@@ -187,5 +191,9 @@ public final class DatabaseToolsMetadataProvider implements MyBatisDatabaseMetad
             return MyBatisSqlDialect.H2;
         }
         return MyBatisSqlDialect.GENERIC;
+    }
+
+    static @NotNull MyBatisSqlDialect dialectName(@Nullable String dbmsName) {
+        return MyBatisSqlDialect.fromDatabaseId(dbmsName);
     }
 }

@@ -378,7 +378,7 @@ public final class MyBatisMethodSqlGenerator {
             String offset = "#{" + parameters.offset().orElseThrow().name() + '}';
             String size = "#{" + parameters.pageSize().orElseThrow().name() + '}';
             switch (request.dialect()) {
-                case MYSQL, POSTGRESQL, SQLITE, H2 ->
+                case MYSQL, POSTGRESQL, SQLITE, DAMENG, H2 ->
                         body.append(" LIMIT ").append(size).append(" OFFSET ").append(offset);
                 case GENERIC, ORACLE, SQL_SERVER -> body.append(" OFFSET ")
                         .append(offset).append(" ROWS FETCH NEXT ")
@@ -392,7 +392,7 @@ public final class MyBatisMethodSqlGenerator {
         }
         int limit = request.query().limit().orElseThrow();
         switch (request.dialect()) {
-            case MYSQL, POSTGRESQL, SQLITE, H2 -> body.append(" LIMIT ").append(limit);
+            case MYSQL, POSTGRESQL, SQLITE, DAMENG, H2 -> body.append(" LIMIT ").append(limit);
             case GENERIC, ORACLE -> body.append(" FETCH FIRST ")
                     .append(limit).append(" ROWS ONLY");
             case SQL_SERVER -> throw new IllegalStateException("SQL Server 已使用 TOP");
@@ -473,7 +473,7 @@ public final class MyBatisMethodSqlGenerator {
             sql = switch (request.dialect()) {
                 case MYSQL -> "`" + name.replace("`", "``") + "`";
                 case SQL_SERVER -> "[" + name.replace("]", "]]" ) + "]";
-                case GENERIC, POSTGRESQL, ORACLE, SQLITE, H2 ->
+                case GENERIC, POSTGRESQL, ORACLE, SQLITE, DAMENG, H2 ->
                         "\"" + name.replace("\"", "\"\"") + "\"";
             };
         }

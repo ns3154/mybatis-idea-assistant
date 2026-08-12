@@ -72,6 +72,8 @@ public final class DatabaseToolsMetadataProviderTest extends BasePlatformTestCas
                 DatabaseToolsMetadataProvider.dialect(Dbms.SQLITE));
         assertEquals(MyBatisSqlDialect.H2,
                 DatabaseToolsMetadataProvider.dialect(Dbms.H2));
+        assertEquals(MyBatisSqlDialect.DAMENG,
+                DatabaseToolsMetadataProvider.dialectName("DM8"));
         assertEquals(MyBatisSqlDialect.GENERIC,
                 DatabaseToolsMetadataProvider.dialect(Dbms.UNKNOWN));
     }

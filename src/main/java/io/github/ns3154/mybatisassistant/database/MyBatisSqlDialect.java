@@ -15,6 +15,7 @@ public enum MyBatisSqlDialect {
     ORACLE,
     SQL_SERVER,
     SQLITE,
+    DAMENG,
     H2;
 
     public static @NotNull MyBatisSqlDialect fromDatabaseId(@Nullable String databaseId) {
@@ -30,6 +31,7 @@ public enum MyBatisSqlDialect {
             case "oracle" -> ORACLE;
             case "sqlserver", "mssql", "tsql" -> SQL_SERVER;
             case "sqlite" -> SQLITE;
+            case "dameng", "dm", "dm8" -> DAMENG;
             case "h2" -> H2;
             default -> GENERIC;
         };

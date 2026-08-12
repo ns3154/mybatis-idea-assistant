@@ -179,7 +179,7 @@ public final class MyBatisJoinSqlGenerator {
         return switch (dialect) {
             case MYSQL -> "`" + value.replace("`", "``") + "`";
             case SQL_SERVER -> "[" + value.replace("]", "]]" ) + "]";
-            case GENERIC, POSTGRESQL, ORACLE, SQLITE, H2 ->
+            case GENERIC, POSTGRESQL, ORACLE, SQLITE, DAMENG, H2 ->
                     "\"" + value.replace("\"", "\"\"") + "\"";
         };
     }

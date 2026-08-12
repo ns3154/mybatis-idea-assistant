@@ -238,6 +238,11 @@ public final class MyBatisGenerationEngineTest extends BasePlatformTestCase {
                 MyBatisGenerationConfiguration.standard("com.example"),
                 MyBatisSqlDialect.POSTGRESQL), MyBatisGenerationArtifactKind.XML).content();
         assertTrue(postgres.contains("INSERT INTO identity_only DEFAULT VALUES"));
+        String dameng = artifact(generate(
+                identityOnly,
+                MyBatisGenerationConfiguration.standard("com.example"),
+                MyBatisSqlDialect.DAMENG), MyBatisGenerationArtifactKind.XML).content();
+        assertTrue(dameng.contains("INSERT INTO identity_only (id) VALUES (DEFAULT)"));
     }
 
     private static MyBatisGenerationBundle generate(

@@ -272,6 +272,7 @@ com.google.guava:failureaccess:1.0.3=checkstyle
 com.google.guava:guava:33.6.0-jre=checkstyle
 com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava=checkstyle
 com.google.j2objc:j2objc-annotations:3.1=checkstyle
+com.h2database:h2:2.3.232=intellijPlatformTestRuntimeClasspath,testCompileClasspath,testRuntimeClasspath
 com.jetbrains.intellij.java:java-compiler-ant-tasks:261.26222.65=intellijPlatformJavaCompiler
 com.jetbrains.intellij.java:java-compiler-instrumentation-util-java8:261.26222.65=intellijPlatformJavaCompiler
 com.jetbrains.intellij.java:java-compiler-instrumentation-util:261.26222.65=intellijPlatformJavaCompiler

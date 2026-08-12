@@ -375,13 +375,13 @@ public final class MyBatisGenerationEngine {
             @NotNull List<ColumnModel> keys) {
         switch (request.dialect()) {
             case MYSQL -> body.append(" () VALUES ()\n");
-            case ORACLE -> {
+            case ORACLE, DAMENG -> {
                 List<ColumnModel> defaults = keys.stream()
                         .filter(column -> column.column.autoIncrement())
                         .toList();
                 if (defaults.isEmpty()) {
                     throw new IllegalArgumentException(
-                            "Oracle 空 INSERT 缺少可使用 DEFAULT 的自增列");
+                            request.dialect() + " 空 INSERT 缺少可使用 DEFAULT 的自增列");
                 }
                 body.append(" (")
                         .append(defaults.stream().map(column -> sqlIdentifier(
@@ -590,7 +590,7 @@ public final class MyBatisGenerationEngine {
         return switch (dialect) {
             case MYSQL -> "`" + name.replace("`", "``") + "`";
             case SQL_SERVER -> "[" + name.replace("]", "]]" ) + "]";
-            case GENERIC, POSTGRESQL, ORACLE, SQLITE, H2 ->
+            case GENERIC, POSTGRESQL, ORACLE, SQLITE, DAMENG, H2 ->
                     "\"" + name.replace("\"", "\"\"") + "\"";
         };
     }

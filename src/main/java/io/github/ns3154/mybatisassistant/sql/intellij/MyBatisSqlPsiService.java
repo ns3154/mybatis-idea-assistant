@@ -72,7 +72,7 @@ public final class MyBatisSqlPsiService {
             case POSTGRESQL -> PgDialect.INSTANCE;
             case ORACLE -> OraDialect.INSTANCE;
             case SQL_SERVER -> MsDialect.INSTANCE;
-            case GENERIC, SQLITE, H2 -> GenericDialect.INSTANCE;
+            case GENERIC, SQLITE, DAMENG, H2 -> GenericDialect.INSTANCE;
         };
     }
 
