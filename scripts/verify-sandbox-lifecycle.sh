@@ -6,8 +6,10 @@ readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly CYCLE_COUNT="${1:-20}"
 readonly PROJECT_PATH_INPUT="${2:-}"
 readonly REBUILD_INDEXES="${3:-false}"
+readonly PLATFORM_VERSION_OVERRIDE="${4:-}"
 readonly REPORT_DIR="${PROJECT_ROOT}/build/reports/lifecycle"
-readonly PLATFORM_VERSION="$(sed -n 's/^platformVersion=//p' "${PROJECT_ROOT}/gradle.properties")"
+readonly DEFAULT_PLATFORM_VERSION="$(sed -n 's/^platformVersion=//p' "${PROJECT_ROOT}/gradle.properties")"
+readonly PLATFORM_VERSION="${PLATFORM_VERSION_OVERRIDE:-${DEFAULT_PLATFORM_VERSION}}"
 readonly SANDBOX_ROOT="${PROJECT_ROOT}/build/idea-sandbox/mybatis-idea-assistant/IU-${PLATFORM_VERSION}"
 readonly SANDBOX_LOG="${SANDBOX_ROOT}/log/idea.log"
 readonly SANDBOX_INDEX_DIR="${SANDBOX_ROOT}/system/index"
@@ -19,6 +21,10 @@ if ! [[ "${CYCLE_COUNT}" =~ ^[1-9][0-9]*$ ]]; then
 fi
 if [[ -z "${PLATFORM_VERSION}" ]]; then
     echo "gradle.properties 缺少 platformVersion" >&2
+    exit 2
+fi
+if [[ ! "${PLATFORM_VERSION}" =~ ^[0-9]{4}\.[0-9]+([.][0-9]+)*$ ]]; then
+    echo "IDE 版本格式不正确：${PLATFORM_VERSION}" >&2
     exit 2
 fi
 if [[ "${REBUILD_INDEXES}" != "true" && "${REBUILD_INDEXES}" != "false" ]]; then
@@ -58,10 +64,13 @@ case "${SANDBOX_INDEX_DIR}" in
 esac
 
 mkdir -p "${REPORT_DIR}"
-printf 'cycle\tstart_line\tshutdown_line\tplugin_loaded\tproject_opened\tindex_scan_completed\tindex_rebuilt\tproject_disposed\tplugin_error_count\texit_code\n' > "${SUMMARY_FILE}"
+printf 'cycle\tplatform_version\tstart_line\tshutdown_line\tplugin_loaded\tproject_opened\tindex_scan_completed\tindex_rebuilt\tproject_disposed\tplugin_error_count\texit_code\n' > "${SUMMARY_FILE}"
 
 cd "${PROJECT_ROOT}"
-./gradlew prepareSandbox >/dev/null
+readonly GRADLE_PLATFORM_ARGUMENT="-PplatformVersion=${PLATFORM_VERSION}"
+readonly GRADLE_LOCK_ARGUMENT="-PdependencyLockFile=gradle/lifecycle-${PLATFORM_VERSION}.lockfile"
+./gradlew "${GRADLE_PLATFORM_ARGUMENT}" "${GRADLE_LOCK_ARGUMENT}" \
+    prepareSandbox >/dev/null
 touch "${SANDBOX_LOG}"
 
 wait_for_pattern() {
@@ -94,7 +103,12 @@ for ((cycle = 1; cycle <= CYCLE_COUNT; cycle++)); do
         rm -rf -- "${SANDBOX_INDEX_DIR}"
     fi
 
-    run_ide_command=(./gradlew runIde)
+    run_ide_command=(
+        ./gradlew
+        "${GRADLE_PLATFORM_ARGUMENT}"
+        "${GRADLE_LOCK_ARGUMENT}"
+        runIde
+    )
     if [[ -n "${PROJECT_PATH}" ]]; then
         run_ide_command+=("--args=${PROJECT_PATH}")
     fi
@@ -124,7 +138,9 @@ for ((cycle = 1; cycle <= CYCLE_COUNT; cycle++)); do
         fi
     fi
 
-    ./gradlew runIde --args=exit >>"${cycle_output}" 2>&1
+    ./gradlew "${GRADLE_PLATFORM_ARGUMENT}" "${GRADLE_LOCK_ARGUMENT}" \
+        runIde --args=exit \
+        >>"${cycle_output}" 2>&1
 
     set +e
     wait "${run_pid}"
@@ -175,8 +191,9 @@ for ((cycle = 1; cycle <= CYCLE_COUNT; cycle++)); do
         'ERROR .*MyBatis Assistant|PluginException.*io\.github\.ns3154|NoClassDefFoundError.*mybatisassistant|ClassNotFoundException.*mybatisassistant|^[[:space:]]+at io\.github\.ns3154\.mybatisassistant' \
         "${cycle_slice}" || true)"
 
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
         "${cycle}" \
+        "${PLATFORM_VERSION}" \
         "${start_line}" \
         "${shutdown_line}" \
         "${plugin_loaded}" \

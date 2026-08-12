@@ -114,6 +114,7 @@ jobs:
           "${CYCLES}"
           samples/semantic-corpus
           true
+          2026.1.4
 
       - name: 上传生命周期证据
         if: always()

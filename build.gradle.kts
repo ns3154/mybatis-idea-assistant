@@ -32,6 +32,8 @@ val configuredSinceBuild = providers.gradleProperty("pluginSinceBuild").orElse("
 val pluginVerifierIdeVersion = providers.gradleProperty("pluginVerifierIdeVersion")
     .orElse("2025.2.6.2")
 val pluginVerifierProduct = providers.gradleProperty("pluginVerifierProduct").orElse("idea")
+val dependencyLockFile = providers.gradleProperty("dependencyLockFile")
+    .orElse("gradle.lockfile")
 
 java {
     toolchain {
@@ -52,6 +54,7 @@ jacoco {
 
 dependencyLocking {
     lockAllConfigurations()
+    lockFile.set(layout.projectDirectory.file(dependencyLockFile))
 }
 
 dependencies {
