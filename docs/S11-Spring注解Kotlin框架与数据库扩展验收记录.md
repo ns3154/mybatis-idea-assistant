@@ -21,10 +21,10 @@
 - Java + MyBatis + H2 最小样例 6/6 通过；语义语料 Spring 2/2、Kotlin K2 1/1、框架 2/2、六方言 2/2 通过；
 - Spring/YAML bundled plugin 已进入 Gradle 依赖和锁文件，运行时仍由 optional depends 控制。
 - ZIP 为 1,212,084 字节，SHA-256 为 `5bc18c5e1a5c94eeb9c727e767b97d57a4794d8ea7902e9d6981516a48cb051d`。
+- GitHub Actions run `31550322961` 在 6 分 39 秒内通过两个 Maven 语料、完整 Gradle 门、ZIP 与报告上传。
 
 ## 尚未关闭的验收项
 
-- 当前分支远端 CI 最终结果；
 - 当前产物 20/20 生命周期与 Kotlin、Spring、YAML、Database Tools、全部禁用共 5/5 可选依赖隔离；
 - 在真实副屏 IDEA 2026.1 验证注解参数补全/检查、双文件迁移预览与一次 Undo、Spring 字段和构造器参数 gutter；
 - S11-D Kotlin K2 编辑器能力、S11-E Plus/Flex/TkMapper 模型适配、S11-F 六数据库/Community JDBC/Android Studio 降级尚未开发。
