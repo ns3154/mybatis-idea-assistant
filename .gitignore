@@ -1,5 +1,8 @@
 .gradle/
 .idea/
+!samples/semantic-corpus/.idea/
+samples/semantic-corpus/.idea/*
+!samples/semantic-corpus/.idea/misc.xml
 .intellijPlatform/
 .kotlin/
 build/
