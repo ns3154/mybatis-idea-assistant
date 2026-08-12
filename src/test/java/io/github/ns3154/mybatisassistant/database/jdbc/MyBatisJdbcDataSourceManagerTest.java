@@ -6,6 +6,7 @@ import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.nio.file.Path;
 
 public final class MyBatisJdbcDataSourceManagerTest extends BasePlatformTestCase {
     private MyBatisJdbcDataSourceManager.SettingsState originalState;
@@ -27,6 +28,16 @@ public final class MyBatisJdbcDataSourceManagerTest extends BasePlatformTestCase
     }
 
     public void testValidatesExplicitDialectDriverAndAbsoluteJarPaths() {
+        String driverJar = Path.of(System.getProperty("java.io.tmpdir"), "dm.jar")
+                .toAbsolutePath()
+                .normalize()
+                .toString();
+        String equivalentDriverJar = Path.of(driverJar)
+                .getParent()
+                .resolve("nested")
+                .resolve("..")
+                .resolve("dm.jar")
+                .toString();
         expectIllegalArgument(() -> config("main", MyBatisSqlDialect.GENERIC, List.of()));
         expectIllegalArgument(() -> new MyBatisJdbcDataSourceConfig(
                 "main", "Main", MyBatisSqlDialect.MYSQL, "https://localhost/db",
@@ -59,13 +70,13 @@ public final class MyBatisJdbcDataSourceManagerTest extends BasePlatformTestCase
         MyBatisJdbcDataSourceConfig config = new MyBatisJdbcDataSourceConfig(
                 " main ", " Main ", MyBatisSqlDialect.DAMENG, "jdbc:dm://localhost:5236",
                 "dm.jdbc.driver.DmDriver",
-                List.of("/tmp/dm.jar", "/tmp/./dm.jar"),
+                List.of(driverJar, equivalentDriverJar),
                 " SYSDBA ", true,
                 Optional.of(" "), Optional.of(" SYSDBA "), true);
 
         assertEquals("main", config.id());
         assertEquals("Main", config.displayName());
-        assertEquals(List.of("/tmp/dm.jar"), config.driverJarPaths());
+        assertEquals(List.of(driverJar), config.driverJarPaths());
         assertEquals("SYSDBA", config.username());
         assertTrue(config.catalog().isEmpty());
         assertEquals(Optional.of("SYSDBA"), config.schema());

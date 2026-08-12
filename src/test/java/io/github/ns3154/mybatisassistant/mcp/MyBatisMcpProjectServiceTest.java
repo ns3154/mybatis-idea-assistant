@@ -40,6 +40,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -410,7 +411,10 @@ public final class MyBatisMcpProjectServiceTest extends BasePlatformTestCase {
                         MyBatisSqlDialect.POSTGRESQL,
                         "jdbc:postgresql://localhost:5432/example",
                         "org.postgresql.Driver",
-                        List.of("/trusted/postgresql.jar"),
+                        List.of(Path.of(System.getProperty("java.io.tmpdir"), "postgresql.jar")
+                                .toAbsolutePath()
+                                .normalize()
+                                .toString()),
                         "app_user",
                         true,
                         Optional.empty(),

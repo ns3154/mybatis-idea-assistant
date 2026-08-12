@@ -21,3 +21,4 @@
 - 将最低编译 SDK 下调到 IntelliJ IDEA 2025.2.6.2，并建立 2025.2、2025.3、2026.1、2026.2 四个稳定大版本兼容矩阵。
 - 增加 Linux、macOS、Windows 三系统无界面回归，以及 100 万行、2000 Mapper、10000 statement 性能压力门。
 - 修复 MCP statement 预览在 Undo 后可能读取陈旧 PSI 范围的问题，并增加 CodeQL Java/Kotlin 安全扫描。
+- 修复 JDBC 与 MCP 测试夹具写死 Unix 绝对路径导致 Windows 回归失败的问题。
