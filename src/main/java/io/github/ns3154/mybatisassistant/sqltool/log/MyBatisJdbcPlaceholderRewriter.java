@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.log;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -19,8 +20,9 @@ public final class MyBatisJdbcPlaceholderRewriter {
                     MyBatisSqlLexicalScanner.scan(sql, replacements);
             if (scanned.placeholderCount() != replacements.size()) {
                 return new MyBatisJdbcPlaceholderRewriteResult.Failure(
-                        "JDBC 占位符数量为 " + scanned.placeholderCount()
-                                + "，替换参数数量为 " + replacements.size());
+                        MyBatisAssistantBundle.message(
+                                "sqltool.log.error.replacement.count",
+                                scanned.placeholderCount(), replacements.size()));
             }
             return new MyBatisJdbcPlaceholderRewriteResult.Success(
                     scanned.renderedSql(), scanned.placeholderCount());

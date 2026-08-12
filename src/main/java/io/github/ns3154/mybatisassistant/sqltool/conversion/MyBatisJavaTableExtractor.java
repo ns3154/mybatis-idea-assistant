@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.sqltool.conversion;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiAnnotation;
 import com.intellij.psi.PsiAnnotationMemberValue;
@@ -47,7 +48,8 @@ public final class MyBatisJavaTableExtractor {
         if (!source.isValid() || source.isInterface() || source.isAnnotationType()
                 || source.isEnum() || source.getName() == null) {
             return new MyBatisJavaTableExtractionResult.Failure(
-                    "请选择有效的 Java 实体类、record 或普通类");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.conversion.error.java.class.unsupported"));
         }
         List<String> warnings = new ArrayList<>();
         PsiAnnotation tableAnnotation = firstAnnotation(source, JPA_TABLES);
@@ -89,7 +91,8 @@ public final class MyBatisJavaTableExtractor {
         }
         if (fields.isEmpty()) {
             return new MyBatisJavaTableExtractionResult.Failure(
-                    "所选 Java 类没有可转换的实例字段");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.conversion.error.java.fields.empty"));
         }
         List<MyBatisJavaIndexSchema> indexes = indexes(tableAnnotation, warnings);
         MyBatisJavaTableSchema table = new MyBatisJavaTableSchema(
@@ -141,13 +144,15 @@ public final class MyBatisJavaTableExtractor {
         List<MyBatisJavaIndexSchema> indexes = new ArrayList<>();
         for (PsiAnnotationMemberValue member : values) {
             if (!(member instanceof PsiAnnotation annotation)) {
-                warnings.add("@Table.indexes 含无法静态解析的表达式，已跳过");
+                warnings.add(MyBatisAssistantBundle.message(
+                        "sqltool.conversion.warning.table.indexes.unresolved"));
                 continue;
             }
             String name = stringAttribute(annotation, "name");
             String columnList = stringAttribute(annotation, "columnList");
             if (name == null || name.isBlank() || columnList == null || columnList.isBlank()) {
-                warnings.add("@Index 缺少确定的 name 或 columnList，已跳过");
+                warnings.add(MyBatisAssistantBundle.message(
+                        "sqltool.conversion.warning.index.incomplete"));
                 continue;
             }
             List<String> columns = new ArrayList<>();
@@ -161,7 +166,8 @@ public final class MyBatisJavaTableExtractor {
                 columns.add(column);
             }
             if (!valid || columns.isEmpty()) {
-                warnings.add("@Index " + name + " 的 columnList 无法安全解析，已跳过");
+                warnings.add(MyBatisAssistantBundle.message(
+                        "sqltool.conversion.warning.index.columns.invalid", name));
                 continue;
             }
             indexes.add(new MyBatisJavaIndexSchema(
@@ -231,7 +237,8 @@ public final class MyBatisJavaTableExtractor {
                 return value;
             }
         }
-        throw new IllegalArgumentException("候选值不能为空");
+        throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                "sqltool.conversion.error.candidates.empty"));
     }
 
     private static String nonBlank(String value) {

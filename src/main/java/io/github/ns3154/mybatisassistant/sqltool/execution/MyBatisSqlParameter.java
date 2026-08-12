@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.execution;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -12,7 +13,8 @@ public record MyBatisSqlParameter(
         int jdbcType) {
     @Override
     public String toString() {
-        return "MyBatisSqlParameter[type=" + type + ", value=<已脱敏>, jdbcType="
+        return "MyBatisSqlParameter[type=" + type + ", value="
+                + MyBatisAssistantBundle.message("common.redacted") + ", jdbcType="
                 + jdbcType + "]";
     }
 }

@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.sqltool.log;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.charset.StandardCharsets;
@@ -35,7 +36,7 @@ public final class MyBatisLogSqlRestorer {
             return new MyBatisLogRestoreReport(List.of(), List.of(new MyBatisLogDiagnostic(
                     MyBatisLogDiagnosticCode.INPUT_TOO_LARGE,
                     0,
-                    "日志超过 2 MiB 本地处理上限，请缩小选区后重试")));
+                    MyBatisAssistantBundle.message("sqltool.log.error.input.too.large"))));
         }
         List<MyBatisRestoredStatement> restored = new ArrayList<>();
         List<MyBatisLogDiagnostic> diagnostics = new ArrayList<>();
@@ -58,7 +59,8 @@ public final class MyBatisLogSqlRestorer {
                     diagnostics.add(new MyBatisLogDiagnostic(
                             MyBatisLogDiagnosticCode.PARAMETERS_WITHOUT_PREPARING,
                             lineNumber,
-                            "第 " + lineNumber + " 行参数缺少同一上下文的 Preparing 日志"));
+                            MyBatisAssistantBundle.message(
+                                    "sqltool.log.error.preparing.missing", lineNumber)));
                     continue;
                 }
                 PreparingEntry preparing = entries.removeFirst();
@@ -76,7 +78,8 @@ public final class MyBatisLogSqlRestorer {
                 diagnostics.add(new MyBatisLogDiagnostic(
                         MyBatisLogDiagnosticCode.PREPARING_WITHOUT_PARAMETERS,
                         entry.lineNumber,
-                        "第 " + entry.lineNumber + " 行 Preparing 缺少同一上下文的 Parameters 日志"));
+                        MyBatisAssistantBundle.message(
+                                "sqltool.log.error.parameters.missing", entry.lineNumber)));
             }
         }
         return new MyBatisLogRestoreReport(restored, diagnostics);
@@ -96,7 +99,7 @@ public final class MyBatisLogSqlRestorer {
             diagnostics.add(new MyBatisLogDiagnostic(
                     MyBatisLogDiagnosticCode.MALFORMED_SQL,
                     preparing.lineNumber,
-                    "Preparing SQL 词法结构不完整，未生成还原结果"));
+                    MyBatisAssistantBundle.message("sqltool.log.error.sql.incomplete")));
             return;
         }
         MyBatisLogParameterParser.ParseResult parsed = MyBatisLogParameterParser.parse(
@@ -105,7 +108,8 @@ public final class MyBatisLogSqlRestorer {
             diagnostics.add(new MyBatisLogDiagnostic(
                     parsed.diagnosticCode(),
                     parametersLine,
-                    "第 " + parametersLine + " 行：" + parsed.message()));
+                    MyBatisAssistantBundle.message(
+                            "sqltool.log.error.line.detail", parametersLine, parsed.message())));
             return;
         }
         try {
@@ -115,7 +119,8 @@ public final class MyBatisLogSqlRestorer {
                 diagnostics.add(new MyBatisLogDiagnostic(
                         MyBatisLogDiagnosticCode.PLACEHOLDER_COUNT_MISMATCH,
                         parametersLine,
-                        "JDBC 占位符与参数数量不一致，未生成还原结果"));
+                        MyBatisAssistantBundle.message(
+                                "sqltool.log.error.restore.count.mismatch")));
                 return;
             }
             String sql = replaced.renderedSql();
@@ -129,7 +134,7 @@ public final class MyBatisLogSqlRestorer {
             diagnostics.add(new MyBatisLogDiagnostic(
                     MyBatisLogDiagnosticCode.MALFORMED_SQL,
                     preparing.lineNumber,
-                    "Preparing SQL 词法结构不完整，未生成还原结果"));
+                    MyBatisAssistantBundle.message("sqltool.log.error.sql.incomplete")));
         }
     }
 
@@ -144,7 +149,8 @@ public final class MyBatisLogSqlRestorer {
         }
         String normalized = LEADING_TIME.matcher(prefix).replaceFirst("");
         normalized = LEADING_LEVEL.matcher(normalized.trim()).replaceFirst("").trim();
-        return normalized.isEmpty() ? "默认上下文" : normalized;
+        return normalized.isEmpty()
+                ? MyBatisAssistantBundle.message("sqltool.log.context.default") : normalized;
     }
 
     private record PreparingEntry(int lineNumber, String sql) {

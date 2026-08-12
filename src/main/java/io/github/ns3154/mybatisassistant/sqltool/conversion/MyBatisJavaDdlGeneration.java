@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.conversion;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -13,7 +14,8 @@ public record MyBatisJavaDdlGeneration(
         boolean confirmationRequired) {
     public MyBatisJavaDdlGeneration {
         if (ddl.isBlank()) {
-            throw new IllegalArgumentException("DDL 不能为空");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "sqltool.conversion.error.ddl.empty"));
         }
         warnings = List.copyOf(warnings);
     }

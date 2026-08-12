@@ -27,7 +27,7 @@ public final class MyBatisSqlExecutionPolicyTest extends BasePlatformTestCase {
             assertInstanceOf(MyBatisSqlExecutionPolicy.authorize(plan, true, "执行"),
                     MyBatisSqlExecutionAuthorization.Rejected.class);
             assertInstanceOf(MyBatisSqlExecutionPolicy.authorize(
-                            plan, true, MyBatisSqlExecutionPolicy.DANGEROUS_CONFIRMATION_PHRASE),
+                            plan, true, MyBatisSqlExecutionPolicy.dangerousConfirmationPhrase()),
                     MyBatisSqlExecutionAuthorization.Authorized.class);
         }
     }

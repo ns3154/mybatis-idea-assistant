@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.generator;
 
 import com.intellij.ide.highlighter.JavaFileType;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiErrorElement;
 import com.intellij.psi.PsiFile;
@@ -32,19 +33,19 @@ final class MyBatisGenerationPsiValidator {
                         JavaFileType.INSTANCE,
                         text);
         if (!PsiTreeUtil.findChildrenOfType(file, PsiErrorElement.class).isEmpty()) {
-            throw new IllegalArgumentException("生成候选文件存在语法错误："
-                    + artifact.relativePath());
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.candidate.syntax", artifact.relativePath()));
         }
         if (artifact.kind() == MyBatisGenerationArtifactKind.XML) {
             XmlTag root = file instanceof XmlFile xmlFile ? xmlFile.getRootTag() : null;
             if (root == null || !"mapper".equals(root.getName())) {
-                throw new IllegalArgumentException("Mapper XML 缺少 mapper 根标签："
-                        + artifact.relativePath());
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "generator.error.candidate.mapper.root", artifact.relativePath()));
             }
         } else if (!(file instanceof PsiJavaFile javaFile)
                 || javaFile.getClasses().length != 1) {
-            throw new IllegalArgumentException("Java 候选文件必须包含一个顶层类型："
-                    + artifact.relativePath());
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.candidate.java.top.level", artifact.relativePath()));
         }
     }
 }

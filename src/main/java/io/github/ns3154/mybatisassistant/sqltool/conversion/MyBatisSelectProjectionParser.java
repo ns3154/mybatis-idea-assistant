@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.sqltool.conversion;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationNames;
 import org.jetbrains.annotations.NotNull;
 
@@ -32,7 +33,8 @@ public final class MyBatisSelectProjectionParser {
                     scan.failureOffset, scan.failure);
         }
         if (scan.selectStart < 0 || scan.fromStart < 0) {
-            return failure(0, "仅支持具有 FROM 的单条 SELECT");
+            return failure(0, MyBatisAssistantBundle.message(
+                    "sqltool.conversion.error.select.from.missing"));
         }
         List<Range> ranges = new ArrayList<>(scan.commas.size() + 1);
         int start = scan.selectEnd;
@@ -49,20 +51,24 @@ public final class MyBatisSelectProjectionParser {
             ProgressManager.checkCanceled();
             String item = sql.substring(range.start, range.end).strip();
             if (item.isEmpty()) {
-                return failure(range.start, "SELECT 投影存在空列");
+                return failure(range.start, MyBatisAssistantBundle.message(
+                        "sqltool.conversion.error.select.projection.empty.column"));
             }
             String label = label(item);
             if (label == null) {
                 return failure(range.start,
-                        "复杂投影必须使用 AS 指定唯一别名，且不支持 *");
+                        MyBatisAssistantBundle.message(
+                                "sqltool.conversion.error.select.projection.alias"));
             }
             String property = MyBatisGenerationNames.lowerCamel(label);
             if (!properties.add(property)) {
-                return failure(range.start, "投影属性重复：" + property);
+                return failure(range.start, MyBatisAssistantBundle.message(
+                        "sqltool.conversion.error.select.property.duplicate", property));
             }
             columns.add(new MyBatisSelectColumn(label, property));
         }
-        return columns.isEmpty() ? failure(scan.selectEnd, "SELECT 投影不能为空")
+        return columns.isEmpty() ? failure(scan.selectEnd, MyBatisAssistantBundle.message(
+                "sqltool.conversion.error.select.projection.empty"))
                 : new MyBatisSelectProjectionResult.Success(columns);
     }
 
@@ -155,7 +161,8 @@ public final class MyBatisSelectProjectionParser {
                     parenthesisDepth++;
                 } else if (current == ')') {
                     if (--parenthesisDepth < 0) {
-                        return scan.fail(index, "SQL 括号不匹配");
+                        return scan.fail(index, MyBatisAssistantBundle.message(
+                                "sqltool.conversion.error.sql.parenthesis.mismatch"));
                     }
                 } else if (parenthesisDepth == 0) {
                     if (scan.selectStart < 0 && wordAt(sql, index, "SELECT")) {
@@ -228,14 +235,17 @@ public final class MyBatisSelectProjectionParser {
                         dollarDelimiter = null;
                     }
                 }
-                case NORMAL -> throw new IllegalStateException("扫描状态异常");
+                case NORMAL -> throw new IllegalStateException(MyBatisAssistantBundle.message(
+                        "sqltool.log.error.scan.state.invalid"));
             }
         }
         if (state != State.NORMAL && state != State.LINE_COMMENT) {
-            return scan.fail(sql.length(), "SQL 包含未闭合的引号、标识符或注释");
+            return scan.fail(sql.length(), MyBatisAssistantBundle.message(
+                    "sqltool.log.error.sql.unclosed"));
         }
         if (parenthesisDepth != 0) {
-            return scan.fail(sql.length(), "SQL 括号不匹配");
+            return scan.fail(sql.length(), MyBatisAssistantBundle.message(
+                    "sqltool.conversion.error.sql.parenthesis.mismatch"));
         }
         return scan;
     }

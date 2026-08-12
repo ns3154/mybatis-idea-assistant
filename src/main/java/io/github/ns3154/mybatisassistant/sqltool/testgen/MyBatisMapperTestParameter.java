@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.testgen;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -10,7 +11,8 @@ public record MyBatisMapperTestParameter(
         @NotNull String canonicalType) {
     public MyBatisMapperTestParameter {
         if (name.isBlank() || canonicalType.isBlank()) {
-            throw new IllegalArgumentException("参数名称和类型不能为空");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "sqltool.testgen.error.parameter.identity.empty"));
         }
     }
 }

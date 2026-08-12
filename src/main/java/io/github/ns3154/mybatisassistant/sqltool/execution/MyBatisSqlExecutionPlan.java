@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.execution;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.sqltool.log.MyBatisSqlRiskAssessment;
 import org.jetbrains.annotations.NotNull;
 
@@ -21,6 +22,7 @@ public record MyBatisSqlExecutionPlan(
     public String toString() {
         return "MyBatisSqlExecutionPlan[risk=" + riskAssessment.risk()
                 + ", statements=" + riskAssessment.statementCount()
-                + ", parameters=" + parameters.size() + ", sql=<已脱敏>]";
+                + ", parameters=" + parameters.size() + ", sql="
+                + MyBatisAssistantBundle.message("common.redacted") + "]";
     }
 }

@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.sqltool.log;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -27,24 +28,28 @@ final class MyBatisLogParameterParser {
 
     static @NotNull ParseResult parse(@NotNull String source, int expectedCount) {
         if (expectedCount < 0) {
-            throw new IllegalArgumentException("参数数量不能为负数");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "sqltool.log.error.parameter.count.negative"));
         }
         if (expectedCount == 0) {
             return source.isBlank()
                     ? ParseResult.success(List.of())
                     : ParseResult.failure(MyBatisLogDiagnosticCode.PLACEHOLDER_COUNT_MISMATCH,
-                            "SQL 不含 JDBC 占位符，但日志仍包含参数");
+                            MyBatisAssistantBundle.message(
+                                    "sqltool.log.error.parameters.without.placeholder"));
         }
         if (source.isEmpty()) {
             return ParseResult.failure(MyBatisLogDiagnosticCode.PLACEHOLDER_COUNT_MISMATCH,
-                    "JDBC 占位符数量为 " + expectedCount + "，但参数日志为空");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.log.error.parameters.empty", expectedCount));
         }
         List<List<ParameterLiteral>> solutions = new ArrayList<>(2);
         SearchState state = new SearchState(SEARCH_BUDGET);
         search(source, expectedCount, 0, new ArrayList<>(), solutions, state);
         if (solutions.size() > 1) {
             return ParseResult.failure(MyBatisLogDiagnosticCode.AMBIGUOUS_PARAMETERS,
-                    "参数文本存在多种合法切分，已拒绝猜测");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.log.error.parameters.ambiguous"));
         }
         if (solutions.isEmpty()) {
             MyBatisLogDiagnosticCode code = state.binarySeen
@@ -53,9 +58,12 @@ final class MyBatisLogParameterParser {
                     ? MyBatisLogDiagnosticCode.INVALID_PARAMETER
                     : MyBatisLogDiagnosticCode.PLACEHOLDER_COUNT_MISMATCH;
             String message = switch (code) {
-                case UNSUPPORTED_BINARY_PARAMETER -> "二进制或流式参数无法从日志安全还原";
-                case INVALID_PARAMETER -> "参数类型或值不符合可安全还原的 MyBatis 日志格式";
-                default -> "JDBC 占位符与可解析参数数量不一致";
+                case UNSUPPORTED_BINARY_PARAMETER -> MyBatisAssistantBundle.message(
+                        "sqltool.log.error.parameter.binary");
+                case INVALID_PARAMETER -> MyBatisAssistantBundle.message(
+                        "sqltool.log.error.parameter.invalid");
+                default -> MyBatisAssistantBundle.message(
+                        "sqltool.log.error.parameter.count.mismatch");
             };
             return ParseResult.failure(code, message);
         }

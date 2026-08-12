@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.sqltool.conversion;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import org.jetbrains.annotations.NotNull;
 
@@ -36,7 +37,8 @@ public final class MyBatisJavaDdlGenerator {
             MyBatisJavaFieldSchema field = table.fields().get(index);
             TypeMapping type = sqlType(field.javaType(), dialect);
             if (type.warning != null) {
-                warnings.add("字段 " + field.propertyName() + "：" + type.warning);
+                warnings.add(MyBatisAssistantBundle.message(
+                        "sqltool.conversion.warning.field", field.propertyName(), type.warning));
             }
             boolean sqliteInlineKey = dialect == MyBatisSqlDialect.SQLITE
                     && field.primaryKey() && field.autoIncrement()
@@ -48,8 +50,9 @@ public final class MyBatisJavaDdlGenerator {
             } else {
                 appendIdentity(ddl, field, dialect);
                 if (field.autoIncrement() && dialect == MyBatisSqlDialect.GENERIC) {
-                    warnings.add("字段 " + field.propertyName()
-                            + " 的自增语法无法在通用方言中确定，DDL 未添加自增定义");
+                    warnings.add(MyBatisAssistantBundle.message(
+                            "sqltool.conversion.warning.identity.generic",
+                            field.propertyName()));
                 }
                 if (!field.nullable() || field.primaryKey()) {
                     ddl.append(" NOT NULL");
@@ -102,14 +105,16 @@ public final class MyBatisJavaDdlGenerator {
         for (MyBatisJavaFieldSchema field : table.fields()) {
             String normalized = field.columnName().toLowerCase(Locale.ROOT);
             if (!columns.add(normalized)) {
-                throw new IllegalArgumentException("列名重复：" + field.columnName());
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "sqltool.conversion.error.column.duplicate", field.columnName()));
             }
         }
         for (MyBatisJavaIndexSchema index : table.indexes()) {
             for (String column : index.columns()) {
                 if (!columns.contains(column.toLowerCase(Locale.ROOT))) {
-                    throw new IllegalArgumentException(
-                            "索引 " + index.name() + " 引用了未知列：" + column);
+                    throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                            "sqltool.conversion.error.index.column.unknown",
+                            index.name(), column));
                 }
             }
         }
@@ -141,7 +146,8 @@ public final class MyBatisJavaDdlGenerator {
                     ? new TypeMapping("BYTEA", null) : new TypeMapping("BLOB", null);
             default -> new TypeMapping(
                     "VARCHAR(255)",
-                    "Java 类型 " + javaType + " 没有确定映射，暂用 VARCHAR(255)");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.conversion.warning.java.type.fallback", javaType));
         };
     }
 
@@ -160,7 +166,8 @@ public final class MyBatisJavaDdlGenerator {
             case SQLITE, GENERIC -> {
                 // SQLite 在 INTEGER PRIMARY KEY 上单独处理；通用方言不猜测自增语法。
             }
-            default -> throw new IllegalStateException("未识别的数据库方言");
+            default -> throw new IllegalStateException(MyBatisAssistantBundle.message(
+                    "sqltool.conversion.error.dialect.unknown"));
         }
     }
 
@@ -187,13 +194,15 @@ public final class MyBatisJavaDdlGenerator {
             }
         } else if (table.comment().isPresent()
                 || table.fields().stream().anyMatch(field -> field.comment().isPresent())) {
-            warnings.add("目标方言不支持当前确定性注释语法，DDL 未写入注释");
+            warnings.add(MyBatisAssistantBundle.message(
+                    "sqltool.conversion.warning.comment.unsupported"));
         }
     }
 
     private static String quote(String identifier, MyBatisSqlDialect dialect) {
         if (identifier.isBlank() || identifier.indexOf('\0') >= 0) {
-            throw new IllegalArgumentException("SQL 标识符不能为空或包含 NUL");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "sqltool.conversion.error.sql.identifier.invalid"));
         }
         return switch (dialect) {
             case MYSQL -> "`" + identifier.replace("`", "``") + "`";

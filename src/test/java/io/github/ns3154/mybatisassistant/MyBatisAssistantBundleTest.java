@@ -2,6 +2,10 @@ package io.github.ns3154.mybatisassistant;
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettings;
+import io.github.ns3154.mybatisassistant.sqltool.execution.MyBatisSqlExecutionPolicy;
+import io.github.ns3154.mybatisassistant.sqltool.execution.MyBatisSqlExecutionPreparation;
+import io.github.ns3154.mybatisassistant.sqltool.format.MyBatisXmlFormatResult;
+import io.github.ns3154.mybatisassistant.sqltool.format.MyBatisXmlFormatter;
 
 import java.util.Locale;
 import java.util.ResourceBundle;
@@ -47,6 +51,16 @@ public final class MyBatisAssistantBundleTest extends BasePlatformTestCase {
                 MyBatisAssistantBundle.message("database.sql.execution.title", "demo"));
         assertEquals("The conversion is a preview only and will not write to the project.",
                 MyBatisAssistantBundle.message("sqltool.select.conversion.preview"));
+        assertEquals("EXECUTE DANGEROUS SQL",
+                MyBatisAssistantBundle.message("sqltool.execution.confirmation.phrase"));
+        assertEquals("Read-only",
+                MyBatisAssistantBundle.message("sqltool.risk.read.only"));
+        assertEquals("SQL must not be empty",
+                ((MyBatisSqlExecutionPreparation.Rejected)
+                        MyBatisSqlExecutionPolicy.prepare("", "")).message());
+        assertEquals("Indent width must be between 1 and 8",
+                ((MyBatisXmlFormatResult.Failure)
+                        MyBatisXmlFormatter.format("<mapper/>", 0)).message());
 
         state.uiLocale = "zh-CN";
         MyBatisAssistantSettings.getInstance().replace(state);
@@ -56,5 +70,15 @@ public final class MyBatisAssistantBundleTest extends BasePlatformTestCase {
                 MyBatisAssistantBundle.message("database.sql.execution.title", "demo"));
         assertEquals("转换结果仅供预览，不会写入项目。",
                 MyBatisAssistantBundle.message("sqltool.select.conversion.preview"));
+        assertEquals("执行危险SQL",
+                MyBatisAssistantBundle.message("sqltool.execution.confirmation.phrase"));
+        assertEquals("只读",
+                MyBatisAssistantBundle.message("sqltool.risk.read.only"));
+        assertEquals("SQL 不能为空",
+                ((MyBatisSqlExecutionPreparation.Rejected)
+                        MyBatisSqlExecutionPolicy.prepare("", "")).message());
+        assertEquals("缩进宽度必须在 1 到 8 之间",
+                ((MyBatisXmlFormatResult.Failure)
+                        MyBatisXmlFormatter.format("<mapper/>", 0)).message());
     }
 }

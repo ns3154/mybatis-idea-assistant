@@ -23,6 +23,7 @@ import com.intellij.psi.PsiTypes;
 import com.intellij.psi.PsiWildcardType;
 import com.intellij.psi.PsiArrayType;
 import com.intellij.psi.xml.XmlTag;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGeneratedArtifact;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationArtifactKind;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationPlan;
@@ -73,16 +74,19 @@ public final class MyBatisAnnotationSqlMigrationPlanner {
                 || !projectRoot.isValid()
                 || !projectRoot.isDirectory()
                 || !projectRoot.isWritable()) {
-            return failure(FailureCode.SOURCE_INVALID, "Mapper 方法或项目目录已失效");
+            return failure(FailureCode.SOURCE_INVALID, MyBatisAssistantBundle.message(
+                    "sqltool.annotation.error.source.invalid"));
         }
         PsiClass mapper = method.getContainingClass();
         String namespace = mapper == null ? null : mapper.getQualifiedName();
         if (mapper == null || !mapper.isInterface() || namespace == null) {
-            return failure(FailureCode.UNSUPPORTED_SOURCE, "当前位置不是具名 Mapper 接口方法");
+            return failure(FailureCode.UNSUPPORTED_SOURCE, MyBatisAssistantBundle.message(
+                    "sqltool.annotation.error.source.unsupported"));
         }
         if (mapper.findMethodsByName(method.getName(), false).length != 1) {
             return failure(FailureCode.OVERLOADED_METHOD,
-                    "XML statement 无法区分 Java 重载，请先消除同名重载");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.annotation.error.method.overloaded"));
         }
 
         AnnotationSelection selection = selectAnnotation(method);
@@ -94,14 +98,17 @@ public final class MyBatisAnnotationSqlMigrationPlanner {
         String sql = sql(annotation);
         if (sql == null || sql.isBlank()) {
             return failure(FailureCode.UNSUPPORTED_SQL,
-                    "注解 SQL 不是可静态求值的字符串或字符串数组");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.annotation.error.sql.not.constant"));
         }
         if (sql.length() > MAX_SQL_LENGTH) {
-            return failure(FailureCode.SQL_TOO_LARGE, "注解 SQL 超过 1 MiB，已拒绝迁移");
+            return failure(FailureCode.SQL_TOO_LARGE, MyBatisAssistantBundle.message(
+                    "sqltool.annotation.error.sql.too.large"));
         }
         if (sql.toLowerCase(java.util.Locale.ROOT).contains("<script")) {
             return failure(FailureCode.UNSUPPORTED_SQL,
-                    "动态 <script> 注解 SQL 需要人工核对，当前不自动迁移");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.annotation.error.sql.dynamic"));
         }
 
         List<XmlTag> mapperRoots = MyBatisXmlSymbolLocator.findMapperRoots(
@@ -110,11 +117,13 @@ public final class MyBatisAnnotationSqlMigrationPlanner {
                 method.getResolveScope());
         if (mapperRoots.isEmpty()) {
             return failure(FailureCode.MAPPER_XML_NOT_FOUND,
-                    "未找到 namespace 精确匹配的 Mapper XML");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.annotation.error.mapper.xml.missing"));
         }
         if (mapperRoots.size() != 1) {
             return failure(FailureCode.AMBIGUOUS_MAPPER_XML,
-                    "找到多个 namespace 相同的 Mapper XML，无法安全选择目标");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.annotation.error.mapper.xml.ambiguous"));
         }
         XmlTag mapperRoot = mapperRoots.getFirst();
         for (XmlTag child : mapperRoot.getSubTags()) {
@@ -122,7 +131,8 @@ public final class MyBatisAnnotationSqlMigrationPlanner {
             if (MyBatisXmlModel.isStatement(child)
                     && method.getName().equals(MyBatisXmlModel.statementId(child))) {
                 return failure(FailureCode.STATEMENT_ALREADY_EXISTS,
-                        "目标 XML 已存在同名 statement：" + method.getName());
+                        MyBatisAssistantBundle.message(
+                                "sqltool.annotation.error.statement.exists", method.getName()));
             }
         }
 
@@ -131,7 +141,8 @@ public final class MyBatisAnnotationSqlMigrationPlanner {
                 : "";
         if ("select".equals(statementTag) && resultType == null) {
             return failure(FailureCode.UNSUPPORTED_RETURN_TYPE,
-                    "无法可靠推导 @Select 的 XML resultType，请先改为明确返回类型");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.annotation.error.result.type.unsupported"));
         }
 
         PsiFile javaFile = method.getContainingFile();
@@ -140,22 +151,26 @@ public final class MyBatisAnnotationSqlMigrationPlanner {
                 || javaFile.getVirtualFile() == null
                 || xmlFile == null
                 || xmlFile.getVirtualFile() == null) {
-            return failure(FailureCode.SOURCE_INVALID, "Java 或 XML 文件没有可写磁盘目标");
+            return failure(FailureCode.SOURCE_INVALID, MyBatisAssistantBundle.message(
+                    "sqltool.annotation.error.target.missing"));
         }
         if (!javaFile.getVirtualFile().isWritable() || !xmlFile.getVirtualFile().isWritable()) {
-            return failure(FailureCode.READ_ONLY_TARGET, "Java 或 XML 目标文件只读");
+            return failure(FailureCode.READ_ONLY_TARGET, MyBatisAssistantBundle.message(
+                    "sqltool.annotation.error.target.readonly"));
         }
         String javaPath = relativePath(projectRoot, javaFile.getVirtualFile());
         String xmlPath = relativePath(projectRoot, xmlFile.getVirtualFile());
         if (javaPath == null || xmlPath == null || javaPath.equals(xmlPath)) {
             return failure(FailureCode.TARGET_OUTSIDE_PROJECT,
-                    "Java 或 XML 文件不在当前项目目录内");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.annotation.error.target.outside.project"));
         }
 
         String javaText = currentText(javaFile);
         String xmlText = currentText(xmlFile);
         if (javaText == null || xmlText == null) {
-            return failure(FailureCode.SOURCE_INVALID, "无法读取 Java 或 XML 当前文档");
+            return failure(FailureCode.SOURCE_INVALID, MyBatisAssistantBundle.message(
+                    "sqltool.annotation.error.document.unavailable"));
         }
         String proposedJava = removeAnnotation(javaText, annotation.getTextRange());
         String proposedXml = insertStatement(
@@ -167,7 +182,8 @@ public final class MyBatisAnnotationSqlMigrationPlanner {
                 sql);
         if (proposedJava == null || proposedXml == null) {
             return failure(FailureCode.SOURCE_CHANGED,
-                    "PSI 与当前文档偏移不一致，请提交文档后重试");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.annotation.error.source.changed"));
         }
 
         String regionId = "annotation-sql:" + namespace + '#' + method.getName();
@@ -196,7 +212,8 @@ public final class MyBatisAnnotationSqlMigrationPlanner {
                 MyBatisStatementSourceKind.ANNOTATION_SQL);
         if (statementAnnotations.size() != 1) {
             return AnnotationSelection.failure(FailureCode.UNSUPPORTED_ANNOTATION,
-                    "仅支持迁移一个 @Select/@Insert/@Update/@Delete 注解");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.annotation.error.annotation.count"));
         }
         PsiAnnotation target = statementAnnotations.getFirst();
         boolean directlyDeclared = Arrays.stream(method.getAnnotations())
@@ -204,7 +221,8 @@ public final class MyBatisAnnotationSqlMigrationPlanner {
                         .areElementsEquivalent(annotation, target));
         if (!directlyDeclared) {
             return AnnotationSelection.failure(FailureCode.UNSUPPORTED_ANNOTATION,
-                    "重复注解容器需要保留 databaseId 等语义，当前不自动迁移");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.annotation.error.annotation.container"));
         }
         for (PsiAnnotation annotation : method.getAnnotations()) {
             ProgressManager.checkCanceled();
@@ -214,8 +232,9 @@ public final class MyBatisAnnotationSqlMigrationPlanner {
             }
             if (qualifiedName != null && qualifiedName.startsWith(MYBATIS_ANNOTATION_PREFIX)) {
                 return AnnotationSelection.failure(FailureCode.UNSUPPORTED_ANNOTATION,
-                        "方法还包含 " + qualifiedName
-                                + "，自动迁移可能丢失 MyBatis 运行时语义");
+                        MyBatisAssistantBundle.message(
+                                "sqltool.annotation.error.annotation.additional",
+                                qualifiedName));
             }
         }
         for (var pair : target.getParameterList().getAttributes()) {
@@ -223,7 +242,8 @@ public final class MyBatisAnnotationSqlMigrationPlanner {
             String name = pair.getName();
             if (name != null && !"value".equals(name)) {
                 return AnnotationSelection.failure(FailureCode.UNSUPPORTED_ANNOTATION,
-                        "注解显式设置了 " + name + "，当前不自动迁移");
+                        MyBatisAssistantBundle.message(
+                                "sqltool.annotation.error.annotation.attribute", name));
             }
         }
         String qualifiedName = target.getQualifiedName();
@@ -236,7 +256,8 @@ public final class MyBatisAnnotationSqlMigrationPlanner {
         };
         return statementTag == null
                 ? AnnotationSelection.failure(FailureCode.UNSUPPORTED_ANNOTATION,
-                "不是可迁移的 MyBatis 内联 SQL 注解")
+                MyBatisAssistantBundle.message(
+                        "sqltool.annotation.error.annotation.unsupported"))
                 : new AnnotationSelection(target, statementTag, null);
     }
 

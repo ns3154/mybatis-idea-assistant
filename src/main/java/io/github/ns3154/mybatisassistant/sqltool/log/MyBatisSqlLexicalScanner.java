@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.sqltool.log;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -166,12 +167,15 @@ final class MyBatisSqlLexicalScanner {
                         dollarDelimiter = null;
                     }
                 }
-                case NORMAL -> throw new IllegalStateException("扫描状态异常");
-                default -> throw new IllegalStateException("未识别的扫描状态");
+                case NORMAL -> throw new IllegalStateException(MyBatisAssistantBundle.message(
+                        "sqltool.log.error.scan.state.invalid"));
+                default -> throw new IllegalStateException(MyBatisAssistantBundle.message(
+                        "sqltool.log.error.scan.state.unknown"));
             }
         }
         if (state != State.NORMAL && state != State.LINE_COMMENT) {
-            throw new MalformedSqlException("SQL 包含未闭合的引号、标识符或注释");
+            throw new MalformedSqlException(MyBatisAssistantBundle.message(
+                    "sqltool.log.error.sql.unclosed"));
         }
         finishStatement(visible, statements);
         return new ScanResult(rendered.toString(), replacementIndex, List.copyOf(statements));

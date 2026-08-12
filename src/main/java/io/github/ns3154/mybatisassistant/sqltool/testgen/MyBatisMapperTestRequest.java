@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.testgen;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -22,7 +23,8 @@ public record MyBatisMapperTestRequest(
                 || mapperSimpleName.isBlank()
                 || methodName.isBlank()
                 || stableSignature.isBlank()) {
-            throw new IllegalArgumentException("Mapper 与方法标识不能为空");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "sqltool.testgen.error.request.identity.empty"));
         }
     }
 }

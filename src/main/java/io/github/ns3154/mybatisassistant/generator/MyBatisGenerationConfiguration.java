@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.generator;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.EnumSet;
@@ -34,7 +35,8 @@ public record MyBatisGenerationConfiguration(
             MyBatisGenerationNames.requireJavaIdentifier("Entity" + entitySuffix);
         }
         if (artifacts.isEmpty()) {
-            throw new IllegalArgumentException("至少选择一种生成产物");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.artifacts.empty"));
         }
         artifacts = Set.copyOf(EnumSet.copyOf(artifacts));
         excludedColumns = excludedColumns.stream()
@@ -43,7 +45,8 @@ public record MyBatisGenerationConfiguration(
         Map<String, MyBatisGenerationColumnOverride> normalized = new TreeMap<>();
         columnOverrides.forEach((column, override) -> {
             if (column == null || column.isBlank() || override == null) {
-                throw new IllegalArgumentException("列覆盖的名称与值不能为空");
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "generator.error.column.override.empty"));
             }
             normalized.put(column.toLowerCase(Locale.ROOT), override);
         });

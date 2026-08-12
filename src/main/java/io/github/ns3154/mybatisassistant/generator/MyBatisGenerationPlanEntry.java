@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.generator;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
@@ -17,10 +18,12 @@ public record MyBatisGenerationPlanEntry(
     public MyBatisGenerationPlanEntry {
         if (status == MyBatisGenerationPlanStatus.CONFLICT) {
             if (conflictCode.isEmpty() || message.isEmpty() || proposedText.isPresent()) {
-                throw new IllegalArgumentException("冲突计划缺少类型或原因");
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "generator.error.plan.conflict.incomplete"));
             }
         } else if (proposedText.isEmpty() || conflictCode.isPresent()) {
-            throw new IllegalArgumentException("可写计划必须包含候选文本且不能含冲突");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.plan.writable.invalid"));
         }
     }
 }

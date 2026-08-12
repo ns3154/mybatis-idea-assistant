@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.sqltool.testgen;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiJavaFile;
@@ -30,16 +31,19 @@ public final class MyBatisMapperTestRequestFactory {
                 || method.hasModifierProperty(PsiModifier.STATIC)
                 || method.hasModifierProperty(PsiModifier.DEFAULT)
                 || method.getBody() != null) {
-            return new Result.Failure("请选择 Mapper 接口中的抽象实例方法");
+            return new Result.Failure(MyBatisAssistantBundle.message(
+                    "sqltool.testgen.error.method.unsupported"));
         }
         String qualifiedName = owner.getQualifiedName();
         String simpleName = owner.getName();
         if (qualifiedName == null || qualifiedName.isBlank()
                 || simpleName == null || simpleName.isBlank()) {
-            return new Result.Failure("Mapper 接口必须具有稳定的全限定名");
+            return new Result.Failure(MyBatisAssistantBundle.message(
+                    "sqltool.testgen.error.mapper.qualified.name"));
         }
         if (owner.getTypeParameters().length > 0 || method.getTypeParameters().length > 0) {
-            return new Result.Failure("首版测试骨架不猜测泛型 Mapper 或泛型方法的测试类型");
+            return new Result.Failure(MyBatisAssistantBundle.message(
+                    "sqltool.testgen.error.generic.unsupported"));
         }
         List<MyBatisMapperTestParameter> parameters = new ArrayList<>();
         StringBuilder signature = new StringBuilder(method.getName()).append('(');

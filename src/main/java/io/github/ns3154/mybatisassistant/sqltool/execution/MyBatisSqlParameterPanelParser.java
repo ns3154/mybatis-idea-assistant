@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.sqltool.execution;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
@@ -44,18 +45,20 @@ public final class MyBatisSqlParameterPanelParser {
                 continue;
             }
             if (parameters.size() >= MAX_PARAMETERS) {
-                return failure(index + 1, "参数数量超过 " + MAX_PARAMETERS + " 个上限");
+                return failure(index + 1, MyBatisAssistantBundle.message(
+                        "sqltool.execution.error.parameter.limit", MAX_PARAMETERS));
             }
             int separator = line.indexOf(':');
             if (separator <= 0) {
-                return failure(index + 1, "参数必须使用 TYPE:value 格式");
+                return failure(index + 1, MyBatisAssistantBundle.message(
+                        "sqltool.execution.error.parameter.format"));
             }
             String typeText = line.substring(0, separator).strip().toUpperCase(Locale.ROOT);
             String valueText = line.substring(separator + 1);
             MyBatisSqlParameter parameter = parameter(typeText, valueText);
             if (parameter == null) {
-                return failure(index + 1, "参数类型或值无效；支持 STRING、LONG、DECIMAL、"
-                        + "BOOLEAN、DATE、TIMESTAMP、NULL");
+                return failure(index + 1, MyBatisAssistantBundle.message(
+                        "sqltool.execution.error.parameter.invalid"));
             }
             parameters.add(parameter);
         }

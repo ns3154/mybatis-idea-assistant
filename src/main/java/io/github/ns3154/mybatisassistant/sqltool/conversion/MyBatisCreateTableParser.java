@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.sqltool.conversion;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
 import org.jetbrains.annotations.NotNull;
@@ -46,37 +47,44 @@ public final class MyBatisCreateTableParser {
         if (ddl.length() > MAX_INPUT_BYTES
                 || ddl.getBytes(StandardCharsets.UTF_8).length > MAX_INPUT_BYTES) {
             return failure(MyBatisDdlDiagnosticCode.INPUT_TOO_LARGE, 0,
-                    "DDL 超过 2 MiB 本地解析上限");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.conversion.error.ddl.too.large"));
         }
         ddl = stripSqlComments(ddl);
         if (ddl == null) {
             return failure(MyBatisDdlDiagnosticCode.MALFORMED_DDL, 0,
-                    "DDL 包含未闭合的块注释");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.conversion.error.ddl.comment.unclosed"));
         }
         Matcher header = HEADER.matcher(ddl);
         if (!header.find()) {
             return failure(MyBatisDdlDiagnosticCode.NOT_CREATE_TABLE, 0,
-                    "仅支持单条 CREATE TABLE DDL");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.conversion.error.ddl.not.create.table"));
         }
         Identifier tableIdentifier = qualifiedIdentifier(ddl, header.end());
         if (tableIdentifier == null) {
             return failure(MyBatisDdlDiagnosticCode.MALFORMED_DDL, header.end(),
-                    "CREATE TABLE 缺少合法表名");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.conversion.error.ddl.table.name"));
         }
         int bodyStart = skipWhitespace(ddl, tableIdentifier.end);
         if (bodyStart >= ddl.length() || ddl.charAt(bodyStart) != '(') {
             return failure(MyBatisDdlDiagnosticCode.MALFORMED_DDL, bodyStart,
-                    "表名后缺少列定义括号");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.conversion.error.ddl.columns.parenthesis.missing"));
         }
         int bodyEnd = matchingParenthesis(ddl, bodyStart);
         if (bodyEnd < 0) {
             return failure(MyBatisDdlDiagnosticCode.MALFORMED_DDL, bodyStart,
-                    "列定义括号未闭合");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.conversion.error.ddl.columns.parenthesis.unclosed"));
         }
         String tail = ddl.substring(bodyEnd + 1).trim();
         if (containsAdditionalStatement(tail)) {
             return failure(MyBatisDdlDiagnosticCode.MULTIPLE_STATEMENTS, bodyEnd + 1,
-                    "一次只允许转换一条 CREATE TABLE，已拒绝后续语句");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.conversion.error.ddl.multiple"));
         }
         List<String> definitions;
         try {
@@ -87,7 +95,8 @@ public final class MyBatisCreateTableParser {
         }
         if (definitions.isEmpty()) {
             return failure(MyBatisDdlDiagnosticCode.NO_COLUMNS, bodyStart + 1,
-                    "CREATE TABLE 未包含列定义");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.conversion.error.ddl.columns.empty"));
         }
         return buildTable(tableIdentifier, definitions, tail);
     }
@@ -116,17 +125,21 @@ public final class MyBatisCreateTableParser {
             ColumnDraft draft = column(definition, drafts.size(), warnings);
             if (draft == null) {
                 return failure(MyBatisDdlDiagnosticCode.UNSUPPORTED_DEFINITION, 0,
-                        "无法安全解析列定义：" + safeDefinition(definition));
+                        MyBatisAssistantBundle.message(
+                                "sqltool.conversion.error.ddl.column.unsupported",
+                                safeDefinition(definition)));
             }
             if (!names.add(draft.name.toLowerCase(Locale.ROOT))) {
                 return failure(MyBatisDdlDiagnosticCode.DUPLICATE_COLUMN, 0,
-                        "列名重复：" + draft.name);
+                        MyBatisAssistantBundle.message(
+                                "sqltool.conversion.error.column.duplicate", draft.name));
             }
             drafts.add(draft);
         }
         if (drafts.isEmpty()) {
             return failure(MyBatisDdlDiagnosticCode.NO_COLUMNS, 0,
-                    "CREATE TABLE 未包含可转换列");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.conversion.error.ddl.columns.convertible.empty"));
         }
         List<MyBatisDatabaseColumn> columns = drafts.stream()
                 .map(draft -> draft.toColumn(
@@ -164,8 +177,9 @@ public final class MyBatisCreateTableParser {
         String modifiers = remainder.substring(typeName.length());
         int jdbcType = jdbcType(typeName);
         if (jdbcType == Types.OTHER) {
-            warnings.add("列 " + unquote(name.text) + " 的数据库类型 " + typeName
-                    + " 未知，将以 Object/OTHER 生成并要求确认");
+            warnings.add(MyBatisAssistantBundle.message(
+                    "sqltool.conversion.warning.ddl.type.unknown",
+                    unquote(name.text), typeName));
         }
         boolean primary = contains(modifiers, "PRIMARY\\s+KEY");
         boolean foreign = contains(modifiers, "REFERENCES\\b");
@@ -247,7 +261,8 @@ public final class MyBatisCreateTableParser {
             } else if (current == ')') {
                 depth--;
                 if (depth < 0) {
-                    throw new IllegalArgumentException("列定义括号不匹配");
+                    throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                            "sqltool.conversion.error.ddl.column.parenthesis.mismatch"));
                 }
             } else if (current == ',' && depth == 0) {
                 addDefinition(definitions, body.substring(start, index));
@@ -255,7 +270,8 @@ public final class MyBatisCreateTableParser {
             }
         }
         if (quote != 0 || depth != 0) {
-            throw new IllegalArgumentException("列定义包含未闭合的引号或括号");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "sqltool.conversion.error.ddl.column.unclosed"));
         }
         addDefinition(definitions, body.substring(start));
         return definitions;

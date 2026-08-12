@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.generator;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.net.URLDecoder;
@@ -57,7 +58,8 @@ public final class MyBatisGenerationConfigurationCodec {
     public static @NotNull MyBatisGenerationConfiguration decode(@NotNull String text) {
         Map<String, String> values = parse(text);
         if (!FORMAT.equals(required(values, "format"))) {
-            throw new IllegalArgumentException("不支持的生成配置版本");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.codec.error.version.unsupported"));
         }
         rejectUnknownKeys(values.keySet());
         EnumSet<MyBatisGenerationArtifactKind> artifacts = EnumSet.noneOf(
@@ -89,7 +91,8 @@ public final class MyBatisGenerationConfigurationCodec {
                 case "property" -> override.property = Optional.of(value);
                 case "javaType" -> override.javaType = Optional.of(value);
                 case "typeHandler" -> override.typeHandler = Optional.of(value);
-                default -> throw new IllegalArgumentException("未知列覆盖字段：" + field);
+                default -> throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "generator.codec.error.override.field.unknown", field));
             }
         });
         Map<String, MyBatisGenerationColumnOverride> overrides = new LinkedHashMap<>();
@@ -125,12 +128,14 @@ public final class MyBatisGenerationConfigurationCodec {
             }
             int separator = line.indexOf('=');
             if (separator <= 0) {
-                throw new IllegalArgumentException("生成配置第 " + lineNumber + " 行缺少等号");
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "generator.codec.error.equals.missing", lineNumber));
             }
             String key = line.substring(0, separator);
             String value = unescape(line.substring(separator + 1));
             if (values.putIfAbsent(key, value) != null) {
-                throw new IllegalArgumentException("生成配置键重复：" + key);
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "generator.codec.error.key.duplicate", key));
             }
         }
         return values;
@@ -144,7 +149,8 @@ public final class MyBatisGenerationConfigurationCodec {
         for (String key : keys) {
             if (!fixed.contains(key) && !key.matches(
                     "override\\..+\\.(property|javaType|typeHandler)")) {
-                throw new IllegalArgumentException("未知生成配置键：" + key);
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "generator.codec.error.key.unknown", key));
             }
         }
     }
@@ -153,7 +159,8 @@ public final class MyBatisGenerationConfigurationCodec {
             @NotNull Map<String, String> values,
             @NotNull String key) {
         if (!values.containsKey(key)) {
-            throw new IllegalArgumentException("生成配置缺少必填键：" + key);
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.codec.error.key.required", key));
         }
         return values.get(key);
     }
@@ -163,7 +170,8 @@ public final class MyBatisGenerationConfigurationCodec {
             @NotNull String key) {
         String value = required(values, key);
         if (!"true".equals(value) && !"false".equals(value)) {
-            throw new IllegalArgumentException("生成配置布尔值不合法：" + key);
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.codec.error.boolean.invalid", key));
         }
         return Boolean.parseBoolean(value);
     }
@@ -174,7 +182,8 @@ public final class MyBatisGenerationConfigurationCodec {
         try {
             return Enum.valueOf(type, value);
         } catch (IllegalArgumentException invalid) {
-            throw new IllegalArgumentException("生成配置枚举值不合法：" + value, invalid);
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.codec.error.enum.invalid", value), invalid);
         }
     }
 
@@ -186,7 +195,8 @@ public final class MyBatisGenerationConfigurationCodec {
         try {
             return URLDecoder.decode(value, StandardCharsets.UTF_8);
         } catch (IllegalArgumentException invalid) {
-            throw new IllegalArgumentException("生成配置包含非法转义：" + value, invalid);
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.codec.error.escape.invalid", value), invalid);
         }
     }
 

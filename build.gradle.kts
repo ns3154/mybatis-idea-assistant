@@ -201,13 +201,14 @@ tasks {
 
     val verifyLocalizedUserInterface = register("verifyLocalizedUserInterface") {
         group = "verification"
-        description = "阻止设置、MCP、数据库和 SQL 工具界面新增硬编码中文字符串"
+        description = "阻止设置、MCP、数据库界面和 SQL 工具链新增硬编码中文字符串"
         val sourceRoots = listOf(
             "src/main/java/io/github/ns3154/mybatisassistant/settings",
             "src/main/java/io/github/ns3154/mybatisassistant/mcp",
             "src/main/java/io/github/ns3154/mybatisassistant/database/intellij",
+            "src/main/java/io/github/ns3154/mybatisassistant/generator",
             "src/main/java/io/github/ns3154/mybatisassistant/sql/intellij",
-            "src/main/java/io/github/ns3154/mybatisassistant/sqltool/intellij",
+            "src/main/java/io/github/ns3154/mybatisassistant/sqltool",
         )
         val sources = files(sourceRoots.map { fileTree(it) }).asFileTree.matching {
             include("**/*.java")

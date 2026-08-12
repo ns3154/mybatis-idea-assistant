@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.execution;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.sqltool.log.MyBatisSqlPlaceholderAnalysis;
 import io.github.ns3154.mybatisassistant.sqltool.log.MyBatisSqlPlaceholderAnalyzer;
 import io.github.ns3154.mybatisassistant.sqltool.log.MyBatisSqlRisk;
@@ -15,7 +16,6 @@ import java.nio.charset.StandardCharsets;
 public final class MyBatisSqlExecutionPolicy {
     public static final int MAX_SQL_BYTES = 1024 * 1024;
     public static final int MAX_PARAMETER_PANEL_BYTES = 2 * 1024 * 1024;
-    public static final String DANGEROUS_CONFIRMATION_PHRASE = "执行危险SQL";
 
     private MyBatisSqlExecutionPolicy() {
     }
@@ -24,26 +24,31 @@ public final class MyBatisSqlExecutionPolicy {
             @NotNull String sql,
             @NotNull String parameterPanel) {
         if (sql.isBlank()) {
-            return rejected("SQL 不能为空");
+            return rejected(MyBatisAssistantBundle.message("sqltool.execution.error.sql.empty"));
         }
         if (sql.length() > MAX_SQL_BYTES
                 || sql.getBytes(StandardCharsets.UTF_8).length > MAX_SQL_BYTES) {
-            return rejected("SQL 超过 1 MiB 执行上限");
+            return rejected(MyBatisAssistantBundle.message(
+                    "sqltool.execution.error.sql.too.large"));
         }
         if (sql.contains("#{") || sql.contains("${")) {
-            return rejected("请先把 MyBatis 动态占位符解析为 JDBC 问号占位符");
+            return rejected(MyBatisAssistantBundle.message(
+                    "sqltool.execution.error.dynamic.placeholder"));
         }
         if (parameterPanel.length() > MAX_PARAMETER_PANEL_BYTES
                 || parameterPanel.getBytes(StandardCharsets.UTF_8).length
                         > MAX_PARAMETER_PANEL_BYTES) {
-            return rejected("参数面板超过 2 MiB 执行上限");
+            return rejected(MyBatisAssistantBundle.message(
+                    "sqltool.execution.error.parameters.too.large"));
         }
         MyBatisSqlRiskAssessment risk = MyBatisSqlRiskClassifier.assess(sql);
         if (!risk.structurallyValid()) {
-            return rejected("SQL 词法结构不完整");
+            return rejected(MyBatisAssistantBundle.message(
+                    "sqltool.execution.error.sql.incomplete"));
         }
         if (risk.statementCount() != 1) {
-            return rejected("快速执行一次只允许一条完整 SQL 语句");
+            return rejected(MyBatisAssistantBundle.message(
+                    "sqltool.execution.error.sql.multiple"));
         }
         MyBatisSqlPlaceholderAnalysis placeholders =
                 MyBatisSqlPlaceholderAnalyzer.analyze(sql);
@@ -53,12 +58,15 @@ public final class MyBatisSqlExecutionPolicy {
         MyBatisSqlParameterParseResult parsed =
                 MyBatisSqlParameterPanelParser.parse(parameterPanel);
         if (parsed instanceof MyBatisSqlParameterParseResult.Failure failure) {
-            return rejected("参数面板第 " + failure.lineNumber() + " 行：" + failure.message());
+            return rejected(MyBatisAssistantBundle.message(
+                    "sqltool.execution.error.parameter.line",
+                    failure.lineNumber(), failure.message()));
         }
         var parameters = ((MyBatisSqlParameterParseResult.Success) parsed).parameters();
         if (parameters.size() != placeholders.placeholderCount()) {
-            return rejected("JDBC 占位符数量为 " + placeholders.placeholderCount()
-                    + "，参数面板提供了 " + parameters.size() + " 个参数");
+            return rejected(MyBatisAssistantBundle.message(
+                    "sqltool.execution.error.placeholder.count",
+                    placeholders.placeholderCount(), parameters.size()));
         }
         boolean dangerous = risk.risk() != MyBatisSqlRisk.READ_ONLY;
         return new MyBatisSqlExecutionPreparation.Ready(new MyBatisSqlExecutionPlan(
@@ -74,13 +82,19 @@ public final class MyBatisSqlExecutionPolicy {
                     new MyBatisAuthorizedSqlExecution(plan));
         }
         if (!riskConfirmed) {
-            return authorizationRejected("危险 SQL 风险确认未完成");
+            return authorizationRejected(MyBatisAssistantBundle.message(
+                    "sqltool.execution.error.risk.not.confirmed"));
         }
-        if (!DANGEROUS_CONFIRMATION_PHRASE.equals(typedConfirmation)) {
-            return authorizationRejected("二次确认短语不匹配，未授权执行");
+        if (!dangerousConfirmationPhrase().equals(typedConfirmation)) {
+            return authorizationRejected(MyBatisAssistantBundle.message(
+                    "sqltool.execution.error.confirmation.mismatch"));
         }
         return new MyBatisSqlExecutionAuthorization.Authorized(
                 new MyBatisAuthorizedSqlExecution(plan));
+    }
+
+    public static @NotNull String dangerousConfirmationPhrase() {
+        return MyBatisAssistantBundle.message("sqltool.execution.confirmation.phrase");
     }
 
     private static MyBatisSqlExecutionPreparation.Rejected rejected(String message) {

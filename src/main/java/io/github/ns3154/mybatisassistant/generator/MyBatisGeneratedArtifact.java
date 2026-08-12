@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.generator;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Set;
@@ -15,7 +16,8 @@ public record MyBatisGeneratedArtifact(
     public MyBatisGeneratedArtifact {
         relativePath = MyBatisGenerationNames.requireRelativePath(relativePath);
         if (content.isBlank() || regionIds.isEmpty()) {
-            throw new IllegalArgumentException("生成产物必须包含内容和稳定区域");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.artifact.incomplete"));
         }
         regionIds = Set.copyOf(regionIds);
     }

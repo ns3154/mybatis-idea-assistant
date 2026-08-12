@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.conversion;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationArtifactKind;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationBundle;
@@ -56,7 +57,10 @@ public final class MyBatisSqlArtifactConverter {
             return new MyBatisSqlArtifactConversionResult.Failure(
                     MyBatisDdlDiagnosticCode.UNSUPPORTED_DEFINITION,
                     0,
-                    invalid.getMessage() == null ? "生成配置或标识符不合法" : invalid.getMessage());
+                    invalid.getMessage() == null
+                            ? MyBatisAssistantBundle.message(
+                                    "sqltool.conversion.error.configuration.invalid")
+                            : invalid.getMessage());
         }
     }
 }

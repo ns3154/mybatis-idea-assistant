@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.generator;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
@@ -44,7 +45,8 @@ public final class MyBatisGenerationEngine {
         MyBatisGenerationNames.requireJavaIdentifier(entityName);
         List<ColumnModel> columns = columns(request.table(), configuration);
         if (columns.isEmpty()) {
-            throw new IllegalArgumentException("字段过滤后没有可生成的列：" + tableName);
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.engine.error.columns.empty", tableName));
         }
         validatePropertyNames(columns);
 
@@ -88,8 +90,10 @@ public final class MyBatisGenerationEngine {
         String header = javaHeader(packageName, imports);
         StringBuilder declaration = new StringBuilder();
         if (configuration.generateComments()) {
-            declaration.append(javaDoc(request.table().comment()
-                    .orElse("数据库表 " + request.table().name())));
+            declaration.append(javaDoc(request.table().comment().orElseGet(() ->
+                    MyBatisAssistantBundle.message(
+                            "generator.engine.comment.database.table",
+                            request.table().name()))));
         }
         if (plus) {
             declaration.append("@TableName(\"")
@@ -128,7 +132,8 @@ public final class MyBatisGenerationEngine {
                         baseId + ":declaration", declaration.toString())
                 + region(MyBatisGeneratedRegion.Style.JAVA,
                         baseId + ":members", indent(members.toString(), 1))
-                + "\n    // 手写字段和方法请放在生成区之外。\n"
+                + "\n    // " + MyBatisAssistantBundle.message(
+                        "generator.engine.comment.entity.manual") + "\n"
                 + "}\n";
         return artifact(
                 MyBatisGenerationArtifactKind.ENTITY,
@@ -184,7 +189,8 @@ public final class MyBatisGenerationEngine {
                         baseId + ":declaration", declaration)
                 + region(MyBatisGeneratedRegion.Style.JAVA,
                         baseId + ":members", indent(members.toString(), 1))
-                + "\n    // 手写 Mapper 方法请放在生成区之外。\n"
+                + "\n    // " + MyBatisAssistantBundle.message(
+                        "generator.engine.comment.mapper.manual") + "\n"
                 + "}\n";
         return artifact(
                 MyBatisGenerationArtifactKind.MAPPER,
@@ -259,7 +265,8 @@ public final class MyBatisGenerationEngine {
                         baseId + ":declaration", declaration)
                 + region(MyBatisGeneratedRegion.Style.JAVA,
                         baseId + ":members", indent(members.toString(), 1))
-                + "\n    // 手写 Service 方法请放在生成区之外。\n"
+                + "\n    // " + MyBatisAssistantBundle.message(
+                        "generator.engine.comment.service.manual") + "\n"
                 + "}\n";
         return artifact(
                 MyBatisGenerationArtifactKind.SERVICE,
@@ -283,8 +290,10 @@ public final class MyBatisGenerationEngine {
         List<ColumnModel> keys = primaryKeys(columns);
         StringBuilder body = new StringBuilder();
         if (configuration.generateComments()) {
-            body.append("    <!-- ").append(xmlComment(request.table().comment()
-                    .orElse("数据库表 " + request.table().name()))).append(" -->\n");
+            body.append("    <!-- ").append(xmlComment(
+                    request.table().comment().orElseGet(() -> MyBatisAssistantBundle.message(
+                            "generator.engine.comment.database.table",
+                            request.table().name())))).append(" -->\n");
         }
         body.append("    <resultMap id=\"BaseResultMap\" type=\"")
                 .append(xmlAttribute(entityPackage)).append("\">\n");
@@ -325,7 +334,8 @@ public final class MyBatisGenerationEngine {
         String content = region(MyBatisGeneratedRegion.Style.XML, baseId + ":header", header)
                 + region(MyBatisGeneratedRegion.Style.XML,
                         baseId + ":statements", indent(body.toString(), 1))
-                + "\n    <!-- 手写 resultMap、SQL 片段和 statement 请放在生成区之外。 -->\n"
+                + "\n    <!-- " + MyBatisAssistantBundle.message(
+                        "generator.engine.comment.xml.manual") + " -->\n"
                 + "</mapper>\n";
         String path = configuration.resourceRoot() + "/mapper/" + mapperName + ".xml";
         return artifact(
@@ -380,8 +390,9 @@ public final class MyBatisGenerationEngine {
                         .filter(column -> column.column.autoIncrement())
                         .toList();
                 if (defaults.isEmpty()) {
-                    throw new IllegalArgumentException(
-                            request.dialect() + " 空 INSERT 缺少可使用 DEFAULT 的自增列");
+                    throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                            "generator.engine.error.empty.insert.default",
+                            request.dialect()));
                 }
                 body.append(" (")
                         .append(defaults.stream().map(column -> sqlIdentifier(
@@ -521,8 +532,8 @@ public final class MyBatisGenerationEngine {
         for (ColumnModel column : columns) {
             MyBatisGenerationNames.requireJavaIdentifier(column.propertyName);
             if (!names.add(column.propertyName)) {
-                throw new IllegalArgumentException("多个列映射到同一 Java 属性："
-                        + column.propertyName);
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "generator.engine.error.property.duplicate", column.propertyName));
             }
         }
     }
@@ -715,13 +726,14 @@ public final class MyBatisGenerationEngine {
                     : canonicalType;
             String shortName = simpleName(component);
             if (declaredName.equals(shortName)) {
-                throw new IllegalArgumentException(
-                        "生成类名与引用类型短名冲突：" + declaredName);
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "generator.engine.error.type.declared.conflict", declaredName));
             }
             String previous = names.putIfAbsent(shortName, component);
             if (previous != null && !previous.equals(component)) {
-                throw new IllegalArgumentException(
-                        "引用类型短名冲突：" + previous + " 与 " + component);
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "generator.engine.error.type.reference.conflict",
+                        previous, component));
             }
         }
     }

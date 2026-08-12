@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.generator;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -52,11 +53,13 @@ public final class MyBatisGenerationNames {
         String normalized = path.trim().replace('\\', '/');
         if (normalized.isEmpty() || normalized.startsWith("/")
                 || normalized.matches("^[A-Za-z]:.*")) {
-            throw new IllegalArgumentException("生成根目录必须是项目相对路径");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.root.relative"));
         }
         for (String segment : normalized.split("/")) {
             if (segment.isBlank() || ".".equals(segment) || "..".equals(segment)) {
-                throw new IllegalArgumentException("生成根目录不得包含空段或路径跳转");
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "generator.error.root.traversal"));
             }
         }
         return normalized;
@@ -64,7 +67,8 @@ public final class MyBatisGenerationNames {
 
     static void requirePackageName(@NotNull String value) {
         if (value.isBlank()) {
-            throw new IllegalArgumentException("基础包名不能为空");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.base.package.empty"));
         }
         for (String segment : value.split("\\.")) {
             requireJavaIdentifier(segment);
@@ -73,15 +77,18 @@ public final class MyBatisGenerationNames {
 
     static void requireJavaIdentifier(@NotNull String value) {
         if (value.isBlank() || !Character.isJavaIdentifierStart(value.charAt(0))) {
-            throw new IllegalArgumentException("不合法的 Java 标识符：" + value);
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.java.identifier.invalid", value));
         }
         for (int index = 1; index < value.length(); index++) {
             if (!Character.isJavaIdentifierPart(value.charAt(index))) {
-                throw new IllegalArgumentException("不合法的 Java 标识符：" + value);
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "generator.error.java.identifier.invalid", value));
             }
         }
         if (JAVA_KEYWORDS.contains(value)) {
-            throw new IllegalArgumentException("Java 关键字不能作为标识符：" + value);
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.java.identifier.keyword", value));
         }
     }
 

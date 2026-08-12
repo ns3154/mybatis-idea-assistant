@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.execution;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -26,7 +27,7 @@ public sealed interface MyBatisSqlExecutionResult {
                     + ", updateCount=" + updateCount
                     + ", truncated=" + truncated
                     + ", durationMillis=" + durationMillis
-                    + ", data=<已脱敏>]";
+                    + ", data=" + MyBatisAssistantBundle.message("common.redacted") + "]";
         }
     }
 
@@ -36,7 +37,8 @@ public sealed interface MyBatisSqlExecutionResult {
             int vendorCode) implements MyBatisSqlExecutionResult {
         @Override
         public String toString() {
-            return "Failure[message=<已脱敏>, sqlState=" + sqlState
+            return "Failure[message=" + MyBatisAssistantBundle.message("common.redacted")
+                    + ", sqlState=" + sqlState
                     + ", vendorCode=" + vendorCode + "]";
         }
     }

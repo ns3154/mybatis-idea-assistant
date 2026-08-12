@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.sqltool.testgen;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Locale;
@@ -54,7 +55,10 @@ public final class MyBatisMapperTestSkeletonGenerator {
                 .append(" mapper;\n\n")
                 .append(junit4 ? "    @Before\n" : "    @BeforeEach\n")
                 .append(junit4 ? "    public void setUp() {\n" : "    void setUp() {\n")
-                .append("        // TODO 使用项目的 MyBatis/Spring 测试上下文注入真实 Mapper\n")
+                .append("        // ")
+                .append(MyBatisAssistantBundle.message(
+                        "sqltool.testgen.comment.inject.mapper"))
+                .append('\n')
                 .append("        mapper = null;\n")
                 .append("    }\n\n")
                 .append("    @Test\n")
@@ -88,7 +92,10 @@ public final class MyBatisMapperTestSkeletonGenerator {
         }
         source.append(");\n");
         if (request.returnsVoid()) {
-            source.append("        // TODO 断言数据库状态或受影响记录\n");
+            source.append("        // ")
+                    .append(MyBatisAssistantBundle.message(
+                            "sqltool.testgen.comment.assert.database"))
+                    .append('\n');
         } else {
             source.append("        assertNotNull(actual);\n");
         }

@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.generator;
 
 import com.intellij.openapi.application.ApplicationManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
@@ -23,8 +24,6 @@ import java.util.stream.Collectors;
  * 在一个稳定的 IDE 命令中原子写入已预览的生成计划。
  */
 public final class MyBatisGenerationCommandExecutor {
-    private static final String DEFAULT_COMMAND_NAME = "生成 MyBatis 代码";
-
     private MyBatisGenerationCommandExecutor() {
     }
 
@@ -35,7 +34,7 @@ public final class MyBatisGenerationCommandExecutor {
             @NotNull Project project,
             @NotNull VirtualFile projectRoot,
             @NotNull MyBatisGenerationPlan plan) {
-        execute(project, projectRoot, plan, DEFAULT_COMMAND_NAME, WriteHook.NONE);
+        execute(project, projectRoot, plan, defaultCommandName(), WriteHook.NONE);
     }
 
     public static void execute(
@@ -44,7 +43,8 @@ public final class MyBatisGenerationCommandExecutor {
             @NotNull MyBatisGenerationPlan plan,
             @NotNull String commandName) {
         if (commandName.isBlank()) {
-            throw new IllegalArgumentException("命令名称不能为空");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.command.error.name.empty"));
         }
         execute(project, projectRoot, plan, commandName, WriteHook.NONE);
     }
@@ -54,7 +54,7 @@ public final class MyBatisGenerationCommandExecutor {
             @NotNull VirtualFile projectRoot,
             @NotNull MyBatisGenerationPlan plan,
             @NotNull WriteHook writeHook) {
-        execute(project, projectRoot, plan, DEFAULT_COMMAND_NAME, writeHook);
+        execute(project, projectRoot, plan, defaultCommandName(), writeHook);
     }
 
     private static void execute(
@@ -97,8 +97,11 @@ public final class MyBatisGenerationCommandExecutor {
         }
         throw new IllegalStateException(plan.entries().stream()
                 .filter(entry -> entry.status() == MyBatisGenerationPlanStatus.CONFLICT)
-                .map(entry -> entry.artifact().relativePath() + "："
-                        + entry.message().orElse("生成冲突"))
+                .map(entry -> MyBatisAssistantBundle.message(
+                        "generator.command.error.conflict.entry",
+                        entry.artifact().relativePath(),
+                        entry.message().orElseGet(() -> MyBatisAssistantBundle.message(
+                                "generator.command.error.conflict"))))
                 .collect(Collectors.joining("\n")));
     }
 
@@ -107,7 +110,8 @@ public final class MyBatisGenerationCommandExecutor {
             @NotNull MyBatisGenerationPlan plan) {
         if (!projectRoot.isValid() || !projectRoot.isDirectory()
                 || !projectRoot.isWritable()) {
-            return "项目目录已失效或变为只读，请重新预览";
+            return MyBatisAssistantBundle.message(
+                    "generator.command.error.project.root.invalid");
         }
         for (MyBatisGenerationPlanEntry entry : plan.entries()) {
             ProgressManager.checkCanceled();
@@ -116,21 +120,25 @@ public final class MyBatisGenerationCommandExecutor {
             }
             String relativePath = entry.artifact().relativePath();
             if (!isSafeRelativePath(relativePath)) {
-                return "目标路径不是安全的项目相对路径：" + relativePath;
+                return MyBatisAssistantBundle.message(
+                        "generator.command.error.path.unsafe", relativePath);
             }
             VirtualFile current = projectRoot.findFileByRelativePath(relativePath);
             if (entry.status() == MyBatisGenerationPlanStatus.CREATE) {
                 if (current != null) {
-                    return "预览后目标已被创建，请重新预览：" + relativePath;
+                    return MyBatisAssistantBundle.message(
+                            "generator.command.error.target.created", relativePath);
                 }
                 VirtualFile parent = nearestExistingAncestor(projectRoot, relativePath);
                 if (parent == null || !parent.isDirectory() || !parent.isWritable()) {
-                    return "预览后目标目录已失效或变为只读：" + relativePath;
+                    return MyBatisAssistantBundle.message(
+                            "generator.command.error.target.directory.invalid", relativePath);
                 }
                 continue;
             }
             if (current == null || current.isDirectory() || !current.isWritable()) {
-                return "预览后目标已失效或变为只读：" + relativePath;
+                return MyBatisAssistantBundle.message(
+                        "generator.command.error.target.invalid", relativePath);
             }
             try {
                 Document document = FileDocumentManager.getInstance()
@@ -139,10 +147,12 @@ public final class MyBatisGenerationCommandExecutor {
                         ? VfsUtilCore.loadText(current)
                         : document.getText();
                 if (!currentText.equals(entry.existingText().orElseThrow())) {
-                    return "预览后文件内容已变化，请重新预览：" + relativePath;
+                    return MyBatisAssistantBundle.message(
+                            "generator.command.error.target.changed", relativePath);
                 }
             } catch (IOException failure) {
-                return "预览后文件无法读取：" + relativePath;
+                return MyBatisAssistantBundle.message(
+                        "generator.command.error.target.unreadable", relativePath);
             }
         }
         return null;
@@ -225,11 +235,13 @@ public final class MyBatisGenerationCommandExecutor {
             String relativePath = entry.artifact().relativePath();
             VirtualFile file = projectRoot.findFileByRelativePath(relativePath);
             if (file == null) {
-                throw new IOException("目标文件在写入时失效：" + relativePath);
+                throw new IOException(MyBatisAssistantBundle.message(
+                        "generator.command.error.write.target.invalid", relativePath));
             }
             Document document = FileDocumentManager.getInstance().getDocument(file);
             if (document == null) {
-                throw new IOException("无法取得目标文档：" + relativePath);
+                throw new IOException(MyBatisAssistantBundle.message(
+                        "generator.command.error.write.document.unavailable", relativePath));
             }
             String oldText = entry.existingText().orElseThrow();
             updatedDocuments.add(new UpdatedDocument(document, oldText));
@@ -247,7 +259,8 @@ public final class MyBatisGenerationCommandExecutor {
                     child = parent.createChildDirectory(this, segments[index]);
                     createdDirectories.add(child);
                 } else if (!child.isDirectory()) {
-                    throw new IOException("目标父路径已变为文件：" + relativePath);
+                    throw new IOException(MyBatisAssistantBundle.message(
+                            "generator.command.error.write.parent.file", relativePath));
                 }
                 parent = child;
             }
@@ -260,9 +273,11 @@ public final class MyBatisGenerationCommandExecutor {
             RuntimeException rollbackFailure = rollback();
             if (rollbackFailure != null) {
                 IllegalStateException result = new IllegalStateException(
-                        "生成写入失败且自动回滚不完整，请使用“MyBatis Assistant 代码生成前”"
-                                + " Local History 标签恢复：" + message(failure),
-                        failure);
+                        MyBatisAssistantBundle.message(
+                                "generator.command.error.rollback.incomplete",
+                                MyBatisAssistantBundle.message(
+                                        "database.generation.local.history.before"),
+                                message(failure)), failure);
                 result.addSuppressed(rollbackFailure);
                 return result;
             }
@@ -270,8 +285,8 @@ public final class MyBatisGenerationCommandExecutor {
             if (failure instanceof ProcessCanceledException canceled) {
                 return canceled;
             }
-            return new IllegalStateException(
-                    "生成写入失败，已自动回滚：" + message(failure), failure);
+            return new IllegalStateException(MyBatisAssistantBundle.message(
+                    "generator.command.error.rollback.complete", message(failure)), failure);
         }
 
         private RuntimeException rollback() {
@@ -331,5 +346,9 @@ public final class MyBatisGenerationCommandExecutor {
     }
 
     private record UpdatedDocument(@NotNull Document document, @NotNull String oldText) {
+    }
+
+    private static @NotNull String defaultCommandName() {
+        return MyBatisAssistantBundle.message("generator.command.default.name");
     }
 }

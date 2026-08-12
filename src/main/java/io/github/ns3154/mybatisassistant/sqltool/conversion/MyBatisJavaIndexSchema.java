@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.conversion;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -13,7 +14,8 @@ public record MyBatisJavaIndexSchema(
         boolean unique) {
     public MyBatisJavaIndexSchema {
         if (name.isBlank() || columns.isEmpty() || columns.stream().anyMatch(String::isBlank)) {
-            throw new IllegalArgumentException("索引名称和列不能为空");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "sqltool.conversion.error.java.index.empty"));
         }
         columns = List.copyOf(columns);
     }

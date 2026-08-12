@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.conversion;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.sqltool.log.MyBatisJdbcPlaceholderRewriteResult;
 import io.github.ns3154.mybatisassistant.sqltool.log.MyBatisJdbcPlaceholderRewriter;
 import io.github.ns3154.mybatisassistant.sqltool.log.MyBatisSqlRisk;
@@ -27,7 +28,8 @@ public final class MyBatisSelectArtifactConverter {
             @NotNull String methodName) {
         if (sql.length() > MAX_INPUT_BYTES
                 || sql.getBytes(StandardCharsets.UTF_8).length > MAX_INPUT_BYTES) {
-            return failure(0, "SELECT 超过 1 MiB 转换上限");
+            return failure(0, MyBatisAssistantBundle.message(
+                    "sqltool.conversion.error.select.too.large"));
         }
         String validation = validateNames(basePackage, mapperSimpleName, methodName);
         if (validation != null) {
@@ -37,7 +39,8 @@ public final class MyBatisSelectArtifactConverter {
         if (!risk.structurallyValid() || risk.statementCount() != 1
                 || risk.risk() != MyBatisSqlRisk.READ_ONLY
                 || !sql.stripLeading().regionMatches(true, 0, "SELECT", 0, 6)) {
-            return failure(0, "仅支持单条、词法完整且以 SELECT 开头的只读 SQL");
+            return failure(0, MyBatisAssistantBundle.message(
+                    "sqltool.conversion.error.select.unsupported"));
         }
         MyBatisSelectProjectionResult projection =
                 MyBatisSelectProjectionParser.parse(sql);
@@ -65,7 +68,8 @@ public final class MyBatisSelectArtifactConverter {
                 mapperSource(basePackage, mapperSimpleName, methodName, rowName, placeholders),
                 xmlSource(basePackage, mapperSimpleName, methodName, rowName, myBatisSql, columns),
                 rowSource(basePackage, rowName, columns),
-                List.of("SELECT 结果 JDBC 类型未知，Java 字段与参数使用 Object/OTHER；应用前必须确认"));
+                List.of(MyBatisAssistantBundle.message(
+                        "sqltool.conversion.warning.select.jdbc.unknown")));
     }
 
     private static String mapperSource(
@@ -150,15 +154,18 @@ public final class MyBatisSelectArtifactConverter {
 
     private static String validateNames(String basePackage, String mapper, String method) {
         if (basePackage.isBlank() || mapper.isBlank() || method.isBlank()) {
-            return "基础包名、Mapper 名称和方法名不能为空";
+            return MyBatisAssistantBundle.message(
+                    "sqltool.conversion.error.names.empty");
         }
         for (String segment : basePackage.split("\\.")) {
             if (!javaIdentifier(segment)) {
-                return "基础包名不合法：" + basePackage;
+                return MyBatisAssistantBundle.message(
+                        "sqltool.conversion.error.base.package.invalid", basePackage);
             }
         }
         if (!javaIdentifier(mapper) || !javaIdentifier(method)) {
-            return "Mapper 名称或方法名不是合法 Java 标识符";
+            return MyBatisAssistantBundle.message(
+                    "sqltool.conversion.error.java.identifier.invalid");
         }
         return null;
     }

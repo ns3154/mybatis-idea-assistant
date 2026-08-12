@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.generator;
 
 import com.intellij.ide.highlighter.JavaFileType;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiFile;
@@ -31,8 +32,8 @@ public final class MyBatisMethodPlanIntegrator {
         long xmlCount = plan.entries().stream().filter(entry ->
                 entry.artifact().kind() == MyBatisGenerationArtifactKind.XML).count();
         if (mapperCount != 1 || xmlCount != 1) {
-            throw new IllegalArgumentException(
-                    "S9 方法生成要求计划恰好包含一个 Mapper 与一个 XML");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.method.plan.targets"));
         }
         List<MyBatisGenerationPlanEntry> entries = new ArrayList<>();
         for (MyBatisGenerationPlanEntry entry : plan.entries()) {
@@ -144,7 +145,8 @@ public final class MyBatisMethodPlanIntegrator {
         int parameters = method.indexOf('(');
         int separator = method.lastIndexOf(' ', parameters);
         if (parameters <= 0 || separator < 0) {
-            throw new IllegalArgumentException("无法从 Java 方法声明提取方法名");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.method.name.unavailable"));
         }
         return method.substring(separator + 1, parameters);
     }

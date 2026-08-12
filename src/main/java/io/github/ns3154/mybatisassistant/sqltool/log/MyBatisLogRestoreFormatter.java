@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.log;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -14,25 +15,32 @@ public final class MyBatisLogRestoreFormatter {
         for (int index = 0; index < report.statements().size(); index++) {
             MyBatisRestoredStatement statement = report.statements().get(index);
             MyBatisSqlRiskAssessment risk = statement.riskAssessment();
-            output.append("-- 结果 ").append(index + 1)
-                    .append("｜上下文：").append(statement.context())
-                    .append("｜日志行：").append(statement.preparingLine())
+            output.append(MyBatisAssistantBundle.message(
+                            "sqltool.log.output.result", index + 1))
+                    .append(MyBatisAssistantBundle.message("sqltool.log.output.context"))
+                    .append(statement.context())
+                    .append(MyBatisAssistantBundle.message("sqltool.log.output.lines"))
+                    .append(statement.preparingLine())
                     .append('/').append(statement.parametersLine()).append('\n')
-                    .append("-- 风险：").append(risk.risk().displayName())
-                    .append("｜语句数：").append(risk.statementCount())
-                    .append("｜后续执行需确认：")
-                    .append(risk.confirmationRequired() ? "是" : "否").append('\n')
+                    .append(MyBatisAssistantBundle.message("sqltool.log.output.risk"))
+                    .append(risk.risk().displayName())
+                    .append(MyBatisAssistantBundle.message("sqltool.log.output.statement.count"))
+                    .append(risk.statementCount())
+                    .append(MyBatisAssistantBundle.message("sqltool.log.output.confirmation"))
+                    .append(MyBatisAssistantBundle.message(risk.confirmationRequired()
+                            ? "common.yes" : "common.no")).append('\n')
                     .append(statement.sql()).append('\n').append('\n');
         }
         if (!report.diagnostics().isEmpty()) {
-            output.append("诊断：\n");
+            output.append(MyBatisAssistantBundle.message("sqltool.log.output.diagnostics"))
+                    .append('\n');
             for (MyBatisLogDiagnostic diagnostic : report.diagnostics()) {
                 output.append("- [").append(diagnostic.code()).append("] ")
                         .append(diagnostic.message()).append('\n');
             }
         }
         if (output.isEmpty()) {
-            return "未发现可还原的 MyBatis Preparing/Parameters 日志。";
+            return MyBatisAssistantBundle.message("sqltool.log.output.empty");
         }
         return output.toString().stripTrailing();
     }

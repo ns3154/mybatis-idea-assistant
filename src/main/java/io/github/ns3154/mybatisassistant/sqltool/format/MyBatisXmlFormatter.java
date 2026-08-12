@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.sqltool.format;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.charset.StandardCharsets;
@@ -25,12 +26,12 @@ public final class MyBatisXmlFormatter {
             int indentSize) {
         if (indentSize < 1 || indentSize > 8) {
             return failure(MyBatisXmlFormatDiagnosticCode.INVALID_INDENT_SIZE, 0,
-                    "缩进宽度必须在 1 到 8 之间");
+                    MyBatisAssistantBundle.message("sqltool.format.error.indent.range"));
         }
         if (xml.length() > MAX_INPUT_BYTES
                 || xml.getBytes(StandardCharsets.UTF_8).length > MAX_INPUT_BYTES) {
             return failure(MyBatisXmlFormatDiagnosticCode.INPUT_TOO_LARGE, 0,
-                    "XML 超过 2 MiB 本地格式化上限");
+                    MyBatisAssistantBundle.message("sqltool.format.error.input.too.large"));
         }
         List<SourceLine> lines = lines(xml);
         Scanner scanner = new Scanner();
@@ -130,7 +131,8 @@ public final class MyBatisXmlFormatter {
                     case PROCESSING_INSTRUCTION -> index = closeOpaque(
                             line, index, "?>", Mode.PROCESSING_INSTRUCTION);
                     case DECLARATION -> index = scanDeclaration(line, index);
-                    default -> throw new IllegalStateException("未识别的 XML 扫描状态");
+                    default -> throw new IllegalStateException(MyBatisAssistantBundle.message(
+                            "sqltool.format.error.scan.state.unknown"));
                 }
             }
         }
@@ -166,7 +168,8 @@ public final class MyBatisXmlFormatter {
                 nameEnd++;
             }
             if (nameEnd == nameStart) {
-                throw malformed(lineNumber, "XML 标签缺少合法名称");
+                throw malformed(lineNumber, MyBatisAssistantBundle.message(
+                        "sqltool.format.error.tag.name.invalid"));
             }
             tagName = line.substring(nameStart, nameEnd);
             quote = 0;
@@ -200,7 +203,8 @@ public final class MyBatisXmlFormatter {
         private void completeTag(int lineNumber) throws MalformedXmlException {
             if (closingTag) {
                 if (elements.isEmpty() || !elements.getLast().equals(tagName)) {
-                    throw malformed(lineNumber, "XML 结束标签与当前结构不匹配：" + tagName);
+                    throw malformed(lineNumber, MyBatisAssistantBundle.message(
+                            "sqltool.format.error.end.tag.mismatch", tagName));
                 }
                 elements.removeLast();
             } else if (lastTagCharacter != '/') {
@@ -218,7 +222,8 @@ public final class MyBatisXmlFormatter {
                 return line.length();
             }
             if (mode != expected) {
-                throw new IllegalStateException("XML 不透明区状态异常");
+                throw new IllegalStateException(MyBatisAssistantBundle.message(
+                        "sqltool.format.error.opaque.state"));
             }
             mode = Mode.NORMAL;
             return closing + delimiter.length();
@@ -247,10 +252,12 @@ public final class MyBatisXmlFormatter {
 
         private void finish(int lineCount) throws MalformedXmlException {
             if (mode != Mode.NORMAL) {
-                throw malformed(lineCount, "XML 包含未闭合的标签、注释、CDATA 或声明");
+                throw malformed(lineCount, MyBatisAssistantBundle.message(
+                        "sqltool.format.error.unclosed.structure"));
             }
             if (!elements.isEmpty()) {
-                throw malformed(lineCount, "XML 标签未闭合：" + elements.getLast());
+                throw malformed(lineCount, MyBatisAssistantBundle.message(
+                        "sqltool.format.error.tag.unclosed", elements.getLast()));
             }
         }
 

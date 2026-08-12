@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.generator;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import org.jetbrains.annotations.NotNull;
@@ -14,7 +15,8 @@ public record MyBatisGenerationRequest(
         @NotNull MyBatisGenerationConfiguration configuration) {
     public MyBatisGenerationRequest {
         if (dataSourceId.isBlank()) {
-            throw new IllegalArgumentException("数据源标识不能为空");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.data.source.empty"));
         }
     }
 }

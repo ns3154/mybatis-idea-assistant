@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.conversion;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -16,7 +17,8 @@ public record MyBatisJavaTableSchema(
         @NotNull List<MyBatisJavaIndexSchema> indexes) {
     public MyBatisJavaTableSchema {
         if (tableName.isBlank() || fields.isEmpty()) {
-            throw new IllegalArgumentException("表名和字段不能为空");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "sqltool.conversion.error.java.table.empty"));
         }
         schema = schema.filter(value -> !value.isBlank());
         comment = comment.filter(value -> !value.isBlank());

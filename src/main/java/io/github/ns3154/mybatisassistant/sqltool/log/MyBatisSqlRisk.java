@@ -1,21 +1,23 @@
 package io.github.ns3154.mybatisassistant.sqltool.log;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
+
 /**
  * SQL 的保守风险等级。未知语句绝不按只读处理。
  */
 public enum MyBatisSqlRisk {
-    READ_ONLY("只读"),
-    WRITE("写入"),
-    DDL("结构变更"),
-    UNKNOWN("未知");
+    READ_ONLY("sqltool.risk.read.only"),
+    WRITE("sqltool.risk.write"),
+    DDL("sqltool.risk.ddl"),
+    UNKNOWN("sqltool.risk.unknown");
 
-    private final String displayName;
+    private final String messageKey;
 
-    MyBatisSqlRisk(String displayName) {
-        this.displayName = displayName;
+    MyBatisSqlRisk(String messageKey) {
+        this.messageKey = messageKey;
     }
 
     public String displayName() {
-        return displayName;
+        return MyBatisAssistantBundle.message(messageKey);
     }
 }

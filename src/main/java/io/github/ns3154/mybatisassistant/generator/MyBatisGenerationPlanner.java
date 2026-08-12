@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.generator;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.vfs.VfsUtilCore;
@@ -27,7 +28,8 @@ public final class MyBatisGenerationPlanner {
             @NotNull VirtualFile projectRoot,
             @NotNull List<MyBatisGenerationBundle> bundles) {
         if (!projectRoot.isDirectory()) {
-            throw new IllegalArgumentException("生成基目录必须是项目目录");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.base.directory.invalid"));
         }
         Map<String, MyBatisGeneratedArtifact> unique = new LinkedHashMap<>();
         Map<String, String> collisions = new LinkedHashMap<>();
@@ -37,8 +39,8 @@ public final class MyBatisGenerationPlanner {
                 MyBatisGeneratedArtifact previous = unique.putIfAbsent(
                         artifact.relativePath(), artifact);
                 if (previous != null && !previous.content().equals(artifact.content())) {
-                    collisions.put(artifact.relativePath(),
-                            "多张表产生了同一目标路径");
+                    collisions.put(artifact.relativePath(), MyBatisAssistantBundle.message(
+                            "generator.error.path.collision"));
                 }
             }
         }
@@ -66,7 +68,9 @@ public final class MyBatisGenerationPlanner {
             if (ancestor == null || !ancestor.isDirectory() || !ancestor.isWritable()) {
                 return conflict(artifact, Optional.empty(),
                         MyBatisSafeMergeConflictCode.TARGET_READ_ONLY,
-                        "目标目录不可写：" + artifact.relativePath());
+                        MyBatisAssistantBundle.message(
+                                "generator.error.target.directory.readonly",
+                                artifact.relativePath()));
             }
             try {
                 MyBatisGenerationPsiValidator.validate(project, artifact, artifact.content());
@@ -84,8 +88,12 @@ public final class MyBatisGenerationPlanner {
                             ? MyBatisSafeMergeConflictCode.TARGET_IS_DIRECTORY
                             : MyBatisSafeMergeConflictCode.TARGET_READ_ONLY,
                     existing.isDirectory()
-                            ? "目标路径已是目录：" + artifact.relativePath()
-                            : "目标文件只读：" + artifact.relativePath());
+                            ? MyBatisAssistantBundle.message(
+                                    "generator.error.target.is.directory",
+                                    artifact.relativePath())
+                            : MyBatisAssistantBundle.message(
+                                    "generator.error.target.file.readonly",
+                                    artifact.relativePath()));
         }
         String existingText;
         try {
@@ -95,7 +103,9 @@ public final class MyBatisGenerationPlanner {
         } catch (IOException failure) {
             return conflict(artifact, Optional.empty(),
                     MyBatisSafeMergeConflictCode.IO_ERROR,
-                    "无法读取目标文件：" + artifact.relativePath());
+                    MyBatisAssistantBundle.message(
+                            "generator.error.target.file.unreadable",
+                            artifact.relativePath()));
         }
         MyBatisSafeMergeResult merged = MyBatisSafeMerger.merge(
                 existingText, artifact.content());

@@ -108,7 +108,7 @@ public final class MyBatisDatabaseSqlExecuteAction extends AnAction {
                 project,
                 MyBatisAssistantBundle.message(
                         "database.sql.execute.confirm.second.prompt",
-                        MyBatisSqlExecutionPolicy.DANGEROUS_CONFIRMATION_PHRASE),
+                        MyBatisSqlExecutionPolicy.dangerousConfirmationPhrase()),
                 MyBatisAssistantBundle.message("database.sql.execute.confirm.second.title"),
                 Messages.getWarningIcon());
         return MyBatisSqlExecutionPolicy.authorize(

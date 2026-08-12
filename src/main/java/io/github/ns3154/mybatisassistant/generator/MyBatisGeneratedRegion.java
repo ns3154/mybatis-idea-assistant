@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.generator;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.charset.StandardCharsets;
@@ -24,7 +25,8 @@ public final class MyBatisGeneratedRegion {
             @NotNull String id,
             @NotNull String body) {
         if (id.isBlank() || id.indexOf('"') >= 0 || id.indexOf('\n') >= 0) {
-            throw new IllegalArgumentException("生成区标识不合法");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.region.id.invalid"));
         }
         String normalized = normalize(body);
         String start = switch (style) {
@@ -45,7 +47,8 @@ public final class MyBatisGeneratedRegion {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                     .digest(value.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException impossible) {
-            throw new IllegalStateException("JDK 缺少 SHA-256", impossible);
+            throw new IllegalStateException(MyBatisAssistantBundle.message(
+                    "generator.error.sha256.unavailable"), impossible);
         }
     }
 

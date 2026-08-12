@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.generator;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -37,7 +38,8 @@ final class MyBatisMethodRegionMerger {
                 existing, "<mybatis-assistant-method id=\"" + methodName + "\"");
         if (markerOccurrences != blocks.size() || blocks.size() > 1) {
             return conflict(MyBatisSafeMergeConflictCode.MALFORMED_MARKERS,
-                    "方法生成区标识缺失、损坏或重复：" + methodName);
+                    MyBatisAssistantBundle.message(
+                            "generator.error.method.region.marker", methodName));
         }
         String rendered = render(style, methodName, body);
         String merged;
@@ -45,21 +47,25 @@ final class MyBatisMethodRegionMerger {
             Block old = blocks.get(0);
             if (!old.hash().equals(MyBatisGeneratedRegion.sha256(old.body()))) {
                 return conflict(MyBatisSafeMergeConflictCode.METHOD_REGION_MODIFIED,
-                        "方法生成区已被手工修改：" + methodName);
+                        MyBatisAssistantBundle.message(
+                                "generator.error.method.region.modified", methodName));
             }
             merged = existing.substring(0, old.start()) + rendered
                     + existing.substring(old.end());
         } else {
             if (declarationAlreadyExists) {
                 return conflict(MyBatisSafeMergeConflictCode.METHOD_DECLARATION_EXISTS,
-                        "目标文件已存在同名手写声明：" + methodName);
+                        MyBatisAssistantBundle.message(
+                                "generator.error.method.declaration.exists", methodName));
             }
             int insertion = insertionOffset(existing, style);
             if (insertion < 0) {
                 return conflict(MyBatisSafeMergeConflictCode.METHOD_TARGET_MISSING,
                         style == MyBatisGeneratedRegion.Style.JAVA
-                                ? "Java 目标缺少类型结束边界"
-                                : "XML 目标缺少 mapper 结束标签");
+                                ? MyBatisAssistantBundle.message(
+                                        "generator.error.method.java.target.boundary")
+                                : MyBatisAssistantBundle.message(
+                                        "generator.error.method.xml.target.boundary"));
             }
             String prefix = existing.substring(0, insertion);
             merged = prefix + (prefix.endsWith("\n") ? "" : "\n")
@@ -94,7 +100,8 @@ final class MyBatisMethodRegionMerger {
             @NotNull String methodName,
             @NotNull String body) {
         if (!methodName.matches("[A-Za-z_$][A-Za-z0-9_$]*")) {
-            throw new IllegalArgumentException("方法生成区标识不是 Java 方法名：" + methodName);
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "generator.error.method.region.id.invalid", methodName));
         }
         String normalizedBody = MyBatisGeneratedRegion.normalize(body);
         String indent = "    ";

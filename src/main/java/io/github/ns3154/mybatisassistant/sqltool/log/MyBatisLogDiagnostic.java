@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.log;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -11,7 +12,8 @@ public record MyBatisLogDiagnostic(
         @NotNull String message) {
     public MyBatisLogDiagnostic {
         if (lineNumber < 0) {
-            throw new IllegalArgumentException("行号不能为负数");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "sqltool.log.error.line.negative"));
         }
     }
 }

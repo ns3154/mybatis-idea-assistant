@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.generator;
 
 import com.intellij.openapi.progress.ProgressManager;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -41,26 +42,30 @@ public final class MyBatisSafeMerger {
         if (existingRegions.regions.isEmpty()) {
             return new MyBatisSafeMergeResult.Conflict(
                     MyBatisSafeMergeConflictCode.FILE_WITHOUT_MARKERS,
-                    "已有文件不含 MyBatis Assistant 稳定生成标识");
+                    MyBatisAssistantBundle.message(
+                            "generator.error.marker.missing"));
         }
         if (!existingRegions.regions.keySet().equals(desiredRegions.regions.keySet())) {
             return new MyBatisSafeMergeResult.Conflict(
                     MyBatisSafeMergeConflictCode.MARKER_SET_CHANGED,
-                    "新旧生成区集合不一致，已停止覆盖");
+                    MyBatisAssistantBundle.message(
+                            "generator.error.marker.set.changed"));
         }
         for (Region region : existingRegions.regions.values()) {
             ProgressManager.checkCanceled();
             if (!region.declaredHash.equals(MyBatisGeneratedRegion.sha256(region.body))) {
                 return new MyBatisSafeMergeResult.Conflict(
                         MyBatisSafeMergeConflictCode.GENERATED_REGION_MODIFIED,
-                        "生成区已被手工修改：" + region.id);
+                        MyBatisAssistantBundle.message(
+                                "generator.error.region.modified", region.id));
             }
         }
         for (Region region : desiredRegions.regions.values()) {
             if (!region.declaredHash.equals(MyBatisGeneratedRegion.sha256(region.body))) {
                 return new MyBatisSafeMergeResult.Conflict(
                         MyBatisSafeMergeConflictCode.MALFORMED_MARKERS,
-                        "候选生成区指纹不一致：" + region.id);
+                        MyBatisAssistantBundle.message(
+                                "generator.error.region.fingerprint", region.id));
             }
         }
         StringBuilder merged = new StringBuilder(existing);
@@ -93,13 +98,15 @@ public final class MyBatisSafeMerger {
                 String id = start.group(1);
                 if (open.putIfAbsent(id, new OpenRegion(
                         id, start.group(2), cursor, next)) != null || regions.containsKey(id)) {
-                    return ParseResult.error("生成区标识重复：" + id);
+                    return ParseResult.error(MyBatisAssistantBundle.message(
+                            "generator.error.marker.duplicate", id));
                 }
             } else if (end.matches()) {
                 String id = end.group(1);
                 OpenRegion started = open.remove(id);
                 if (started == null || !open.isEmpty()) {
-                    return ParseResult.error("生成区边界交叉或缺失：" + id);
+                    return ParseResult.error(MyBatisAssistantBundle.message(
+                            "generator.error.marker.boundary", id));
                 }
                 String body = text.substring(started.bodyStart, cursor);
                 regions.put(id, new Region(
@@ -113,7 +120,8 @@ public final class MyBatisSafeMerger {
             cursor = next;
         }
         if (!open.isEmpty()) {
-            return ParseResult.error("生成区缺少结束标识：" + open.keySet().iterator().next());
+            return ParseResult.error(MyBatisAssistantBundle.message(
+                    "generator.error.marker.end.missing", open.keySet().iterator().next()));
         }
         return new ParseResult(regions, null);
     }

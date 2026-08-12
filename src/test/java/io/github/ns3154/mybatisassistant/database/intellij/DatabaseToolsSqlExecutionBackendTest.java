@@ -176,7 +176,7 @@ public final class DatabaseToolsSqlExecutionBackendTest extends BasePlatformTest
                         plan,
                         plan.doubleConfirmationRequired(),
                         plan.doubleConfirmationRequired()
-                                ? MyBatisSqlExecutionPolicy.DANGEROUS_CONFIRMATION_PHRASE : "");
+                                ? MyBatisSqlExecutionPolicy.dangerousConfirmationPhrase() : "");
         return ((MyBatisSqlExecutionAuthorization.Authorized) authorization).execution();
     }
 

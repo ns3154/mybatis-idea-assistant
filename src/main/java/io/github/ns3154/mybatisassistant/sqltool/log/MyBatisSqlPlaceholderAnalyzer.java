@@ -1,5 +1,6 @@
 package io.github.ns3154.mybatisassistant.sqltool.log;
 
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -19,7 +20,8 @@ public final class MyBatisSqlPlaceholderAnalyzer {
                     result.placeholderCount(), true, "");
         } catch (MyBatisSqlLexicalScanner.MalformedSqlException malformed) {
             return new MyBatisSqlPlaceholderAnalysis(
-                    0, false, "SQL 包含未闭合的引号、标识符或注释");
+                    0, false, MyBatisAssistantBundle.message(
+                            "sqltool.log.error.sql.unclosed"));
         }
     }
 }
