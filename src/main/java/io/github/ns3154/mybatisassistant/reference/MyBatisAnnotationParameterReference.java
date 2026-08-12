@@ -5,20 +5,19 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiElementResolveResult;
-import com.intellij.psi.PsiLiteralExpression;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiPolyVariantReferenceBase;
 import com.intellij.psi.ResolveResult;
 import org.jetbrains.annotations.NotNull;
 
 public final class MyBatisAnnotationParameterReference
-        extends PsiPolyVariantReferenceBase<PsiLiteralExpression> {
+        extends PsiPolyVariantReferenceBase<PsiElement> {
     private final PsiMethod method;
     private final MyBatisParameterExpressionParser.ParameterPath path;
     private final int segmentIndex;
 
     MyBatisAnnotationParameterReference(
-            @NotNull PsiLiteralExpression literal,
+            @NotNull PsiElement literal,
             @NotNull TextRange range,
             @NotNull PsiMethod method,
             @NotNull MyBatisParameterExpressionParser.ParameterPath path,

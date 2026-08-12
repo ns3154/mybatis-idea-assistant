@@ -2,7 +2,7 @@
 
 > 阶段：S11 兼容矩阵扩展
 > 日期：2026-08-12
-> 状态：注解 SQL 与 Spring 注入切面开发完成；Kotlin、框架和数据库扩展待后续批次
+> 状态：注解 SQL、Spring 注入与 Kotlin K2 编辑器切面开发完成；框架和数据库扩展待后续批次
 
 ## 目标
 
@@ -25,7 +25,7 @@
 | S11-A | 注解 SQL 参数引用、补全与检查 | 代码与自动化完成 | 根/嵌套参数、List、Map、无关注解、Dumb/PCE、真实 Inspection 与 SQL 补全测试 |
 | S11-B | 注解 SQL 到 XML 的安全迁移 | 代码与自动化完成，待副屏 | 四类注解、数组拼接、转义/resultType、冲突拒绝、TOCTOU、双文件一次 Undo、动作注册测试 |
 | S11-C | Spring 显式注入关系 | 代码与自动化完成，待隔离和副屏 | 真实可选描述符 gutter、字段/构造器/参数、多 XML 候选、误报静默、Dumb/PCE 测试 |
-| S11-D | Kotlin K2 编辑器能力 | 待开发 | 导航、补全、检查、默认/可空参数、data class 与可选依赖隔离 |
+| S11-D | Kotlin K2 编辑器能力 | 代码与自动化完成，待隔离和副屏 | XML/注解双向导航、参数引用/补全、缺失参数/statement 检查、默认/可空参数、data class、多目标、Dumb/PCE 测试 |
 | S11-E | Plus/Flex/TkMapper 统一模型适配 | 待开发 | 锁定版本基类方法、实体推导、Wrapper/模板和不支持版本拒绝 |
 | S11-F | 六数据库、Community JDBC 与 Android Studio | 待开发 | 方言矩阵、PasswordSafe、无 Database/Spring 模块降级和安装冒烟 |
 
@@ -39,6 +39,7 @@
 | S11-04 | Spring 注入导航 | 显式注入变量到精确 namespace XML；多目标全部保留 | `@Qualifier` 单独存在、普通字段/类型、无 Mapper 证据、Dumb Mode 静默 |
 | S11-05 | 可选依赖隔离 | 禁用 Spring 后主插件继续加载且核心能力可用 | Spring 扩展类不得从核心描述符或核心公开类型加载 |
 | S11-06 | 当前批质量门 | 平台测试、85% S11 核心覆盖率、Checkstyle、结构、261 Verifier、ZIP 与双 Maven 语料全绿 | 生命周期、隔离和副屏未完成前不得把整个 S11 标为已验收 |
+| S11-07 | Kotlin K2 编辑器 | Kotlin 函数与 XML/注解精确导航，注解参数根/嵌套属性引用和补全，缺失路径/statement 精确警告 | 动态 Map、运行期字符串插值、重载、带函数体、Dumb/竞态时静默；多 XML 全部保留 |
 
 ## 统一门禁
 
