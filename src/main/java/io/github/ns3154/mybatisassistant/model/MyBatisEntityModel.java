@@ -17,7 +17,8 @@ public record MyBatisEntityModel(
         Objects.requireNonNull(kind, "kind");
         typeArguments = List.copyOf(typeArguments);
         if (canonicalType.isBlank()) {
-            throw new IllegalArgumentException("实体类型不能为空");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.entity.type.empty"));
         }
     }
 }

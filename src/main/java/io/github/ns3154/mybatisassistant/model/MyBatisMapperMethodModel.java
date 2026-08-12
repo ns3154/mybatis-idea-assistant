@@ -21,7 +21,8 @@ public record MyBatisMapperMethodModel(
         Objects.requireNonNull(statementSource, "statementSource");
         parameters = List.copyOf(parameters);
         if (name.isBlank() || declaringType.isBlank() || returnType.isBlank()) {
-            throw new IllegalArgumentException("Mapper 方法名称、声明类型和返回类型不能为空");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.mapper.method.identity.empty"));
         }
     }
 

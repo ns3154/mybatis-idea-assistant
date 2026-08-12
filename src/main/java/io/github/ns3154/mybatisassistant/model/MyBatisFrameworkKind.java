@@ -9,27 +9,27 @@ public enum MyBatisFrameworkKind {
     MYBATIS_PLUS(
             "MyBatis-Plus",
             "com.baomidou.mybatisplus.core.mapper.BaseMapper",
-            "3.5+ 的 3.x"),
+            "model.framework.range.mybatis.plus"),
     MYBATIS_FLEX(
             "MyBatis-Flex",
             "com.mybatisflex.core.BaseMapper",
-            "1.7.2+ 的 1.x"),
+            "model.framework.range.mybatis.flex"),
     TK_MAPPER(
             "TkMapper",
             "tk.mybatis.mapper.common.Mapper",
-            "6.x");
+            "model.framework.range.tk.mapper");
 
     private final String displayName;
     private final String baseMapperQualifiedName;
-    private final String supportedVersionRange;
+    private final String supportedVersionRangeKey;
 
     MyBatisFrameworkKind(
             @NotNull String displayName,
             @NotNull String baseMapperQualifiedName,
-            @NotNull String supportedVersionRange) {
+            @NotNull String supportedVersionRangeKey) {
         this.displayName = displayName;
         this.baseMapperQualifiedName = baseMapperQualifiedName;
-        this.supportedVersionRange = supportedVersionRange;
+        this.supportedVersionRangeKey = supportedVersionRangeKey;
     }
 
     public @NotNull String displayName() {
@@ -41,7 +41,7 @@ public enum MyBatisFrameworkKind {
     }
 
     public @NotNull String supportedVersionRange() {
-        return supportedVersionRange;
+        return MyBatisModelMessages.message(supportedVersionRangeKey);
     }
 
     /**
@@ -57,17 +57,17 @@ public enum MyBatisFrameworkKind {
             case TK_MAPPER -> parsed.major() == 6;
         };
         if (!supported) {
-            throw new IllegalArgumentException(
-                    "不支持的 " + displayName + " 版本：" + version
-                            + "；支持范围：" + supportedVersionRange);
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.framework.version.unsupported",
+                    displayName, version, supportedVersionRange()));
         }
     }
 
     private record Version(int major, int minor, int patch) {
         private static @NotNull Version parse(@NotNull String value) {
             if (!value.matches("[0-9]+\\.[0-9]+(?:\\.[0-9]+)?")) {
-                throw new IllegalArgumentException(
-                        "框架版本格式必须为 major.minor[.patch]：" + value);
+                throw new IllegalArgumentException(MyBatisModelMessages.message(
+                        "model.error.framework.version.format", value));
             }
             String[] parts = value.split("\\.");
             try {
@@ -76,7 +76,8 @@ public enum MyBatisFrameworkKind {
                         Integer.parseInt(parts[1]),
                         parts.length == 3 ? Integer.parseInt(parts[2]) : 0);
             } catch (NumberFormatException invalid) {
-                throw new IllegalArgumentException("框架版本数字过大：" + value, invalid);
+                throw new IllegalArgumentException(MyBatisModelMessages.message(
+                        "model.error.framework.version.number", value), invalid);
             }
         }
     }

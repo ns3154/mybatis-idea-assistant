@@ -16,7 +16,8 @@ public record MyBatisMapperModel(
         methods = List.copyOf(methods);
         frameworkBindings = List.copyOf(frameworkBindings);
         if (qualifiedName.isBlank() || evidence.isEmpty()) {
-            throw new IllegalArgumentException("Mapper 模型必须包含全限定名和识别证据");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.mapper.model.incomplete"));
         }
     }
 

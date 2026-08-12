@@ -24,7 +24,8 @@ public record MyBatisParameterBinding(
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(certainty, "certainty");
         if (name.isBlank() || javaIndex < 0 || effectiveIndex < 0) {
-            throw new IllegalArgumentException("参数绑定名称和下标必须有效");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.parameter.binding.invalid"));
         }
     }
 }

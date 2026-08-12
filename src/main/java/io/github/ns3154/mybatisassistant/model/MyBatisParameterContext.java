@@ -25,11 +25,13 @@ public record MyBatisParameterContext(
         bindings = List.copyOf(bindings);
         if (rootMode == MyBatisParameterRootMode.DIRECT
                 && (directParameter == null || directType == null)) {
-            throw new IllegalArgumentException("单参数直接上下文必须包含参数和替换后的类型");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.parameter.context.direct"));
         }
         if (rootMode == MyBatisParameterRootMode.NAMED
                 && (directParameter != null || directType != null || dynamicMapRoot)) {
-            throw new IllegalArgumentException("具名参数上下文不能包含直接根对象");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.parameter.context.named"));
         }
     }
 

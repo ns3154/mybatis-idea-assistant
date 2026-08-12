@@ -16,10 +16,12 @@ public record MyBatisConfigurationEntry(
         name = normalizeName(kind, name);
         value = value == null ? null : normalized(value);
         if (kind == MyBatisConfigurationEntryKind.TYPE_ALIAS && value == null) {
-            throw new IllegalArgumentException("显式 TypeAlias 必须包含目标类型");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.type.alias.target.missing"));
         }
         if (kind != MyBatisConfigurationEntryKind.TYPE_ALIAS && value != null) {
-            throw new IllegalArgumentException("非 TypeAlias 配置项不能包含额外值");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.configuration.extra.value"));
         }
     }
 
@@ -39,7 +41,8 @@ public record MyBatisConfigurationEntry(
     private static @NotNull String normalized(@NotNull String value) {
         String normalized = value.trim();
         if (normalized.isEmpty()) {
-            throw new IllegalArgumentException("MyBatis 配置项不能为空");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.configuration.entry.empty"));
         }
         return normalized;
     }

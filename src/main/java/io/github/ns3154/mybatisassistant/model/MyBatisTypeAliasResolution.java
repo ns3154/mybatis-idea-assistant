@@ -10,7 +10,8 @@ public sealed interface MyBatisTypeAliasResolution {
         public Unique {
             Objects.requireNonNull(canonicalType, "canonicalType");
             if (canonicalType.isBlank()) {
-                throw new IllegalArgumentException("TypeAlias 目标类型不能为空");
+                throw new IllegalArgumentException(MyBatisModelMessages.message(
+                        "model.error.type.alias.target.empty"));
             }
         }
     }
@@ -19,7 +20,8 @@ public sealed interface MyBatisTypeAliasResolution {
         public Multiple {
             canonicalTypes = List.copyOf(canonicalTypes);
             if (canonicalTypes.size() < 2) {
-                throw new IllegalArgumentException("多 TypeAlias 结果至少需要两个目标类型");
+                throw new IllegalArgumentException(MyBatisModelMessages.message(
+                        "model.error.type.alias.multiple"));
             }
         }
     }

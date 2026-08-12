@@ -34,7 +34,7 @@ go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
 
 ## 仍未验收
 
-- SQL 工具链、生成器和方法名 SQL/Wrapper/Join 的解析、校验、冲突、回滚与候选注释已完成资源化；统一语义、重构、动态 SQL、OGNL 等历史核心诊断仍可能透传固定中文，仍需继续迁移，不得提前宣称全产品英文错误文案完成。
+- SQL 工具链、生成器、方法名 SQL/Wrapper/Join 及统一语义模型的解析、校验、冲突、回滚与候选注释已完成资源化；重构、动态 SQL、OGNL 等历史核心诊断仍可能透传固定中文，仍需继续迁移，不得提前宣称全产品英文错误文案完成。
 - 当前未提供 `CERTIFICATE_CHAIN`、`PRIVATE_KEY`、`PRIVATE_KEY_PASSWORD` 和 `PUBLISH_TOKEN`，因此只验证了失败关闭配置，没有生成真实签名包或发布 Marketplace。
 - 按用户要求不占用主屏；当前无副屏，未运行 `runIde`、IDE 生命周期脚本、真实 MCP 客户端、设置页、安装、升级、降级、禁用和卸载验收。
 - 本批仍需运行远端 CI 和兼容矩阵；这些证据未写入本记录前，S12 保持“部分完成”。

@@ -14,7 +14,8 @@ public final class MyBatisBootConfigurationKey {
             @NotNull String value) {
         String normalized = value.trim();
         if (normalized.isEmpty() || normalized.indexOf(SEPARATOR) >= 0) {
-            throw new IllegalArgumentException("MyBatis Boot 配置索引键无效");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.boot.configuration.key.invalid"));
         }
         return kind.name() + SEPARATOR + normalized;
     }

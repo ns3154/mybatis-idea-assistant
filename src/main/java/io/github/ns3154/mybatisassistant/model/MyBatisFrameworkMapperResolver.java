@@ -37,7 +37,8 @@ public final class MyBatisFrameworkMapperResolver {
             return new MyBatisFrameworkMapperResolution.SourceInvalid();
         }
         if (!mapper.isInterface() || mapper.isAnnotationType()) {
-            return new MyBatisFrameworkMapperResolution.Unsupported("源必须是 Mapper 接口");
+            return new MyBatisFrameworkMapperResolution.Unsupported(
+                    MyBatisModelMessages.message("model.error.framework.source.interface"));
         }
         if (DumbService.isDumb(project)) {
             return new MyBatisFrameworkMapperResolution.IndexNotReady();
@@ -62,7 +63,8 @@ public final class MyBatisFrameworkMapperResolver {
             }
             if (candidates.size() != 1) {
                 return new MyBatisFrameworkMapperResolution.Unsupported(
-                        "Mapper 同时继承多个已支持框架基类");
+                        MyBatisModelMessages.message(
+                                "model.error.framework.multiple.base.types"));
             }
             return binding(mapper, candidates.getFirst());
         } catch (IndexNotReadyException ignored) {
@@ -77,7 +79,8 @@ public final class MyBatisFrameworkMapperResolver {
         PsiTypeParameter[] parameters = baseMapper.getTypeParameters();
         if (parameters.length != 1) {
             return new MyBatisFrameworkMapperResolution.Unsupported(
-                    candidate.framework().displayName() + " 基类泛型形状不受支持");
+                    MyBatisModelMessages.message("model.error.framework.generic.shape",
+                            candidate.framework().displayName()));
         }
         PsiSubstitutor substitutor = TypeConversionUtil.getSuperClassSubstitutor(
                 baseMapper,
@@ -89,12 +92,14 @@ public final class MyBatisFrameworkMapperResolver {
                 : null;
         if (entityClass == null || entityClass instanceof PsiTypeParameter) {
             return new MyBatisFrameworkMapperResolution.Unsupported(
-                    candidate.framework().displayName() + " 实体泛型必须是可解析的具体类");
+                    MyBatisModelMessages.message("model.error.framework.generic.resolve",
+                            candidate.framework().displayName()));
         }
         MyBatisEntityModel entity = MyBatisEntityModelFactory.create(entityType, mapper);
         if (entity.kind() != MyBatisEntityKind.CLASS || entity.qualifiedName() == null) {
             return new MyBatisFrameworkMapperResolution.Unsupported(
-                    candidate.framework().displayName() + " 实体泛型必须是具体实体类");
+                    MyBatisModelMessages.message("model.error.framework.generic.concrete",
+                            candidate.framework().displayName()));
         }
         return new MyBatisFrameworkMapperResolution.Found(
                 new MyBatisFrameworkMapperBinding(

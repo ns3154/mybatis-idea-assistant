@@ -20,10 +20,12 @@ public record MyBatisFrameworkMapperBinding(
         frameworkDeclaringTypes = List.copyOf(frameworkDeclaringTypes);
         if (entity.qualifiedName() == null
                 || entity.kind() != MyBatisEntityKind.CLASS) {
-            throw new IllegalArgumentException("框架 Mapper 实体必须是可解析的具体类");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.framework.entity.concrete"));
         }
         if (!frameworkDeclaringTypes.contains(framework.baseMapperQualifiedName())) {
-            throw new IllegalArgumentException("框架方法声明类型必须包含锁定基类");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.framework.declaring.type"));
         }
     }
 

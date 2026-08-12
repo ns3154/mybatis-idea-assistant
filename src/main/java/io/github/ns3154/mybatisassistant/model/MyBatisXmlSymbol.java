@@ -15,7 +15,8 @@ public record MyBatisXmlSymbol(
         Objects.requireNonNull(namespace, "namespace");
         if ((kind.isNamed() && (id == null || id.isBlank()))
                 || (!kind.isNamed() && id != null)) {
-            throw new IllegalArgumentException("MyBatis XML 符号类型与 id 不匹配");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.xml.symbol.kind.id"));
         }
         namespace = namespace.trim();
         id = id == null ? null : id.trim();

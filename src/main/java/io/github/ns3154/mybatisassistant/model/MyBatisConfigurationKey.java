@@ -16,7 +16,8 @@ public final class MyBatisConfigurationKey {
             @NotNull String name) {
         String normalized = name.trim();
         if (normalized.isEmpty() || normalized.indexOf(SEPARATOR) >= 0) {
-            throw new IllegalArgumentException("MyBatis 配置索引键无效");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.configuration.key.invalid"));
         }
         if (kind == MyBatisConfigurationEntryKind.TYPE_ALIAS) {
             normalized = normalized.toLowerCase(Locale.ROOT);
