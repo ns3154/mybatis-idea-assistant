@@ -84,6 +84,47 @@ final class MyBatisParameterPathResolver {
         }
     }
 
+    static @NotNull MyBatisParameterPathResolution resolveAnnotation(
+            @NotNull PsiElement source,
+            @NotNull PsiMethod method,
+            @NotNull MyBatisParameterExpressionParser.ParameterPath path,
+            int segmentIndex) {
+        ProgressManager.checkCanceled();
+        Project project = source.getProject();
+        if (!source.isValid()
+                || !method.isValid()
+                || project.isDisposed()
+                || !project.isOpen()) {
+            return resolution(MyBatisParameterPathResolution.Status.SOURCE_INVALID);
+        }
+        if (segmentIndex < 0 || segmentIndex >= path.segments().size()) {
+            return resolution(MyBatisParameterPathResolution.Status.UNKNOWN);
+        }
+        if (DumbService.isDumb(project)) {
+            return resolution(MyBatisParameterPathResolution.Status.INDEX_NOT_READY);
+        }
+        try {
+            PsiClass mapper = method.getContainingClass();
+            if (mapper == null || !mapper.isInterface() || mapper.isAnnotationType()) {
+                return resolution(MyBatisParameterPathResolution.Status.UNKNOWN);
+            }
+            MyBatisParameterContextResolution contextResolution =
+                    MyBatisParameterContextResolver.resolve(mapper, method);
+            if (contextResolution instanceof MyBatisParameterContextResolution.Found found) {
+                return resolveContexts(List.of(found.context()), path, segmentIndex);
+            }
+            if (contextResolution instanceof MyBatisParameterContextResolution.IndexNotReady) {
+                return resolution(MyBatisParameterPathResolution.Status.INDEX_NOT_READY);
+            }
+            if (contextResolution instanceof MyBatisParameterContextResolution.SourceInvalid) {
+                return resolution(MyBatisParameterPathResolution.Status.SOURCE_INVALID);
+            }
+            return resolution(MyBatisParameterPathResolution.Status.UNKNOWN);
+        } catch (IndexNotReadyException ignored) {
+            return resolution(MyBatisParameterPathResolution.Status.INDEX_NOT_READY);
+        }
+    }
+
     private static @NotNull List<MyBatisParameterContext> parameterContexts(
             @NotNull PsiElement source,
             @NotNull StatementContext statement) {

@@ -14,6 +14,10 @@
                 language="XML"
                 order="first"
                 implementationClass="io.github.ns3154.mybatisassistant.sql.intellij.MyBatisSqlCompletionContributor"/>
+        <completion.contributor
+                language="GenericSQL"
+                order="first"
+                implementationClass="io.github.ns3154.mybatisassistant.sql.intellij.MyBatisSqlCompletionContributor"/>
         <localInspection
                 language="XML"
                 shortName="MyBatisSqlSchema"

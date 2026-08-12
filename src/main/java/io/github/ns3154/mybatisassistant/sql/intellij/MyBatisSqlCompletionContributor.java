@@ -12,6 +12,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiLanguageInjectionHost;
+import com.intellij.psi.PsiLiteralExpression;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.psi.xml.XmlText;
@@ -22,6 +23,7 @@ import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseSnapshot;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
 import io.github.ns3154.mybatisassistant.database.MyBatisMetadataFreshness;
 import io.github.ns3154.mybatisassistant.model.MyBatisXmlModel;
+import io.github.ns3154.mybatisassistant.reference.MyBatisAnnotationSqlSupport;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.LinkedHashMap;
@@ -55,9 +57,13 @@ public final class MyBatisSqlCompletionContributor extends CompletionContributor
         ProgressManager.checkCanceled();
         PsiElement position = parameters.getPosition();
         XmlTag statement = statement(parameters);
-        if (statement == null) {
+        AnnotationContext annotation = annotationContext(parameters);
+        if (statement == null && annotation == null) {
             return;
         }
+        CompletionResultSet output = annotation == null
+                ? result
+                : result.withPrefixMatcher(annotationPrefix(annotation));
         Map<String, LookupElementBuilder> candidates = new LinkedHashMap<>();
         COMMON_KEYWORDS.forEach(keyword -> candidates.put(
                 "keyword:" + keyword,
@@ -65,13 +71,18 @@ public final class MyBatisSqlCompletionContributor extends CompletionContributor
         COMMON_FUNCTIONS.forEach(function -> candidates.put(
                 "function:" + function,
                 LookupElementBuilder.create(function).withTypeText("SQL 函数", true)));
-        addAliases(statement, candidates);
+        if (statement != null) {
+            addAliases(statement, candidates);
+        } else {
+            addAliases(position.getContainingFile(), candidates);
+            addAnnotationParameters(annotation, candidates);
+        }
         MyBatisDatabaseMetadataService service = MyBatisDatabaseMetadataService
                 .getInstance(position.getProject());
         var latest = service.latest();
         if (latest.isEmpty()) {
             service.refresh();
-            candidates.values().forEach(result::addElement);
+            candidates.values().forEach(output::addElement);
             return;
         }
         for (MyBatisDatabaseSnapshot snapshot : latest.orElseThrow().snapshots()) {
@@ -96,7 +107,7 @@ public final class MyBatisSqlCompletionContributor extends CompletionContributor
                 }
             }
         }
-        candidates.values().forEach(result::addElement);
+        candidates.values().forEach(output::addElement);
     }
 
     private static void addAliases(
@@ -108,8 +119,14 @@ public final class MyBatisSqlCompletionContributor extends CompletionContributor
         if (!(parsed instanceof MyBatisSqlPsiResult.Ready ready)) {
             return;
         }
+        addAliases(ready.psiFile(), candidates);
+    }
+
+    private static void addAliases(
+            @NotNull PsiFile sqlFile,
+            @NotNull Map<String, LookupElementBuilder> candidates) {
         for (SqlAsExpression expression : PsiTreeUtil.findChildrenOfType(
-                ready.psiFile(),
+                sqlFile,
                 SqlAsExpression.class)) {
             ProgressManager.checkCanceled();
             if (expression.getNameElement() == null
@@ -121,6 +138,39 @@ public final class MyBatisSqlCompletionContributor extends CompletionContributor
                     "alias:" + alias,
                     LookupElementBuilder.create(alias).withTypeText("SQL 别名", true));
         }
+    }
+
+    private static void addAnnotationParameters(
+            @NotNull AnnotationContext annotation,
+            @NotNull Map<String, LookupElementBuilder> candidates) {
+        for (String variant : MyBatisAnnotationSqlSupport.completionVariants(
+                annotation.literal(),
+                annotation.offsetInLiteral())) {
+            ProgressManager.checkCanceled();
+            candidates.putIfAbsent(
+                    "parameter:" + variant,
+                    LookupElementBuilder.create(variant)
+                            .withTypeText("MyBatis 参数", true));
+        }
+    }
+
+    private static @NotNull String annotationPrefix(
+            @NotNull AnnotationContext annotation) {
+        MyBatisAnnotationSqlSupport.AnnotationSqlLiteral sql =
+                MyBatisAnnotationSqlSupport.inspect(annotation.literal());
+        if (sql == null) {
+            return "";
+        }
+        int rawOffset = Math.max(0, Math.min(
+                annotation.offsetInLiteral() - sql.valueRange().getStartOffset(),
+                sql.rawSql().length()));
+        String prefix = sql.rawSql().substring(0, rawOffset);
+        int placeholderStart = Math.max(prefix.lastIndexOf("#{"), prefix.lastIndexOf("${"));
+        if (placeholderStart < 0 || prefix.lastIndexOf('}') > placeholderStart) {
+            return "";
+        }
+        int segmentStart = Math.max(prefix.lastIndexOf('.'), placeholderStart + 1) + 1;
+        return prefix.substring(Math.min(segmentStart, prefix.length()));
     }
 
     private static XmlTag statement(@NotNull CompletionParameters parameters) {
@@ -155,6 +205,63 @@ public final class MyBatisSqlCompletionContributor extends CompletionContributor
         return statementFromXmlText(topLevel.findElementAt(Math.max(0, hostOffset)));
     }
 
+    private static AnnotationContext annotationContext(
+            @NotNull CompletionParameters parameters) {
+        PsiElement position = parameters.getOriginalPosition();
+        if (position == null) {
+            position = parameters.getPosition();
+        }
+        PsiLanguageInjectionHost injectionHost = InjectedLanguageManager
+                .getInstance(position.getProject())
+                .getInjectionHost(position.getContainingFile());
+        if (injectionHost instanceof PsiLiteralExpression literal) {
+            int hostOffset = hostOffset(parameters);
+            return MyBatisAnnotationSqlSupport.inspect(literal) == null
+                    ? null
+                    : new AnnotationContext(literal, hostOffset - literal.getTextOffset());
+        }
+        Document document = parameters.getEditor().getDocument();
+        if (document instanceof DocumentWindow window && window.isValid()) {
+            PsiFile topLevel = PsiDocumentManager.getInstance(position.getProject())
+                    .getPsiFile(window.getDelegate());
+            int hostOffset = hostOffset(parameters);
+            PsiElement hostElement = topLevel == null || topLevel.getTextLength() == 0
+                    ? null
+                    : topLevel.findElementAt(Math.min(
+                            Math.max(0, hostOffset),
+                            topLevel.getTextLength() - 1));
+            PsiLiteralExpression hostLiteral = hostElement instanceof PsiLiteralExpression direct
+                    ? direct
+                    : PsiTreeUtil.getParentOfType(
+                            hostElement,
+                            PsiLiteralExpression.class,
+                            false);
+            if (hostLiteral != null
+                    && MyBatisAnnotationSqlSupport.inspect(hostLiteral) != null) {
+                return new AnnotationContext(
+                        hostLiteral,
+                        hostOffset - hostLiteral.getTextOffset());
+            }
+        }
+        PsiLiteralExpression literal = position instanceof PsiLiteralExpression direct
+                ? direct
+                : PsiTreeUtil.getParentOfType(position, PsiLiteralExpression.class, false);
+        if (literal == null || MyBatisAnnotationSqlSupport.inspect(literal) == null) {
+            return null;
+        }
+        return new AnnotationContext(literal, hostOffset(parameters) - literal.getTextOffset());
+    }
+
+    private static int hostOffset(@NotNull CompletionParameters parameters) {
+        Document document = parameters.getEditor().getDocument();
+        if (document instanceof DocumentWindow window && window.isValid()) {
+            return window.injectedToHost(Math.min(
+                    parameters.getOffset(),
+                    document.getTextLength()));
+        }
+        return parameters.getOffset();
+    }
+
     private static XmlTag statementFromXmlText(PsiElement element) {
         if (element == null) {
             return null;
@@ -180,5 +287,10 @@ public final class MyBatisSqlCompletionContributor extends CompletionContributor
             tag = tag.getParentTag();
         }
         return null;
+    }
+
+    private record AnnotationContext(
+            @NotNull PsiLiteralExpression literal,
+            int offsetInLiteral) {
     }
 }
