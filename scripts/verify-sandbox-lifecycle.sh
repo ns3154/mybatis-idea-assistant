@@ -14,6 +14,7 @@ readonly SANDBOX_ROOT="${PROJECT_ROOT}/build/idea-sandbox/mybatis-idea-assistant
 readonly SANDBOX_LOG="${SANDBOX_ROOT}/log/idea.log"
 readonly SANDBOX_INDEX_DIR="${SANDBOX_ROOT}/system/index"
 readonly SUMMARY_FILE="${REPORT_DIR}/sandbox-lifecycle.tsv"
+readonly INSPECTION_PROFILE="${PROJECT_ROOT}/config/lifecycle-inspection-profile.xml"
 
 if ! [[ "${CYCLE_COUNT}" =~ ^[1-9][0-9]*$ ]]; then
     echo "循环次数必须是正整数：${CYCLE_COUNT}" >&2
@@ -29,6 +30,10 @@ if [[ ! "${PLATFORM_VERSION}" =~ ^[0-9]{4}\.[0-9]+([.][0-9]+)*$ ]]; then
 fi
 if [[ "${REBUILD_INDEXES}" != "true" && "${REBUILD_INDEXES}" != "false" ]]; then
     echo "索引重建参数只能是 true 或 false：${REBUILD_INDEXES}" >&2
+    exit 2
+fi
+if [[ -n "${PROJECT_PATH_INPUT}" && ! -f "${INSPECTION_PROFILE}" ]]; then
+    echo "生命周期检查配置不存在：${INSPECTION_PROFILE}" >&2
     exit 2
 fi
 
@@ -91,6 +96,21 @@ wait_for_pattern() {
     return 1
 }
 
+wait_for_process_exit() {
+    local process_id="$1"
+    local timeout_seconds="$2"
+    local elapsed=0
+
+    while kill -0 "${process_id}" 2>/dev/null; do
+        if (( elapsed >= timeout_seconds )); then
+            return 1
+        fi
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+    return 0
+}
+
 for ((cycle = 1; cycle <= CYCLE_COUNT; cycle++)); do
     cycle_name="$(printf '%02d' "${cycle}")"
     cycle_output="${REPORT_DIR}/cycle-${cycle_name}.log"
@@ -110,7 +130,14 @@ for ((cycle = 1; cycle <= CYCLE_COUNT; cycle++)); do
         runIde
     )
     if [[ -n "${PROJECT_PATH}" ]]; then
-        run_ide_command+=("--args=${PROJECT_PATH}")
+        inspection_output="${REPORT_DIR}/inspection-${cycle_name}"
+        rm -rf -- "${inspection_output}"
+        mkdir -p "${inspection_output}"
+        # inspect 是 IDEA 自带的完整项目生命周期入口：打开项目、等待索引、执行检查并自行关闭。
+        # 它不依赖欢迎页或窗口焦点，因此适合独立 runner 和副屏验收机。
+        run_ide_command+=(
+            "--args=inspect ${PROJECT_PATH} ${INSPECTION_PROFILE} ${inspection_output} -v2"
+        )
     fi
     "${run_ide_command[@]}" >"${cycle_output}" 2>&1 &
     run_pid=$!
@@ -138,9 +165,18 @@ for ((cycle = 1; cycle <= CYCLE_COUNT; cycle++)); do
         fi
     fi
 
-    ./gradlew "${GRADLE_PLATFORM_ARGUMENT}" "${GRADLE_LOCK_ARGUMENT}" \
-        runIde --args=exit \
-        >>"${cycle_output}" 2>&1
+    if [[ -n "${PROJECT_PATH}" ]]; then
+        if ! wait_for_process_exit "${run_pid}" 600; then
+            kill "${run_pid}" 2>/dev/null || true
+            wait "${run_pid}" 2>/dev/null || true
+            echo "第 ${cycle} 次项目检查未在索引完成后 600 秒内退出，详见 ${cycle_output}" >&2
+            exit 1
+        fi
+    else
+        ./gradlew "${GRADLE_PLATFORM_ARGUMENT}" "${GRADLE_LOCK_ARGUMENT}" \
+            runIde --args=exit \
+            >>"${cycle_output}" 2>&1
+    fi
 
     set +e
     wait "${run_pid}"
