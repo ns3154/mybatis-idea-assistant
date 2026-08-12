@@ -12,6 +12,7 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationBundle;
@@ -67,8 +68,8 @@ public final class MyBatisDatabaseWrapperGenerateAction extends AnAction {
         }
         String methodName = Messages.showInputDialog(
                 project,
-                "输入确定性方法名：",
-                "生成 Wrapper",
+                MyBatisAssistantBundle.message("database.wrapper.method.prompt"),
+                MyBatisAssistantBundle.message("database.wrapper.title"),
                 Messages.getQuestionIcon());
         if (methodName == null) {
             return;
@@ -76,8 +77,8 @@ public final class MyBatisDatabaseWrapperGenerateAction extends AnAction {
         MyBatisChoiceDialog<MyBatisWrapperFramework> frameworkDialog =
                 new MyBatisChoiceDialog<>(
                 project,
-                "生成 Wrapper",
-                "明确选择目标框架；插件不会按类路径猜测。",
+                MyBatisAssistantBundle.message("database.wrapper.title"),
+                MyBatisAssistantBundle.message("database.wrapper.framework.prompt"),
                 List.of(
                         MyBatisWrapperFramework.MYBATIS_PLUS,
                         MyBatisWrapperFramework.MYBATIS_FLEX),
@@ -91,8 +92,8 @@ public final class MyBatisDatabaseWrapperGenerateAction extends AnAction {
                 ? "3.5.17" : "1.11.8";
         String version = Messages.showInputDialog(
                 project,
-                "输入目标框架版本：",
-                "生成 Wrapper",
+                MyBatisAssistantBundle.message("database.wrapper.version.prompt"),
+                MyBatisAssistantBundle.message("database.wrapper.title"),
                 Messages.getQuestionIcon(),
                 defaultVersion,
                 null);
@@ -110,11 +111,13 @@ public final class MyBatisDatabaseWrapperGenerateAction extends AnAction {
                                 ProgressIndicator indicator = ProgressManager.getInstance()
                                         .getProgressIndicator();
                                 if (indicator == null) {
-                                    throw new IllegalStateException("Wrapper 生成缺少进度上下文");
+                                    throw new IllegalStateException(MyBatisAssistantBundle.message(
+                                            "database.wrapper.error.progress.context"));
                                 }
                                 DbTable table = tables[0];
                                 if (!table.isValid() || table.getDataSource().isLoading()) {
-                                    throw new IllegalStateException("数据库模型已变化，请重新选择表");
+                                    throw new IllegalStateException(MyBatisAssistantBundle.message(
+                                            "database.generation.error.model.changed"));
                                 }
                                 return buildPreview(
                                         DatabaseToolsMetadataProvider.table(
@@ -126,11 +129,12 @@ public final class MyBatisDatabaseWrapperGenerateAction extends AnAction {
                                         framework,
                                         version.trim());
                             }),
-                            "解析方法名并生成 Wrapper",
+                            MyBatisAssistantBundle.message("database.wrapper.progress"),
                             true,
                             project);
             new MyBatisGeneratedTextPreviewDialog(
-                    project, "预览 Wrapper 生成结果", preview.text()).show();
+                    project, MyBatisAssistantBundle.message(
+                            "database.wrapper.preview.title"), preview.text()).show();
         } catch (ProcessCanceledException canceled) {
             throw canceled;
         } catch (RuntimeException failure) {
@@ -138,7 +142,7 @@ public final class MyBatisDatabaseWrapperGenerateAction extends AnAction {
                     project,
                     failure.getMessage() == null
                             ? failure.getClass().getSimpleName() : failure.getMessage(),
-                    "生成 Wrapper 失败");
+                    MyBatisAssistantBundle.message("database.wrapper.error.title"));
         }
     }
 
@@ -156,7 +160,8 @@ public final class MyBatisDatabaseWrapperGenerateAction extends AnAction {
         if (parsed instanceof MyBatisMethodParseResult.Failure failure) {
             MyBatisMethodDiagnostic diagnostic = failure.diagnostic();
             throw new IllegalArgumentException(
-                    diagnostic.message() + "（位置 " + diagnostic.offset() + "）");
+                    diagnostic.message() + MyBatisAssistantBundle.message(
+                            "diagnostic.offset.suffix", diagnostic.offset()));
         }
         MyBatisMethodQuery query = ((MyBatisMethodParseResult.Success) parsed).query();
         String entityType = configuration.basePackage() + ".entity." + bundle.entityName();
@@ -193,11 +198,13 @@ public final class MyBatisDatabaseWrapperGenerateAction extends AnAction {
     record WrapperPreview(
             @NotNull String methodDeclaration,
             @NotNull String xmlStatement,
-            @NotNull String wrapperCode) {
+        @NotNull String wrapperCode) {
         private @NotNull String text() {
-            return "// Mapper 方法\n" + methodDeclaration
+            return MyBatisAssistantBundle.message(
+                    "database.wrapper.preview.mapper.comment") + '\n' + methodDeclaration
                     + "\n\n<!-- XML statement -->\n" + xmlStatement
-                    + "\n// Wrapper 片段\n" + wrapperCode;
+                    + '\n' + MyBatisAssistantBundle.message(
+                            "database.wrapper.preview.fragment.comment") + '\n' + wrapperCode;
         }
     }
 }

@@ -4,6 +4,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.sqltool.execution.MyBatisSqlExecutionResult;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -28,8 +29,9 @@ final class MyBatisDatabaseSqlResultDialog extends DialogWrapper {
         text.setText(render(sql, result));
         text.setCaretPosition(0);
         setTitle(result instanceof MyBatisSqlExecutionResult.Success
-                ? "SQL 执行结果" : "SQL 执行失败");
-        setCancelButtonText("关闭");
+                ? MyBatisAssistantBundle.message("database.sql.result.title.success")
+                : MyBatisAssistantBundle.message("database.sql.result.title.failure"));
+        setCancelButtonText(MyBatisAssistantBundle.message("dialog.button.close"));
         setResizable(true);
         init();
     }
@@ -49,23 +51,29 @@ final class MyBatisDatabaseSqlResultDialog extends DialogWrapper {
     static @NotNull String render(
             @NotNull String sql,
             @NotNull MyBatisSqlExecutionResult result) {
-        StringBuilder output = new StringBuilder("实际执行 SQL：\n")
+        StringBuilder output = new StringBuilder(MyBatisAssistantBundle.message(
+                "database.sql.result.executed.sql")).append('\n')
                 .append(sql).append("\n\n");
         if (result instanceof MyBatisSqlExecutionResult.Failure failure) {
-            output.append("执行失败：").append(failure.message()).append('\n');
+            output.append(MyBatisAssistantBundle.message(
+                    "database.sql.result.failure")).append(failure.message()).append('\n');
             if (!failure.sqlState().isBlank()) {
                 output.append("SQLState：").append(failure.sqlState()).append('\n');
             }
             if (failure.vendorCode() != 0) {
-                output.append("厂商错误码：").append(failure.vendorCode()).append('\n');
+                output.append(MyBatisAssistantBundle.message(
+                        "database.sql.result.vendor.code"))
+                        .append(failure.vendorCode()).append('\n');
             }
             return output.toString();
         }
         MyBatisSqlExecutionResult.Success success =
                 (MyBatisSqlExecutionResult.Success) result;
-        output.append("耗时：").append(success.durationMillis()).append(" ms\n");
+        output.append(MyBatisAssistantBundle.message("database.sql.result.duration"))
+                .append(success.durationMillis()).append(" ms\n");
         if (success.updateCount() >= 0) {
-            output.append("影响行数：").append(success.updateCount()).append('\n');
+            output.append(MyBatisAssistantBundle.message("database.sql.result.update.count"))
+                    .append(success.updateCount()).append('\n');
         }
         if (!success.columns().isEmpty()) {
             output.append(String.join("\t", success.columns())).append('\n');
@@ -73,7 +81,8 @@ final class MyBatisDatabaseSqlResultDialog extends DialogWrapper {
                 output.append(String.join("\t", row)).append('\n');
             }
             if (success.truncated()) {
-                output.append("\n结果超过 200 行，已截断。\n");
+                output.append('\n').append(MyBatisAssistantBundle.message(
+                        "database.sql.result.truncated", 200)).append('\n');
             }
         }
         return output.toString();

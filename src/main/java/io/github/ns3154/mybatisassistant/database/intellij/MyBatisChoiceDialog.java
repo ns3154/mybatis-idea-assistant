@@ -3,6 +3,7 @@ package io.github.ns3154.mybatisassistant.database.intellij;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.ui.components.JBLabel;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -29,13 +30,14 @@ final class MyBatisChoiceDialog<T> extends DialogWrapper {
             @NotNull Function<T, String> display) {
         super(project, true);
         if (values.isEmpty()) {
-            throw new IllegalArgumentException("选择项不能为空");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "database.choice.error.empty"));
         }
         this.values = List.copyOf(values);
         this.choices = new JComboBox<>(values.stream().map(display).toArray(String[]::new));
         this.message = message;
         setTitle(title);
-        setOKButtonText("确定");
+        setOKButtonText(MyBatisAssistantBundle.message("dialog.button.ok"));
         init();
     }
 

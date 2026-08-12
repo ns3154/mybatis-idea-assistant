@@ -12,6 +12,7 @@ import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiJavaFile;
 import com.intellij.psi.util.PsiTreeUtil;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import io.github.ns3154.mybatisassistant.sqltool.conversion.MyBatisJavaDdlGeneration;
 import io.github.ns3154.mybatisassistant.sqltool.conversion.MyBatisJavaDdlGenerator;
@@ -49,22 +50,24 @@ public final class MyBatisJavaToDdlAction extends AnAction {
             return;
         }
         MyBatisSqlDialectDialog dialectDialog = new MyBatisSqlDialectDialog(
-                project, "Java 类生成 DDL");
+                project, MyBatisAssistantBundle.message("sqltool.java.ddl.title"));
         if (!dialectDialog.showAndGet()) {
             return;
         }
         Preview preview = ProgressManager.getInstance().runProcessWithProgressSynchronously(
                 () -> ReadAction.computeCancellable(
                         () -> buildPreview(source, dialectDialog.selectedDialect())),
-                "从 Java PSI 生成 DDL",
+                MyBatisAssistantBundle.message("sqltool.java.ddl.progress"),
                 true,
                 project);
         if (preview.failure != null) {
-            Messages.showErrorDialog(project, preview.failure, "DDL 生成失败");
+            Messages.showErrorDialog(project, preview.failure,
+                    MyBatisAssistantBundle.message("sqltool.java.ddl.error.title"));
             return;
         }
         new MyBatisSqlToolPreviewDialog(
-                project, "预览 Java 类生成 DDL", preview.text).show();
+                project, MyBatisAssistantBundle.message("sqltool.java.ddl.preview.title"),
+                preview.text).show();
     }
 
     static @NotNull Preview buildPreview(
@@ -89,9 +92,9 @@ public final class MyBatisJavaToDdlAction extends AnAction {
 
     private static String render(String ddl, List<String> warnings) {
         if (warnings.isEmpty()) {
-            return "风险：仅生成预览，不会自动执行。\n\n" + ddl;
+            return MyBatisAssistantBundle.message("sqltool.java.ddl.safe.preview") + "\n\n" + ddl;
         }
-        return "风险：存在需要确认的类型、注释或索引降级。\n"
+        return MyBatisAssistantBundle.message("sqltool.java.ddl.warning.preview") + '\n'
                 + warnings.stream().map(warning -> "- " + warning)
                         .reduce((left, right) -> left + "\n" + right).orElse("")
                 + "\n\n" + ddl;

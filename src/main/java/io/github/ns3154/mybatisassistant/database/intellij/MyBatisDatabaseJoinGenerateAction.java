@@ -12,6 +12,7 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationConfiguration;
@@ -69,7 +70,7 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
             JoinModel model = ProgressManager.getInstance().runProcessWithProgressSynchronously(
                     () -> ReadAction.computeCancellable(() -> loadModel(
                             tables, options.configuration())),
-                    "读取两张表的 Join 元数据",
+                    MyBatisAssistantBundle.message("database.join.progress.metadata"),
                     true,
                     project);
             RelationChoice relation = chooseRelation(project, model.relations());
@@ -83,8 +84,8 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
             String defaultSelections = defaultSelections(model.base(), model.target());
             String selectionText = Messages.showInputDialog(
                     project,
-                    "输入输出属性，逗号分隔。可用前缀为 t1（首张表）和 t2（第二张表）。",
-                    "选择 Join 输出字段",
+                    MyBatisAssistantBundle.message("database.join.selection.prompt"),
+                    MyBatisAssistantBundle.message("database.join.selection.title"),
                     Messages.getQuestionIcon(),
                     defaultSelections,
                     null);
@@ -95,7 +96,7 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
                     model, relation, type, selectionText);
             new MyBatisGeneratedTextPreviewDialog(
                     project,
-                    "预览 Join SQL",
+                    MyBatisAssistantBundle.message("database.join.preview.title"),
                     "-- t1 = " + model.base().tableName()
                             + "\n-- t2 = " + model.target().tableName()
                             + "\n" + generation.sql() + "\n").show();
@@ -106,7 +107,7 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
                     project,
                     failure.getMessage() == null
                             ? failure.getClass().getSimpleName() : failure.getMessage(),
-                    "生成 Join SQL 失败");
+                    MyBatisAssistantBundle.message("database.join.error.title"));
         }
     }
 
@@ -119,8 +120,8 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
         MyBatisMethodSchema target = MyBatisMethodSchema.from(targetTable, configuration);
         List<RelationChoice> relations = relationChoices(base, target);
         if (relations.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "两张表之间没有可供用户选择的外键列与主键列组合");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "database.join.error.no.relation"));
         }
         return new JoinModel(base, target, dialect, relations);
     }
@@ -147,7 +148,8 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
             @NotNull MyBatisJoinType type,
             @NotNull String selectionText) {
         if (!model.relations().contains(relation)) {
-            throw new IllegalArgumentException("所选 Join 关系不属于当前两张表");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "database.join.error.relation.invalid"));
         }
         List<MyBatisJoinSelection> selections = parseSelections(
                 selectionText, model.base(), model.target());
@@ -184,14 +186,17 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
             @NotNull MyBatisGenerationConfiguration configuration) {
         ProgressIndicator indicator = ProgressManager.getInstance().getProgressIndicator();
         if (indicator == null) {
-            throw new IllegalStateException("Join 生成缺少进度上下文");
+            throw new IllegalStateException(MyBatisAssistantBundle.message(
+                    "database.join.error.progress.context"));
         }
         if (Arrays.stream(tables).anyMatch(table -> !table.isValid()
                 || table.getDataSource().isLoading())) {
-            throw new IllegalStateException("数据库模型已变化，请重新选择两张表");
+            throw new IllegalStateException(MyBatisAssistantBundle.message(
+                    "database.join.error.model.changed"));
         }
         if (tables[0].getDataSource() != tables[1].getDataSource()) {
-            throw new IllegalStateException("两张表必须来自同一个已加载数据源");
+            throw new IllegalStateException(MyBatisAssistantBundle.message(
+                    "database.join.error.data.source"));
         }
         MyBatisDatabaseTable base = DatabaseToolsMetadataProvider.table(
                 tables[0].getDasObject(), indicator);
@@ -209,8 +214,8 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
             @NotNull List<RelationChoice> choices) {
         MyBatisChoiceDialog<RelationChoice> dialog = new MyBatisChoiceDialog<>(
                 project,
-                "选择 Join 关系",
-                "明确选择一组外键列与主键列；插件不会按名称猜测。",
+                MyBatisAssistantBundle.message("database.join.relation.title"),
+                MyBatisAssistantBundle.message("database.join.relation.prompt"),
                 choices,
                 RelationChoice::display);
         return dialog.showAndGet() ? dialog.selectedValue() : null;
@@ -222,8 +227,8 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
         List<MyBatisJoinType> types = supportedJoinTypes(dialect);
         MyBatisChoiceDialog<MyBatisJoinType> dialog = new MyBatisChoiceDialog<>(
                 project,
-                "选择 Join 类型",
-                "选择目标数据库明确支持的 Join 类型。",
+                MyBatisAssistantBundle.message("database.join.type.title"),
+                MyBatisAssistantBundle.message("database.join.type.prompt"),
                 types,
                 MyBatisDatabaseJoinGenerateAction::displayType);
         return dialog.showAndGet() ? dialog.selectedValue() : null;
@@ -234,7 +239,8 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
             @NotNull MyBatisMethodSchema base,
             @NotNull MyBatisMethodSchema target) {
         if (text.isBlank()) {
-            throw new IllegalArgumentException("至少选择一个 Join 输出字段");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "database.join.error.selection.empty"));
         }
         List<MyBatisJoinSelection> result = new ArrayList<>();
         Set<String> selected = new LinkedHashSet<>();
@@ -243,23 +249,25 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
             int separator = token.indexOf('.');
             if (separator <= 0 || separator == token.length() - 1
                     || token.indexOf('.', separator + 1) >= 0) {
-                throw new IllegalArgumentException("Join 输出字段格式必须为 t1.属性或 t2.属性："
-                        + token);
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "database.join.error.selection.format", token));
             }
             String alias = token.substring(0, separator);
             String property = token.substring(separator + 1);
             MyBatisMethodSchema schema = switch (alias) {
                 case BASE_ALIAS -> base;
                 case TARGET_ALIAS -> target;
-                default -> throw new IllegalArgumentException("未知 Join 表别名：" + alias);
+                default -> throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "database.join.error.alias.unknown", alias));
             };
             MyBatisMethodField field = schema.fields().stream()
                     .filter(candidate -> candidate.propertyName().equals(property))
                     .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "Join 表 " + alias + " 不存在属性：" + property));
+                    .orElseThrow(() -> new IllegalArgumentException(MyBatisAssistantBundle.message(
+                            "database.join.error.property.missing", alias, property)));
             if (!selected.add(token)) {
-                throw new IllegalArgumentException("Join 输出字段重复：" + token);
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "database.join.error.selection.duplicate", token));
             }
             result.add(new MyBatisJoinSelection(
                     alias,

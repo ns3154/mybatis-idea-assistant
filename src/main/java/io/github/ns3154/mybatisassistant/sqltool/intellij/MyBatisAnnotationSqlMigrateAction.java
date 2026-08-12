@@ -12,6 +12,7 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiMethod;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationCommandExecutor;
 import io.github.ns3154.mybatisassistant.model.MyBatisAnnotationModel;
 import io.github.ns3154.mybatisassistant.model.MyBatisStatementSourceKind;
@@ -58,7 +59,9 @@ public final class MyBatisAnnotationSqlMigrateAction extends AnAction {
         }
         VirtualFile projectRoot = ProjectUtil.guessProjectDir(project);
         if (projectRoot == null) {
-            Messages.showErrorDialog(project, "无法确定项目目录", "注解 SQL 迁移未执行");
+            Messages.showErrorDialog(project,
+                    MyBatisAssistantBundle.message("sqltool.annotation.error.project.root"),
+                    MyBatisAssistantBundle.message("sqltool.annotation.error.title"));
             return;
         }
         PsiDocumentManager.getInstance(project).commitAllDocuments();
@@ -68,11 +71,12 @@ public final class MyBatisAnnotationSqlMigrateAction extends AnAction {
                                 () -> MyBatisAnnotationSqlMigrationPlanner.plan(
                                         method,
                                         projectRoot)),
-                        "分析注解 SQL 迁移",
+                        MyBatisAssistantBundle.message("sqltool.annotation.progress"),
                         true,
                         project);
         if (result instanceof MyBatisAnnotationSqlMigrationPlanner.Result.Failure failure) {
-            Messages.showErrorDialog(project, failure.message(), "注解 SQL 迁移未执行");
+            Messages.showErrorDialog(project, failure.message(),
+                    MyBatisAssistantBundle.message("sqltool.annotation.error.title"));
             return;
         }
         MyBatisAnnotationSqlMigrationPlanner.Result.Success success =
@@ -87,17 +91,18 @@ public final class MyBatisAnnotationSqlMigrateAction extends AnAction {
                     project,
                     projectRoot,
                     success.plan(),
-                    "迁移 MyBatis 注解 SQL 到 XML");
+                    MyBatisAssistantBundle.message("sqltool.annotation.command"));
             Messages.showInfoMessage(
                     project,
-                    "已迁移 " + success.namespace() + '#' + success.statementId()
-                            + "；可使用一次 Undo 同时恢复 Java 与 XML。",
-                    "注解 SQL 迁移完成");
+                    MyBatisAssistantBundle.message(
+                            "sqltool.annotation.success",
+                            success.namespace() + '#' + success.statementId()),
+                    MyBatisAssistantBundle.message("sqltool.annotation.success.title"));
         } catch (IllegalStateException failure) {
             Messages.showErrorDialog(
                     project,
                     failure.getMessage(),
-                    "注解 SQL 迁移未执行");
+                    MyBatisAssistantBundle.message("sqltool.annotation.error.title"));
         }
     }
 }

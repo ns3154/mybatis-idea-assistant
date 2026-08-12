@@ -17,6 +17,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationArtifactKind;
@@ -71,13 +72,15 @@ public final class MyBatisDatabaseMethodGenerateAction extends AnAction {
         }
         VirtualFile projectRoot = ProjectUtil.guessProjectDir(project);
         if (projectRoot == null || !projectRoot.isDirectory() || !projectRoot.isWritable()) {
-            Messages.showErrorDialog(project, "项目目录不存在或不可写", "无法按方法名生成 SQL");
+            Messages.showErrorDialog(project,
+                    MyBatisAssistantBundle.message("database.generation.error.project.root"),
+                    MyBatisAssistantBundle.message("database.method.error.unavailable"));
             return;
         }
         String methodName = Messages.showInputDialog(
                 project,
-                "输入确定性方法名，例如 findByStatusAndAgeGreaterThanOrderByIdDesc：",
-                "按方法名生成 MyBatis SQL",
+                MyBatisAssistantBundle.message("database.method.input.prompt"),
+                MyBatisAssistantBundle.message("database.method.input.title"),
                 Messages.getQuestionIcon());
         if (methodName == null) {
             return;
@@ -96,11 +99,13 @@ public final class MyBatisDatabaseMethodGenerateAction extends AnAction {
                                 ProgressIndicator indicator = ProgressManager.getInstance()
                                         .getProgressIndicator();
                                 if (indicator == null) {
-                                    throw new IllegalStateException("方法生成任务缺少进度上下文");
+                                    throw new IllegalStateException(MyBatisAssistantBundle.message(
+                                            "database.method.error.progress.context"));
                                 }
                                 DbTable table = selected[0];
                                 if (!table.isValid() || table.getDataSource().isLoading()) {
-                                    throw new IllegalStateException("数据库模型已变化，请重新选择表");
+                                    throw new IllegalStateException(MyBatisAssistantBundle.message(
+                                            "database.generation.error.model.changed"));
                                 }
                                 MyBatisDatabaseTable model = DatabaseToolsMetadataProvider.table(
                                         table.getDasObject(), indicator);
@@ -113,7 +118,7 @@ public final class MyBatisDatabaseMethodGenerateAction extends AnAction {
                                         configuration,
                                         methodName.trim());
                             }),
-                            "解析方法名并生成 MyBatis SQL",
+                            MyBatisAssistantBundle.message("database.method.progress"),
                             true,
                             project);
             MyBatisGenerationPreviewDialog preview =
@@ -124,13 +129,14 @@ public final class MyBatisDatabaseMethodGenerateAction extends AnAction {
             MyBatisGenerationPlan selectedPlan = preview.selectedPlan();
             requireSelectedTargets(selectedPlan);
             LocalHistory.getInstance().putSystemLabel(
-                    project, "MyBatis Assistant 方法名 SQL 生成前");
+                    project, MyBatisAssistantBundle.message(
+                            "database.method.local.history.before"));
             MyBatisGenerationCommandExecutor.execute(project, projectRoot, selectedPlan);
             NotificationGroupManager.getInstance()
                     .getNotificationGroup("MyBatis Assistant")
                     .createNotification(
-                            "方法名 SQL 生成完成",
-                            "Mapper 方法与 XML statement 已在一个可撤销命令中写入。",
+                            MyBatisAssistantBundle.message("database.method.success.title"),
+                            MyBatisAssistantBundle.message("database.method.success"),
                             NotificationType.INFORMATION)
                     .notify(project);
         } catch (ProcessCanceledException canceled) {
@@ -140,7 +146,7 @@ public final class MyBatisDatabaseMethodGenerateAction extends AnAction {
                     project,
                     failure.getMessage() == null
                             ? failure.getClass().getSimpleName() : failure.getMessage(),
-                    "按方法名生成 SQL 失败");
+                    MyBatisAssistantBundle.message("database.method.error.title"));
         }
     }
 
@@ -159,7 +165,8 @@ public final class MyBatisDatabaseMethodGenerateAction extends AnAction {
         if (parsed instanceof MyBatisMethodParseResult.Failure failure) {
             MyBatisMethodDiagnostic diagnostic = failure.diagnostic();
             throw new IllegalArgumentException(
-                    diagnostic.message() + "（位置 " + diagnostic.offset() + "）");
+                    diagnostic.message() + MyBatisAssistantBundle.message(
+                            "diagnostic.offset.suffix", diagnostic.offset()));
         }
         MyBatisMethodQuery query = ((MyBatisMethodParseResult.Success) parsed).query();
         MyBatisMethodGeneration generation = MyBatisMethodSqlGenerator.generate(
@@ -178,7 +185,8 @@ public final class MyBatisDatabaseMethodGenerateAction extends AnAction {
     private static void requireTargets(@NotNull MyBatisGenerationConfiguration configuration) {
         if (!configuration.artifacts().contains(MyBatisGenerationArtifactKind.MAPPER)
                 || !configuration.artifacts().contains(MyBatisGenerationArtifactKind.XML)) {
-            throw new IllegalArgumentException("方法名生成必须同时选择 Mapper 与 XML 产物");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "database.method.error.targets.required"));
         }
     }
 
@@ -188,7 +196,8 @@ public final class MyBatisDatabaseMethodGenerateAction extends AnAction {
         boolean xml = plan.entries().stream().anyMatch(entry ->
                 entry.artifact().kind() == MyBatisGenerationArtifactKind.XML);
         if (!mapper || !xml) {
-            throw new IllegalArgumentException("预览中必须同时保留 Mapper 与 XML 文件");
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "database.method.error.preview.targets.required"));
         }
     }
 

@@ -17,6 +17,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationBundle;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationCommandExecutor;
@@ -62,7 +63,9 @@ public final class MyBatisDatabaseGenerateAction extends AnAction {
         }
         VirtualFile projectRoot = ProjectUtil.guessProjectDir(project);
         if (projectRoot == null || !projectRoot.isDirectory() || !projectRoot.isWritable()) {
-            Messages.showErrorDialog(project, "项目目录不存在或不可写", "无法生成 MyBatis 代码");
+            Messages.showErrorDialog(project,
+                    MyBatisAssistantBundle.message("database.generation.error.project.root"),
+                    MyBatisAssistantBundle.message("database.generation.error.unavailable"));
             return;
         }
         MyBatisGenerationOptionsDialog optionsDialog =
@@ -76,7 +79,7 @@ public final class MyBatisDatabaseGenerateAction extends AnAction {
                     .runProcessWithProgressSynchronously(
                             () -> ReadAction.computeCancellable(() -> buildPlan(
                                     project, projectRoot, selected, configuration)),
-                            "计算 MyBatis 代码生成计划",
+                            MyBatisAssistantBundle.message("database.generation.progress"),
                             true,
                             project);
             MyBatisGenerationPreviewDialog previewDialog =
@@ -89,7 +92,8 @@ public final class MyBatisDatabaseGenerateAction extends AnAction {
                 return;
             }
             LocalHistory.getInstance().putSystemLabel(
-                    project, "MyBatis Assistant 代码生成前");
+                    project, MyBatisAssistantBundle.message(
+                            "database.generation.local.history.before"));
             MyBatisGenerationCommandExecutor.execute(project, projectRoot, selectedPlan);
             int changed = (int) selectedPlan.entries().stream()
                     .filter(entry -> entry.status()
@@ -99,8 +103,10 @@ public final class MyBatisDatabaseGenerateAction extends AnAction {
             NotificationGroupManager.getInstance()
                     .getNotificationGroup("MyBatis Assistant")
                     .createNotification(
-                            "MyBatis 代码生成完成",
-                            "已在一个可撤销命令中处理 " + changed + " 个文件。",
+                            MyBatisAssistantBundle.message(
+                                    "database.generation.success.title"),
+                            MyBatisAssistantBundle.message(
+                                    "database.generation.success", changed),
                             NotificationType.INFORMATION)
                     .notify(project);
         } catch (ProcessCanceledException canceled) {
@@ -110,7 +116,7 @@ public final class MyBatisDatabaseGenerateAction extends AnAction {
                     project,
                     failure.getMessage() == null ? failure.getClass().getSimpleName()
                             : failure.getMessage(),
-                    "生成 MyBatis 代码失败");
+                    MyBatisAssistantBundle.message("database.generation.error.title"));
         }
     }
 
@@ -121,13 +127,15 @@ public final class MyBatisDatabaseGenerateAction extends AnAction {
             @NotNull MyBatisGenerationConfiguration configuration) {
         ProgressIndicator indicator = ProgressManager.getInstance().getProgressIndicator();
         if (indicator == null) {
-            throw new IllegalStateException("生成任务缺少进度上下文");
+            throw new IllegalStateException(MyBatisAssistantBundle.message(
+                    "database.generation.error.progress.context"));
         }
         List<MyBatisGenerationBundle> bundles = new ArrayList<>();
         for (DbTable table : selected) {
             indicator.checkCanceled();
             if (!table.isValid() || table.getDataSource().isLoading()) {
-                throw new IllegalStateException("数据库模型已变化，请重新选择表");
+                throw new IllegalStateException(MyBatisAssistantBundle.message(
+                        "database.generation.error.model.changed"));
             }
             MyBatisDatabaseTable model = DatabaseToolsMetadataProvider.table(
                     table.getDasObject(), indicator);

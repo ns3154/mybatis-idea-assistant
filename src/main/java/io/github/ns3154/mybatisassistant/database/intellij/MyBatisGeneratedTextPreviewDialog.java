@@ -4,6 +4,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -27,7 +28,7 @@ final class MyBatisGeneratedTextPreviewDialog extends DialogWrapper {
         preview.setLineWrap(false);
         preview.setCaretPosition(0);
         setTitle(title);
-        setOKButtonText("关闭");
+        setOKButtonText(MyBatisAssistantBundle.message("dialog.button.close"));
         setResizable(true);
         init();
     }

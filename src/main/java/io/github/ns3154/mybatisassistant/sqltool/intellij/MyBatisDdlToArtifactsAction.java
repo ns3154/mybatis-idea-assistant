@@ -4,6 +4,7 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.Project;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGeneratedArtifact;
 import io.github.ns3154.mybatisassistant.sqltool.conversion.MyBatisSqlArtifactConversionResult;
@@ -43,14 +44,16 @@ public final class MyBatisDdlToArtifactsAction extends AnAction {
         MyBatisSqlArtifactConversionResult result = MyBatisSqlArtifactConverter.convert(
                 ddl, dialect, basePackage);
         if (result instanceof MyBatisSqlArtifactConversionResult.Failure failure) {
-            return "转换失败 [" + failure.code() + "]：" + failure.message();
+            return MyBatisAssistantBundle.message(
+                    "sqltool.ddl.conversion.failure", failure.code(), failure.message());
         }
         MyBatisSqlArtifactConversionResult.Success success =
                 (MyBatisSqlArtifactConversionResult.Success) result;
         StringBuilder text = new StringBuilder(
-                "转换结果仅供预览，不会自动写入项目。\n");
+                MyBatisAssistantBundle.message("sqltool.ddl.conversion.preview") + '\n');
         if (!success.warnings().isEmpty()) {
-            text.append("存在需要确认的降级：\n");
+            text.append(MyBatisAssistantBundle.message(
+                    "sqltool.ddl.conversion.warnings")).append('\n');
             success.warnings().forEach(warning -> text.append("- ").append(warning).append('\n'));
         }
         for (MyBatisGeneratedArtifact artifact : success.bundle().artifacts()) {

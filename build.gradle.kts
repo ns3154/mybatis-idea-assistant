@@ -199,6 +199,38 @@ tasks {
         }
     }
 
+    val verifyLocalizedUserInterface = register("verifyLocalizedUserInterface") {
+        group = "verification"
+        description = "阻止设置、MCP、数据库和 SQL 工具界面新增硬编码中文字符串"
+        val sourceRoots = listOf(
+            "src/main/java/io/github/ns3154/mybatisassistant/settings",
+            "src/main/java/io/github/ns3154/mybatisassistant/mcp",
+            "src/main/java/io/github/ns3154/mybatisassistant/database/intellij",
+            "src/main/java/io/github/ns3154/mybatisassistant/sql/intellij",
+            "src/main/java/io/github/ns3154/mybatisassistant/sqltool/intellij",
+        )
+        val sources = files(sourceRoots.map { fileTree(it) }).asFileTree.matching {
+            include("**/*.java")
+        }
+        val repositoryRoot = rootDir
+        inputs.files(sources)
+        doLast {
+            val chineseString = Regex("\"[^\"\\n]*[\\u3400-\\u9fff][^\"\\n]*\"")
+            val offenders = sources.files.sorted().flatMap { source ->
+                source.readLines(Charsets.UTF_8).mapIndexedNotNull { index, line ->
+                    if (chineseString.containsMatchIn(line)) {
+                        "${source.relativeTo(repositoryRoot)}:${index + 1}: ${line.trim()}"
+                    } else {
+                        null
+                    }
+                }
+            }
+            check(offenders.isEmpty()) {
+                "用户界面存在未资源化中文字符串：\n${offenders.joinToString("\n")}"
+            }
+        }
+    }
+
     withType<JavaCompile>().configureEach {
         options.encoding = "UTF-8"
         options.release = 21
@@ -356,6 +388,7 @@ tasks {
     check {
         dependsOn(
             verifyCyclonedxBom,
+            verifyLocalizedUserInterface,
             "jacocoTestCoverageVerification",
             coreCoverage,
             sqlDatabaseCoverage,

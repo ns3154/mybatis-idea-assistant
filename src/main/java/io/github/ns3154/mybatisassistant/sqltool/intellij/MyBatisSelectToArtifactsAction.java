@@ -4,6 +4,7 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.Project;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.sqltool.conversion.MyBatisSelectArtifactConversionResult;
 import io.github.ns3154.mybatisassistant.sqltool.conversion.MyBatisSelectArtifactConverter;
 import org.jetbrains.annotations.NotNull;
@@ -42,11 +43,12 @@ public final class MyBatisSelectToArtifactsAction extends AnAction {
         MyBatisSelectArtifactConversionResult result = MyBatisSelectArtifactConverter.convert(
                 sql, basePackage, mapperName, methodName);
         if (result instanceof MyBatisSelectArtifactConversionResult.Failure failure) {
-            return "转换失败（偏移 " + failure.offset() + "）：" + failure.message();
+            return MyBatisAssistantBundle.message(
+                    "sqltool.select.conversion.failure", failure.offset(), failure.message());
         }
         MyBatisSelectArtifactConversionResult.Success success =
                 (MyBatisSelectArtifactConversionResult.Success) result;
-        return "转换结果仅供预览，不会写入项目。\n"
+        return MyBatisAssistantBundle.message("sqltool.select.conversion.preview") + '\n'
                 + success.warnings().stream().map(warning -> "- " + warning)
                         .reduce((left, right) -> left + "\n" + right).orElse("")
                 + "\n\n===== Mapper.java =====\n" + success.mapperSource()

@@ -43,10 +43,18 @@ public final class MyBatisAssistantBundleTest extends BasePlatformTestCase {
         MyBatisAssistantSettings.getInstance().replace(state);
         assertEquals("Navigate to MyBatis XML statement",
                 MyBatisAssistantBundle.message("navigation.to.statement"));
+        assertEquals("Quickly Execute SQL on demo",
+                MyBatisAssistantBundle.message("database.sql.execution.title", "demo"));
+        assertEquals("The conversion is a preview only and will not write to the project.",
+                MyBatisAssistantBundle.message("sqltool.select.conversion.preview"));
 
         state.uiLocale = "zh-CN";
         MyBatisAssistantSettings.getInstance().replace(state);
         assertEquals("跳转到 MyBatis XML statement",
                 MyBatisAssistantBundle.message("navigation.to.statement"));
+        assertEquals("在 demo 上快速执行 SQL",
+                MyBatisAssistantBundle.message("database.sql.execution.title", "demo"));
+        assertEquals("转换结果仅供预览，不会写入项目。",
+                MyBatisAssistantBundle.message("sqltool.select.conversion.preview"));
     }
 }

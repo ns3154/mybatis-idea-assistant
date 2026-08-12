@@ -7,6 +7,7 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBUI;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -28,12 +29,16 @@ final class MyBatisDatabaseSqlExecutionDialog extends DialogWrapper {
             @NotNull String dataSourceName) {
         super(project, true);
         sql.setLineWrap(false);
-        sql.getEmptyText().setText("输入一条 SQL；默认仅建议执行 SELECT/WITH/EXPLAIN");
+        sql.getEmptyText().setText(MyBatisAssistantBundle.message(
+                "database.sql.execution.input.empty"));
         parameters.setLineWrap(false);
-        parameters.getEmptyText().setText("每行一个参数，例如 LONG:1、STRING:张三、NULL:VARCHAR");
-        setTitle("在 " + dataSourceName + " 上快速执行 SQL");
-        setOKButtonText("校验并执行");
-        setCancelButtonText("取消");
+        parameters.getEmptyText().setText(MyBatisAssistantBundle.message(
+                "database.sql.execution.parameters.empty"));
+        setTitle(MyBatisAssistantBundle.message(
+                "database.sql.execution.title", dataSourceName));
+        setOKButtonText(MyBatisAssistantBundle.message(
+                "database.sql.execution.button.execute"));
+        setCancelButtonText(MyBatisAssistantBundle.message("dialog.button.cancel"));
         setResizable(true);
         init();
     }
@@ -41,8 +46,10 @@ final class MyBatisDatabaseSqlExecutionDialog extends DialogWrapper {
     @Override
     protected @Nullable JComponent createCenterPanel() {
         JBSplitter splitter = new JBSplitter(true, 0.68f);
-        splitter.setFirstComponent(section("SQL（一次仅允许一条）", sql));
-        splitter.setSecondComponent(section("参数面板（TYPE:value）", parameters));
+        splitter.setFirstComponent(section(MyBatisAssistantBundle.message(
+                "database.sql.execution.section.sql"), sql));
+        splitter.setSecondComponent(section(MyBatisAssistantBundle.message(
+                "database.sql.execution.section.parameters"), parameters));
         splitter.setPreferredSize(new Dimension(920, 620));
         return splitter;
     }

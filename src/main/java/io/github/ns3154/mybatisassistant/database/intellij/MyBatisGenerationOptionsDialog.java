@@ -9,6 +9,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationArtifactKind;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationConfiguration;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationConfigurationCodec;
@@ -41,8 +42,10 @@ final class MyBatisGenerationOptionsDialog extends DialogWrapper {
             new JComboBox<>(MyBatisGenerationTemplateGroup.values());
     private final Map<MyBatisGenerationArtifactKind, JBCheckBox> artifactBoxes =
             new EnumMap<>(MyBatisGenerationArtifactKind.class);
-    private final JBCheckBox comments = new JBCheckBox("生成数据库注释", true);
-    private final JBCheckBox escapeKeywords = new JBCheckBox("转义 SQL 关键字", true);
+    private final JBCheckBox comments = new JBCheckBox(MyBatisAssistantBundle.message(
+            "database.generation.options.comments"), true);
+    private final JBCheckBox escapeKeywords = new JBCheckBox(MyBatisAssistantBundle.message(
+            "database.generation.options.escape.keywords"), true);
     private final JBTextArea configurationText = new JBTextArea(9, 72);
     private MyBatisGenerationConfiguration importedConfiguration =
             MyBatisGenerationConfiguration.standard("com.example");
@@ -53,8 +56,8 @@ final class MyBatisGenerationOptionsDialog extends DialogWrapper {
             artifactBoxes.put(kind, new JBCheckBox(displayName(kind), true));
         }
         configurationText.setLineWrap(false);
-        setTitle("生成 MyBatis 代码");
-        setOKButtonText("预览");
+        setTitle(MyBatisAssistantBundle.message("database.generation.options.title"));
+        setOKButtonText(MyBatisAssistantBundle.message("dialog.button.preview"));
         setResizable(true);
         init();
         exportConfiguration();
@@ -65,9 +68,11 @@ final class MyBatisGenerationOptionsDialog extends DialogWrapper {
         JPanel artifacts = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         artifactBoxes.values().forEach(artifacts::add);
         JPanel importExport = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        JButton importButton = new JButton("导入上方配置");
+        JButton importButton = new JButton(MyBatisAssistantBundle.message(
+                "database.generation.options.import"));
         importButton.addActionListener(event -> importConfiguration());
-        JButton exportButton = new JButton("导出当前配置");
+        JButton exportButton = new JButton(MyBatisAssistantBundle.message(
+                "database.generation.options.export"));
         exportButton.addActionListener(event -> exportConfiguration());
         importExport.add(importButton);
         importExport.add(exportButton);
@@ -77,17 +82,25 @@ final class MyBatisGenerationOptionsDialog extends DialogWrapper {
         configPanel.add(scrollPane, BorderLayout.CENTER);
         configPanel.add(importExport, BorderLayout.SOUTH);
         return FormBuilder.createFormBuilder()
-                .addLabeledComponent("基础包名：", basePackage)
-                .addLabeledComponent("Java 源码根目录：", javaRoot)
-                .addLabeledComponent("资源根目录：", resourceRoot)
-                .addLabeledComponent("模板组：", templateGroup)
-                .addLabeledComponent("表名前缀：", tablePrefix)
-                .addLabeledComponent("实体后缀：", entitySuffix)
-                .addLabeledComponent("生成文件：", artifacts)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "database.generation.options.base.package"), basePackage)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "database.generation.options.java.root"), javaRoot)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "database.generation.options.resource.root"), resourceRoot)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "database.generation.options.template"), templateGroup)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "database.generation.options.table.prefix"), tablePrefix)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "database.generation.options.entity.suffix"), entitySuffix)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "database.generation.options.artifacts"), artifacts)
                 .addComponent(comments)
                 .addComponent(escapeKeywords)
                 .addSeparator()
-                .addLabeledComponent("可导入/导出的配置文本：", configPanel)
+                .addLabeledComponent(MyBatisAssistantBundle.message(
+                        "database.generation.options.configuration"), configPanel)
                 .getPanel();
     }
 
@@ -128,7 +141,9 @@ final class MyBatisGenerationOptionsDialog extends DialogWrapper {
             applyConfigurationText(configurationText.getText());
             setErrorText(null);
         } catch (IllegalArgumentException invalid) {
-            Messages.showErrorDialog(getContentPanel(), invalid.getMessage(), "导入生成配置失败");
+            Messages.showErrorDialog(getContentPanel(), invalid.getMessage(),
+                    MyBatisAssistantBundle.message(
+                            "database.generation.options.import.failure"));
         }
     }
 

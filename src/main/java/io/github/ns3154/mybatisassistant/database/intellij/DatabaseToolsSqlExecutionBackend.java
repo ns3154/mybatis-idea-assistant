@@ -11,6 +11,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.sqltool.execution.MyBatisAuthorizedSqlExecution;
 import io.github.ns3154.mybatisassistant.sqltool.execution.MyBatisSqlExecutionBackend;
 import io.github.ns3154.mybatisassistant.sqltool.execution.MyBatisSqlExecutionPlan;
@@ -178,14 +179,16 @@ public final class DatabaseToolsSqlExecutionBackend implements MyBatisSqlExecuti
             RemoteResultSetMetaData metadata = resultSet.getMetaData();
             int columnCount = metadata.getColumnCount();
             if (columnCount > MAX_COLUMNS) {
-                throw new SQLException("结果列超过 " + MAX_COLUMNS + " 列上限");
+                throw new SQLException(MyBatisAssistantBundle.message(
+                        "database.sql.result.column.limit", MAX_COLUMNS));
             }
             List<String> columns = new ArrayList<>(columnCount);
             for (int index = 1; index <= columnCount; index++) {
                 indicator.checkCanceled();
                 String label = metadata.getColumnLabel(index);
                 columns.add(label == null || label.isBlank()
-                        ? "列" + index : label);
+                        ? MyBatisAssistantBundle.message("database.sql.result.column", index)
+                        : label);
             }
             List<List<String>> rows = new ArrayList<>();
             boolean truncated = false;
@@ -220,7 +223,8 @@ public final class DatabaseToolsSqlExecutionBackend implements MyBatisSqlExecuti
         if (text.length() <= MAX_CELL_CHARS) {
             return text;
         }
-        return text.substring(0, MAX_CELL_CHARS) + "…<已截断>";
+        return text.substring(0, MAX_CELL_CHARS)
+                + MyBatisAssistantBundle.message("database.sql.result.cell.truncated");
     }
 
     private long elapsedMillis(long started) {

@@ -13,6 +13,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.util.PsiTreeUtil;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.sqltool.testgen.MyBatisJUnitPlatform;
 import io.github.ns3154.mybatisassistant.sqltool.testgen.MyBatisMapperTestGeneration;
 import io.github.ns3154.mybatisassistant.sqltool.testgen.MyBatisMapperTestRequestFactory;
@@ -58,11 +59,12 @@ public final class MyBatisMapperJUnitSkeletonAction extends AnAction {
                 .runProcessWithProgressSynchronously(
                         () -> ReadAction.computeCancellable(
                                 () -> MyBatisMapperTestRequestFactory.create(method, platform)),
-                        "解析 Mapper 方法签名",
+                        MyBatisAssistantBundle.message("sqltool.junit.progress"),
                         true,
                         project);
         if (extracted instanceof MyBatisMapperTestRequestFactory.Result.Failure failure) {
-            Messages.showErrorDialog(project, failure.message(), "无法生成 JUnit 骨架");
+            Messages.showErrorDialog(project, failure.message(),
+                    MyBatisAssistantBundle.message("sqltool.junit.error.title"));
             return;
         }
         var request = ((MyBatisMapperTestRequestFactory.Result.Success) extracted).request();
@@ -70,8 +72,10 @@ public final class MyBatisMapperJUnitSkeletonAction extends AnAction {
                 MyBatisMapperTestSkeletonGenerator.generate(request);
         new MyBatisSqlToolPreviewDialog(
                 project,
-                "预览 " + generation.suggestedFileName(),
-                "仅生成预览，不会写文件或连接数据库。\n\n" + generation.source())
+                MyBatisAssistantBundle.message(
+                        "sqltool.junit.preview.title", generation.suggestedFileName()),
+                MyBatisAssistantBundle.message("sqltool.junit.preview.readonly")
+                        + "\n\n" + generation.source())
                 .show();
     }
 

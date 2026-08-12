@@ -13,6 +13,7 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.xml.XmlFile;
 import com.intellij.psi.xml.XmlTag;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.model.MyBatisXmlModel;
 import io.github.ns3154.mybatisassistant.sqltool.format.MyBatisXmlFormatResult;
 import io.github.ns3154.mybatisassistant.sqltool.format.MyBatisXmlFormatter;
@@ -49,23 +50,28 @@ public final class MyBatisXmlFormatAction extends AnAction {
         }
         Document document = PsiDocumentManager.getInstance(project).getDocument(xmlFile);
         if (document == null) {
-            Messages.showErrorDialog(project, "无法读取当前 XML 文档", "格式化未执行");
+            Messages.showErrorDialog(project,
+                    MyBatisAssistantBundle.message("sqltool.format.error.document"),
+                    MyBatisAssistantBundle.message("sqltool.format.error.title"));
             return;
         }
         String original = document.getText();
         MyBatisXmlFormatResult result = ProgressManager.getInstance()
                 .runProcessWithProgressSynchronously(
                         () -> MyBatisXmlFormatter.format(original, 2),
-                        "分析 MyBatis XML 格式",
+                        MyBatisAssistantBundle.message("sqltool.format.progress"),
                         true,
                         project);
         if (result instanceof MyBatisXmlFormatResult.Failure failure) {
-            Messages.showErrorDialog(project, failure.message(), "格式化未执行");
+            Messages.showErrorDialog(project, failure.message(),
+                    MyBatisAssistantBundle.message("sqltool.format.error.title"));
             return;
         }
         String formatted = ((MyBatisXmlFormatResult.Success) result).text();
         if (formatted.equals(original)) {
-            Messages.showInfoMessage(project, "当前 MyBatis XML 已符合格式。", "无需格式化");
+            Messages.showInfoMessage(project,
+                    MyBatisAssistantBundle.message("sqltool.format.already.formatted"),
+                    MyBatisAssistantBundle.message("sqltool.format.not.needed.title"));
             return;
         }
         if (!new MyBatisXmlFormatPreviewDialog(project, original, formatted).showAndGet()) {
@@ -73,7 +79,8 @@ public final class MyBatisXmlFormatAction extends AnAction {
         }
         ApplyResult applied = apply(project, xmlFile, original, formatted);
         if (applied != ApplyResult.APPLIED) {
-            Messages.showErrorDialog(project, applied.message, "格式化未执行");
+            Messages.showErrorDialog(project, applied.message(),
+                    MyBatisAssistantBundle.message("sqltool.format.error.title"));
         }
     }
 
@@ -94,7 +101,7 @@ public final class MyBatisXmlFormatAction extends AnAction {
         }
         AtomicReference<ApplyResult> result = new AtomicReference<>(ApplyResult.APPLIED);
         WriteCommandAction.writeCommandAction(project, file)
-                .withName("格式化 MyBatis XML")
+                .withName(MyBatisAssistantBundle.message("sqltool.format.command"))
                 .run(() -> {
                     if (!file.isValid() || file.getVirtualFile() == null) {
                         result.set(ApplyResult.INVALID_FILE);
@@ -116,16 +123,20 @@ public final class MyBatisXmlFormatAction extends AnAction {
     }
 
     enum ApplyResult {
-        APPLIED(""),
-        UNCHANGED("格式化结果与当前文档一致"),
-        SOURCE_CHANGED("预览后文档已变化，请重新运行格式化"),
-        READ_ONLY("当前 XML 文件只读"),
-        INVALID_FILE("当前 XML 文件或文档已失效");
+        APPLIED("sqltool.format.result.applied"),
+        UNCHANGED("sqltool.format.result.unchanged"),
+        SOURCE_CHANGED("sqltool.format.result.source.changed"),
+        READ_ONLY("sqltool.format.result.readonly"),
+        INVALID_FILE("sqltool.format.result.invalid");
 
-        private final String message;
+        private final String messageKey;
 
-        ApplyResult(String message) {
-            this.message = message;
+        ApplyResult(String messageKey) {
+            this.messageKey = messageKey;
+        }
+
+        private @NotNull String message() {
+            return MyBatisAssistantBundle.message(messageKey);
         }
     }
 }

@@ -12,6 +12,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.sqltool.execution.MyBatisAuthorizedSqlExecution;
 import io.github.ns3154.mybatisassistant.sqltool.execution.MyBatisSqlExecutionAuthorization;
 import io.github.ns3154.mybatisassistant.sqltool.execution.MyBatisSqlExecutionPlan;
@@ -62,7 +63,8 @@ public final class MyBatisDatabaseSqlExecuteAction extends AnAction {
         MyBatisSqlExecutionPreparation preparation =
                 MyBatisSqlExecutionPolicy.prepare(dialog.sql(), dialog.parameterPanel());
         if (preparation instanceof MyBatisSqlExecutionPreparation.Rejected rejected) {
-            Messages.showErrorDialog(project, rejected.message(), "SQL 未通过执行校验");
+            Messages.showErrorDialog(project, rejected.message(),
+                    MyBatisAssistantBundle.message("database.sql.execute.validation.title"));
             return;
         }
         MyBatisSqlExecutionPlan plan =
@@ -75,7 +77,7 @@ public final class MyBatisDatabaseSqlExecuteAction extends AnAction {
             MyBatisSqlExecutionResult result = ProgressManager.getInstance()
                     .runProcessWithProgressSynchronously(
                             () -> execute(project, dataSource, allowed.execution()),
-                            "执行受控 SQL",
+                            MyBatisAssistantBundle.message("database.sql.execute.progress"),
                             true,
                             project);
             new MyBatisDatabaseSqlResultDialog(project, plan.sql(), result).show();
@@ -90,23 +92,24 @@ public final class MyBatisDatabaseSqlExecuteAction extends AnAction {
         if (!plan.doubleConfirmationRequired()) {
             return MyBatisSqlExecutionPolicy.authorize(plan, false, "");
         }
-        String riskMessage = "该语句属于 " + plan.riskAssessment().risk()
-                + "，将尝试在独立事务中执行。部分数据库 DDL 可能自动提交，无法回滚。是否继续？";
+        String riskMessage = MyBatisAssistantBundle.message(
+                "database.sql.execute.risk.message", plan.riskAssessment().risk());
         boolean riskConfirmed = Messages.showYesNoDialog(
                 project,
                 riskMessage,
-                "危险 SQL 第一次确认",
-                "继续确认",
-                "取消",
+                MyBatisAssistantBundle.message("database.sql.execute.confirm.first.title"),
+                MyBatisAssistantBundle.message("database.sql.execute.confirm.continue"),
+                MyBatisAssistantBundle.message("dialog.button.cancel"),
                 Messages.getWarningIcon()) == Messages.YES;
         if (!riskConfirmed) {
             return MyBatisSqlExecutionPolicy.authorize(plan, false, "");
         }
         String typed = Messages.showInputDialog(
                 project,
-                "请输入“" + MyBatisSqlExecutionPolicy.DANGEROUS_CONFIRMATION_PHRASE
-                        + "”完成第二次确认：",
-                "危险 SQL 第二次确认",
+                MyBatisAssistantBundle.message(
+                        "database.sql.execute.confirm.second.prompt",
+                        MyBatisSqlExecutionPolicy.DANGEROUS_CONFIRMATION_PHRASE),
+                MyBatisAssistantBundle.message("database.sql.execute.confirm.second.title"),
                 Messages.getWarningIcon());
         return MyBatisSqlExecutionPolicy.authorize(
                 plan, true, typed == null ? "" : typed);
@@ -118,7 +121,8 @@ public final class MyBatisDatabaseSqlExecuteAction extends AnAction {
             @NotNull MyBatisAuthorizedSqlExecution execution) {
         var indicator = ProgressManager.getInstance().getProgressIndicator();
         if (indicator == null) {
-            return new MyBatisSqlExecutionResult.Failure("缺少可取消进度上下文", "", 0);
+            return new MyBatisSqlExecutionResult.Failure(MyBatisAssistantBundle.message(
+                    "database.sql.execute.error.progress.context"), "", 0);
         }
         return new DatabaseToolsSqlExecutionBackend(project, dataSource)
                 .execute(execution, indicator);

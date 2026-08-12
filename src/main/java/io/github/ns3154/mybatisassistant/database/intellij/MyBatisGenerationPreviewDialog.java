@@ -10,6 +10,7 @@ import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.table.JBTable;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationPlan;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationPlanEntry;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationPlanStatus;
@@ -39,7 +40,8 @@ final class MyBatisGenerationPreviewDialog extends DialogWrapper {
     private final PlanTableModel model;
     private final JBTable table;
     private final JBTextArea preview = new JBTextArea();
-    private final Action diffAction = new AbstractAction("查看差异") {
+    private final Action diffAction = new AbstractAction(MyBatisAssistantBundle.message(
+            "database.generation.preview.diff")) {
         @Override
         public void actionPerformed(ActionEvent event) {
             showDiff();
@@ -56,8 +58,9 @@ final class MyBatisGenerationPreviewDialog extends DialogWrapper {
         this.table = new JBTable(model);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.getSelectionModel().addListSelectionListener(event -> updatePreview());
-        setTitle("预览 MyBatis 代码生成计划");
-        setOKButtonText("生成");
+        setTitle(MyBatisAssistantBundle.message("database.generation.preview.title"));
+        setOKButtonText(MyBatisAssistantBundle.message(
+                "database.generation.preview.generate"));
         setResizable(true);
         init();
         if (model.getRowCount() > 0) {
@@ -95,7 +98,8 @@ final class MyBatisGenerationPreviewDialog extends DialogWrapper {
     void setPathSelected(@NotNull String path, boolean selected) {
         int row = model.row(path);
         if (row < 0 || !model.isCellEditable(row, 0)) {
-            throw new IllegalArgumentException("文件不可选择：" + path);
+            throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                    "database.generation.preview.file.not.selectable", path));
         }
         model.setValueAt(selected, row, 0);
     }
@@ -121,9 +125,11 @@ final class MyBatisGenerationPreviewDialog extends DialogWrapper {
     private void updateActions() {
         setOKActionEnabled(!plan.hasConflicts() && !model.selectedPaths().isEmpty());
         if (plan.hasConflicts()) {
-            setErrorText("存在冲突，必须修复并重新预览后才能生成");
+            setErrorText(MyBatisAssistantBundle.message(
+                    "database.generation.preview.error.conflict"));
         } else if (model.selectedPaths().isEmpty()) {
-            setErrorText("至少选择一个新建或更新文件");
+            setErrorText(MyBatisAssistantBundle.message(
+                    "database.generation.preview.error.selection"));
         } else {
             setErrorText(null);
         }
@@ -141,8 +147,11 @@ final class MyBatisGenerationPreviewDialog extends DialogWrapper {
                 path,
                 factory.create(project, entry.existingText().orElse(""), fileType),
                 factory.create(project, entry.proposedText().orElseThrow(), fileType),
-                entry.status() == MyBatisGenerationPlanStatus.CREATE ? "新文件" : "当前文件",
-                "生成候选");
+                MyBatisAssistantBundle.message(
+                        entry.status() == MyBatisGenerationPlanStatus.CREATE
+                                ? "database.generation.preview.diff.new"
+                                : "database.generation.preview.diff.current"),
+                MyBatisAssistantBundle.message("database.generation.preview.diff.candidate"));
         DiffManager.getInstance().showDiff(project, request);
     }
 
@@ -177,9 +186,12 @@ final class MyBatisGenerationPreviewDialog extends DialogWrapper {
         @Override
         public String getColumnName(int column) {
             return switch (column) {
-                case 0 -> "生成";
-                case 1 -> "状态";
-                default -> "文件";
+                case 0 -> MyBatisAssistantBundle.message(
+                        "database.generation.preview.column.generate");
+                case 1 -> MyBatisAssistantBundle.message(
+                        "database.generation.preview.column.status");
+                default -> MyBatisAssistantBundle.message(
+                        "database.generation.preview.column.file");
             };
         }
 
@@ -238,10 +250,14 @@ final class MyBatisGenerationPreviewDialog extends DialogWrapper {
 
     private static String displayStatus(MyBatisGenerationPlanStatus status) {
         return switch (status) {
-            case CREATE -> "新建";
-            case UPDATE -> "更新";
-            case UNCHANGED -> "无变化";
-            case CONFLICT -> "冲突";
+            case CREATE -> MyBatisAssistantBundle.message(
+                    "database.generation.preview.status.create");
+            case UPDATE -> MyBatisAssistantBundle.message(
+                    "database.generation.preview.status.update");
+            case UNCHANGED -> MyBatisAssistantBundle.message(
+                    "database.generation.preview.status.unchanged");
+            case CONFLICT -> MyBatisAssistantBundle.message(
+                    "database.generation.preview.status.conflict");
         };
     }
 }
