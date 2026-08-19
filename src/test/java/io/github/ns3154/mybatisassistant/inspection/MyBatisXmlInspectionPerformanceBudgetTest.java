@@ -17,6 +17,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class MyBatisXmlInspectionPerformanceBudgetTest extends BasePlatformTestCase {
     private static final int SQL_LINE_COUNT = 2_000;
@@ -72,50 +73,51 @@ public final class MyBatisXmlInspectionPerformanceBudgetTest extends BasePlatfor
 
         Future<CancellationObservation> future = ApplicationManager.getApplication()
                 .executeOnPooledThread(() -> {
-                    MyBatisPerformanceProgressIndicator indicator =
-                            new MyBatisPerformanceProgressIndicator();
+                    AtomicInteger cancellationChecks = new AtomicInteger();
                     boolean dispatchThread = ApplicationManager.getApplication()
                             .isDispatchThread();
                     try {
-                        ProgressManager.getInstance().runProcess(
-                                () -> ReadAction.compute(() -> inspect(
-                                        statement,
-                                        indicator::cancel)),
-                                indicator);
+                        ReadAction.compute(() -> inspect(statement, () -> {
+                            cancellationChecks.incrementAndGet();
+                            throw new ProcessCanceledException();
+                        }));
                         return new CancellationObservation(
                                 dispatchThread,
                                 false,
-                                indicator.canceledCheckCount());
+                                cancellationChecks.get());
                     } catch (ProcessCanceledException expected) {
                         return new CancellationObservation(
                                 dispatchThread,
                                 true,
-                                indicator.canceledCheckCount());
+                                cancellationChecks.get());
                     }
                 });
 
         CancellationObservation observation = future.get(30, TimeUnit.SECONDS);
         assertFalse("取消夹具必须运行在后台", observation.dispatchThread());
         assertTrue("Inspection visitor 入口必须传播 PCE", observation.canceled());
-        assertTrue("PCE 必须由 visitor 的真实 checkCanceled 触发",
+        assertTrue("PCE 必须由 visitor 的真实取消边界触发",
                 observation.canceledCheckCount() > 0);
     }
 
     private InspectionObservation inspect(XmlTag statement) {
-        return inspect(statement, () -> {
-        });
+        return inspect(statement, new MyBatisDangerousStatementInspection());
     }
 
-    private InspectionObservation inspect(XmlTag statement, Runnable beforeAccept) {
+    private InspectionObservation inspect(XmlTag statement, Runnable cancellationCheck) {
+        return inspect(statement, new MyBatisDangerousStatementInspection(cancellationCheck));
+    }
+
+    private InspectionObservation inspect(
+            XmlTag statement,
+            MyBatisDangerousStatementInspection inspection) {
         boolean dispatchThread = ApplicationManager.getApplication().isDispatchThread();
         boolean readAccessAllowed = ApplicationManager.getApplication().isReadAccessAllowed();
         ProblemsHolder holder = new ProblemsHolder(
                 InspectionManager.getInstance(getProject()),
                 statement.getContainingFile(),
                 true);
-        PsiElementVisitor visitor = new MyBatisDangerousStatementInspection()
-                .buildVisitor(holder, true);
-        beforeAccept.run();
+        PsiElementVisitor visitor = inspection.buildVisitor(holder, true);
         statement.accept(visitor);
         return new InspectionObservation(
                 dispatchThread,

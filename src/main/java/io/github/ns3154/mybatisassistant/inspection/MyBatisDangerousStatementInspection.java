@@ -26,6 +26,15 @@ import java.util.Set;
 public final class MyBatisDangerousStatementInspection extends LocalInspectionTool {
     private static final Set<String> WRITE_TAGS = Set.of("update", "delete");
     private static final String DYNAMIC_IDENTIFIER = "__mybatis_dynamic__";
+    private final Runnable cancellationCheck;
+
+    public MyBatisDangerousStatementInspection() {
+        this(ProgressManager::checkCanceled);
+    }
+
+    MyBatisDangerousStatementInspection(@NotNull Runnable cancellationCheck) {
+        this.cancellationCheck = cancellationCheck;
+    }
 
     @Override
     public @NotNull PsiElementVisitor buildVisitor(
@@ -34,7 +43,7 @@ public final class MyBatisDangerousStatementInspection extends LocalInspectionTo
         return new XmlElementVisitor() {
             @Override
             public void visitXmlTag(@NotNull XmlTag tag) {
-                ProgressManager.checkCanceled();
+                cancellationCheck.run();
                 if (!MyBatisXmlInspectionSupport.isDirectStatement(tag)
                         || !WRITE_TAGS.contains(tag.getName())
                         || !MyBatisXmlInspectionSupport.isReady(tag)) {
