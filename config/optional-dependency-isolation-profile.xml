@@ -11,5 +11,25 @@
                 enabled="true"
                 level="WARNING"
                 enabled_by_default="true"/>
+        <!--
+        Package Checker 的检查依赖项目同步与外部漏洞数据。在无界面隔离门中显式
+        关闭，避免其 10 分钟同步超时掩盖 MyBatis 核心检查结果；隔离脚本仍会对
+        其余平台异常和所有本插件异常严格失败。
+        -->
+        <inspection_tool
+                class="VulnerableLibrariesGlobal"
+                enabled="false"
+                level="WARNING"
+                enabled_by_default="false"/>
+        <inspection_tool
+                class="VulnerableLibrariesLocal"
+                enabled="false"
+                level="WARNING"
+                enabled_by_default="false"/>
+        <inspection_tool
+                class="MaliciousLibrariesLocal"
+                enabled="false"
+                level="WARNING"
+                enabled_by_default="false"/>
     </profile>
 </component>

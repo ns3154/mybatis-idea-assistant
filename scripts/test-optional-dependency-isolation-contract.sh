@@ -503,8 +503,20 @@ verify_dedicated_fixture_contract() {
     [[ -s "${fixture}/.idea/modules.xml" \
         && -s "${fixture}/lifecycle-inspection-corpus.iml" \
         && -s "${mapper_java}" && -s "${mapper_xml}" && -s "${profile}" ]]
-    [[ "$(grep -c '<inspection_tool' "${profile}")" == "1" ]]
+    [[ "$(grep -c '<inspection_tool' "${profile}")" == "4" ]]
     grep -Fq -- 'class="MyBatisUnusedStatement"' "${profile}"
+    for inspection in VulnerableLibrariesGlobal VulnerableLibrariesLocal \
+        MaliciousLibrariesLocal; do
+        awk -v inspection="${inspection}" '
+            $0 ~ "class=\"" inspection "\"" { found = 1 }
+            found && /enabled="false"/ { disabled = 1 }
+            found && /enabled_by_default="false"/ { disabled_by_default = 1 }
+            found && /\/>/ { exit !(disabled && disabled_by_default) }
+            END { if (!found) exit 1 }
+        ' "${profile}"
+    done
+    grep -Fq -- '-Duse.eel.file.watcher=false' \
+        "${TEST_PROJECT_ROOT}/scripts/verify-optional-dependency-isolation.sh"
     grep -Fq -- 'interface UserMapper' "${mapper_java}"
     grep -Fq -- 'findById' "${mapper_java}"
     ! grep -Fq -- 'findSummary' "${mapper_java}"

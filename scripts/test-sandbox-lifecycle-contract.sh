@@ -494,6 +494,16 @@ test_mcp_protocol_fingerprint() {
 
 grep -Fq 'class="MyBatisUnusedStatement"' \
     "${TEST_PROJECT_ROOT}/config/lifecycle-inspection-profile.xml"
+for inspection in VulnerableLibrariesGlobal VulnerableLibrariesLocal \
+    MaliciousLibrariesLocal; do
+    awk -v inspection="${inspection}" '
+        $0 ~ "class=\"" inspection "\"" { found = 1 }
+        found && /enabled="false"/ { disabled = 1 }
+        found && /enabled_by_default="false"/ { disabled_by_default = 1 }
+        found && /\/>/ { exit !(disabled && disabled_by_default) }
+        END { if (!found) exit 1 }
+    ' "${TEST_PROJECT_ROOT}/config/lifecycle-inspection-profile.xml"
+done
 awk '
     /run_ide_command=\(/ { in_command = 1; next }
     in_command && /--no-daemon/ { no_daemon = 1 }

@@ -791,6 +791,10 @@ mybatis_assistant_optional_dependency_isolation_main() {
         rm -rf -- "${inspection_output}"
         mkdir -p "${inspection_output}"
 
+        # 2025.2 在 macOS 无界面启动早期会在 Registry 尚未完成加载时读取
+        # use.eel.file.watcher，并把平台自身错误记录为 SEVERE。平台日志明确要求
+        # 该阶段使用同名系统属性；这里固定为 false，不影响本插件隔离语义。
+        JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+${JAVA_TOOL_OPTIONS} }-Duse.eel.file.watcher=false" \
         ./gradlew --no-daemon runIde \
             "--args=inspect ${semantic_project} ${inspection_profile} ${inspection_output} -v2" \
             > "${case_output}" 2>&1 &
