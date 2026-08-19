@@ -511,6 +511,11 @@ awk '
     END { exit !(no_daemon && run_ide) }
 ' "${TEST_PROJECT_ROOT}/scripts/verify-sandbox-lifecycle.sh"
 awk '
+    /JAVA_TOOL_OPTIONS=.*-Duse\.eel\.file\.watcher=false/ { property = 1; next }
+    property && /"\$\{run_ide_command\[@\]\}"/ { launch = 1; exit }
+    END { exit !(property && launch) }
+' "${TEST_PROJECT_ROOT}/scripts/verify-sandbox-lifecycle.sh"
+awk '
     /run_ide_command\+=\("--args=exit"\)/ { exit_contract = 1 }
     /\.\/gradlew --no-daemon.*runIde --args=exit/ { duplicate_launch = 1 }
     END { exit !(exit_contract && !duplicate_launch) }

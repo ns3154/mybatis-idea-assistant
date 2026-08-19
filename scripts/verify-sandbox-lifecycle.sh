@@ -1224,7 +1224,11 @@ mybatis_assistant_lifecycle_main() {
         else
             run_ide_command+=("--args=exit")
         fi
-        "${run_ide_command[@]}" > "${cycle_output}" 2>&1 &
+        # 2026.1 在长稳反复启动时可能于 Registry 完成加载前读取
+        # use.eel.file.watcher，并由平台自身记录 SEVERE。平台日志明确要求
+        # 早期启动阶段使用同名系统属性；与隔离门保持一致固定为 false。
+        JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+${JAVA_TOOL_OPTIONS} }-Duse.eel.file.watcher=false" \
+            "${run_ide_command[@]}" > "${cycle_output}" 2>&1 &
         run_pid=$!
         MYBATIS_ASSISTANT_ACTIVE_RUN_PID="${run_pid}"
         MYBATIS_ASSISTANT_ACTIVE_PROCESS_IDENTITIES="${process_identity_file}"
