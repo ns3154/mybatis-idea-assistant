@@ -28,15 +28,15 @@
 | Maven 语义语料 | 六模块 reactor 成功，6 个契约测试通过 | 通过 |
 | Plugin Verifier | `IU-261.22158.277 Compatible`，无 deprecated/scheduled-for-removal 报告 | 通过 |
 | 当前 ZIP | `mybatis-idea-assistant-0.1.0-SNAPSHOT.zip`，SHA-256 `dd1007d4d807d98ef486dda087644cebe1d06eb8cfbe44b1a213bd9753aaa4b3` | 通过构建与结构验证 |
-| 加固沙箱生命周期 1/100 | 本地当前工作区 1/1 已审查通过；仍需推送后在同一 SHA 跑 100/100 | 本地首轮通过，远端 100 次待跑 |
-| 5/5 可选依赖隔离 | Kotlin、Spring、YAML、Database Tools 与全部禁用均完成真实 Inspection 和退出清理 | 本地当前工作区 5/5 通过，远端同 SHA 待复验 |
+| 加固沙箱生命周期 1/100 | `bb4a93c` 远端 1/1 与 100/100 通过并审查工件 | Draft 候选通过，最终 `main` SHA 待复验 |
+| 5/5 可选依赖隔离 | Kotlin、Spring、YAML、Database Tools 与全部禁用均完成真实 Inspection 和退出清理 | `bb4a93c` 两轮远端 5/5 通过 |
 
 ## 3. 2026-08-19 当前候选本地证据
 
 - 禁用构建缓存并强制重跑 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m33s）；103 个测试套件中的 744/744 平台测试通过，失败、错误和跳过均为 0。
 - 整体行覆盖率为 15389/18234（84.40%）；包含 ResultMap 增量的各分区覆盖率硬门、Checkstyle、本地化、SBOM、项目与插件结构均通过。
 - Java/MyBatis 样例 8/8、语义语料 11/11、Gradle Spring 四模块 2/2 及 `bootJar` 通过；最低 IDE `IU-252.28539.54` 的 Plugin Verifier 结果为 `Compatible`。
-- 候选 ZIP SHA-256 为 `57b1d53bd1a8f359b3d41206408e78dbb04c7150619f3b936f756a6ce5697e12`。同一工作区的加固生命周期 1/1 与可选依赖隔离 5/5 已通过；该本地证据不替代新 HEAD 远端、生命周期 100/100 或副屏真实 IDEA 验收。
+- 候选 ZIP SHA-256 为 `57b1d53bd1a8f359b3d41206408e78dbb04c7150619f3b936f756a6ce5697e12`。`bb4a93c` 的远端必需检查、加固生命周期 1/1、100/100 与隔离 5/5 已通过；该 Draft 候选证据不替代最终 `main` SHA 或副屏真实 IDEA 验收。
 
 ## 4. 关键行为证据
 
@@ -64,4 +64,4 @@
 
 ## 6. 阶段结论
 
-S4-A～S4-D 的代码、测试和文档已经进入收口状态；ResultMap 新增路径可写为“代码已实现，当前候选本地统一门、生命周期 1/1 与隔离 5/5 已通过”。新 HEAD 远端必需检查、同一 SHA 生命周期 100/100 与副屏真实 IDEA 路径全部通过前，本阶段保持“待最终验收”，不得写成“已验收”。
+S4-A～S4-D 的代码、测试和文档已经进入收口状态；ResultMap 新增路径的本地门与 `bb4a93c` 远端必需检查、生命周期 1/1、100/100、隔离 5/5 已通过。最终 `main` SHA 与副屏真实 IDEA 路径全部通过前，本阶段保持“待最终验收”，不得写成“已验收”。

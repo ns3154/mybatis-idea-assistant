@@ -20,7 +20,7 @@
 
 ## 原 S9 自动化证据快照
 
-本节 467 个测试、覆盖率、ZIP 和远端运行属于 set-based 批量增量前的 S9 快照。新增批量/失败关闭路径已跟随当前工作区重跑统一本地门；新 HEAD 三系统、兼容、CodeQL 和生命周期证据仍待。
+本节 467 个测试、覆盖率、ZIP 和远端运行属于 set-based 批量增量前的 S9 快照。新增批量/失败关闭路径已进入本地统一门，并随 `bb4a93c` 完成三系统、兼容、CodeQL、隔离与生命周期 100/100。
 
 当前代码已经在一次任务图中执行并通过：
 
@@ -49,8 +49,8 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 
 ## 尚未关闭的验收项
 
-- 当前工作区的加固生命周期 1/1 与 5/5 Database Tools 可选依赖隔离已通过；仍需推送后同一 SHA 100/100 与远端 5/5；
-- 新 HEAD 的主 CI、三系统、CodeQL、五宿主和加固生命周期远端门；
+- `bb4a93c` 的加固生命周期 1/1、100/100 与两轮 5/5 Database Tools 可选依赖隔离已通过；最终 `main` SHA 仍须复验；
+- 最终 `main` SHA 的主 CI、三系统、CodeQL、五宿主和加固生命周期远端门；`bb4a93c` 的对应 Draft 候选门已全部通过；
 - 检测到真实副屏后，在副屏 IDEA 2026.1 验证方法名写入的预览/冲突/Undo，以及 Wrapper/Join 的框架、关系、字段选择和只读预览；
 - 当前无可用副屏，因此未启动 IDEA、`runIde` 或 Computer Use，也未占用主屏幕。
 

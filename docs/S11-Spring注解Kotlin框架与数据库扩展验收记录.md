@@ -41,7 +41,7 @@
 
 ## 尚未关闭的验收项
 
-- 当前产物 20/20 生命周期与 Kotlin、Spring、YAML、Database Tools、全部禁用共 5/5 可选依赖隔离；
+- 将 `bb4a93c` 分支候选已通过的加固生命周期 1/1、100/100 与 Kotlin、Spring、YAML、Database Tools、全部禁用共 5/5 可选依赖隔离，在最终 `main` 精确 SHA 上重跑并归档；
 - 在真实副屏 IDEA 2026.1 验证注解参数补全/检查、双文件迁移预览与一次 Undo、Spring 字段和构造器参数 gutter；
 - Community JDBC 真实对话框、驱动选择、连接结果及 Android Studio 安装/索引/导航需在可用副屏上实机验收。
 

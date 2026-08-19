@@ -81,4 +81,4 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 ./scripts/verify-optional-dependency-isolation.sh
 ```
 
-当前代码已经覆盖 S4-A～S4-D，并叠加了 ResultMap `column` 补全与保守缺失映射 Quick Fix。截至 2026-08-19，包含该新路径的工作区已通过禁用构建缓存的独占本地统一门：744/744 平台测试，整体行覆盖率 15389/18234（84.40%），各分区覆盖率、最低 `IU-252.28539.54` Verifier、结构、本地化和 SBOM 均通过；同一工作区的加固生命周期 1/1 与可选依赖隔离 5/5 也已通过。新 HEAD 远端门、同一 SHA 生命周期 100/100 和副屏真实 IDEA 验收仍待补齐；以上全部通过前，S4 不得标记为已验收。
+当前代码已经覆盖 S4-A～S4-D，并叠加了 ResultMap `column` 补全与保守缺失映射 Quick Fix。截至 2026-08-19，本地候选通过 744/744、84.40%、各分区覆盖率、最低 Verifier、结构、本地化和 SBOM；2026-08-20，`bb4a93c` 的远端必需检查、生命周期 1/1、100/100 与隔离 5/5 全部通过。最终 `main` SHA 和副屏真实 IDEA 验收仍待补齐；以上全部通过前，S4 不得标记为已验收。
