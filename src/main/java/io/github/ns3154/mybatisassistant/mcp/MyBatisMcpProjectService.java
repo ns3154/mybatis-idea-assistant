@@ -21,33 +21,39 @@ public final class MyBatisMcpProjectService implements Disposable {
     private MyBatisMcpHttpServer server;
     private char[] accessToken;
     private int configuredPort = -1;
-    private String lastFailure;
+    private String lastFailureType;
 
     public MyBatisMcpProjectService(@NotNull Project project) {
         this.project = project;
         settingsConnection = ApplicationManager.getApplication()
                 .getMessageBus()
                 .connect(this);
+        // loadState 会同步发布状态，监听器必须直接消费快照，避免重入初始化应用级设置服务。
         settingsConnection.subscribe(
                 MyBatisAssistantSettingsListener.TOPIC,
-                state -> reconcile());
+                this::reconcile);
     }
 
     public static @NotNull MyBatisMcpProjectService getInstance(@NotNull Project project) {
         return project.getService(MyBatisMcpProjectService.class);
     }
 
-    public synchronized void reconcile() {
+    public void reconcile() {
+        reconcile(MyBatisAssistantSettings.getInstance().getState());
+    }
+
+    private synchronized void reconcile(
+            @NotNull MyBatisAssistantSettings.SettingsState settingsState) {
         if (project.isDisposed() || !project.isOpen()) {
             stop();
             return;
         }
-        MyBatisAssistantSettings settings = MyBatisAssistantSettings.getInstance();
-        if (!settings.isMcpEnabled()) {
+        MyBatisAssistantSettings.SettingsState settings = settingsState.copyAndNormalize();
+        if (!settings.mcpEnabled) {
             stop();
             return;
         }
-        int desiredPort = settings.getMcpPort();
+        int desiredPort = settings.mcpPort;
         if (server != null) {
             if (configuredPort == desiredPort) {
                 return;
@@ -66,13 +72,14 @@ public final class MyBatisMcpProjectService implements Disposable {
             server = MyBatisMcpHttpServer.start(desiredPort, token, protocol);
             accessToken = token.toCharArray();
             configuredPort = desiredPort;
-            lastFailure = null;
+            lastFailureType = null;
         } catch (IOException | RuntimeException failure) {
             protocol.close();
             clearToken();
             configuredPort = -1;
-            lastFailure = MyBatisAssistantBundle.message(
-                    "mcp.error.server.start", failure.getClass().getSimpleName());
+            // loadState 会同步发布设置事件；此处只记录稳定类型，避免失败路径为本地化
+            // 文案再次读取正在初始化的应用级设置服务。文案在调用方读取时再生成。
+            lastFailureType = failure.getClass().getSimpleName();
         }
     }
 
@@ -90,7 +97,8 @@ public final class MyBatisMcpProjectService implements Disposable {
     }
 
     public synchronized @NotNull Optional<String> lastFailure() {
-        return Optional.ofNullable(lastFailure);
+        return Optional.ofNullable(lastFailureType).map(type ->
+                MyBatisAssistantBundle.message("mcp.error.server.start", type));
     }
 
     public synchronized void stop() {
@@ -99,7 +107,7 @@ public final class MyBatisMcpProjectService implements Disposable {
             server = null;
         }
         configuredPort = -1;
-        lastFailure = null;
+        lastFailureType = null;
         clearToken();
     }
 

@@ -69,8 +69,7 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
         }
         try {
             JoinModel model = ProgressManager.getInstance().runProcessWithProgressSynchronously(
-                    () -> MyBatisReadActionSupport.compute(() -> loadModel(
-                            tables, options.configuration())),
+                    () -> loadModel(tables, options.configuration()),
                     MyBatisAssistantBundle.message("database.join.progress.metadata"),
                     true,
                     project);
@@ -190,24 +189,50 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
             throw new IllegalStateException(MyBatisAssistantBundle.message(
                     "database.join.error.progress.context"));
         }
-        if (Arrays.stream(tables).anyMatch(table -> !table.isValid()
-                || table.getDataSource().isLoading())) {
-            throw new IllegalStateException(MyBatisAssistantBundle.message(
-                    "database.join.error.model.changed"));
-        }
-        if (tables[0].getDataSource() != tables[1].getDataSource()) {
-            throw new IllegalStateException(MyBatisAssistantBundle.message(
-                    "database.join.error.data.source"));
-        }
-        MyBatisDatabaseTable base = DatabaseToolsMetadataProvider.table(
-                tables[0].getDasObject(), indicator);
-        MyBatisDatabaseTable target = DatabaseToolsMetadataProvider.table(
-                tables[1].getDasObject(), indicator);
-        return model(
-                base,
-                target,
-                DatabaseToolsMetadataProvider.dialect(tables[0].getDataSource().getDbms()),
-                configuration);
+        return loadModel(
+                tables,
+                configuration,
+                indicator,
+                MyBatisDatabaseJoinGenerateAction::snapshot,
+                MyBatisDatabaseJoinGenerateAction::buildModel);
+    }
+
+    static @NotNull JoinModel loadModel(
+            @NotNull DbTable[] tables,
+            @NotNull MyBatisGenerationConfiguration configuration,
+            @NotNull ProgressIndicator indicator,
+            @NotNull JoinSnapshotFactory snapshotFactory,
+            @NotNull JoinModelFactory modelFactory) {
+        JoinSnapshot snapshot = MyBatisReadActionSupport.compute(() -> {
+            indicator.checkCanceled();
+            if (Arrays.stream(tables).anyMatch(table -> !table.isValid()
+                    || table.getDataSource().isLoading())) {
+                throw new IllegalStateException(MyBatisAssistantBundle.message(
+                        "database.join.error.model.changed"));
+            }
+            if (tables[0].getDataSource() != tables[1].getDataSource()) {
+                throw new IllegalStateException(MyBatisAssistantBundle.message(
+                        "database.join.error.data.source"));
+            }
+            return snapshotFactory.snapshot(tables, indicator);
+        });
+        indicator.checkCanceled();
+        return modelFactory.model(snapshot, configuration);
+    }
+
+    private static @NotNull JoinSnapshot snapshot(
+            @NotNull DbTable[] tables,
+            @NotNull ProgressIndicator indicator) {
+        return new JoinSnapshot(
+                DatabaseToolsMetadataProvider.table(tables[0].getDasObject(), indicator),
+                DatabaseToolsMetadataProvider.table(tables[1].getDasObject(), indicator),
+                DatabaseToolsMetadataProvider.dialect(tables[0].getDataSource().getDbms()));
+    }
+
+    private static @NotNull JoinModel buildModel(
+            @NotNull JoinSnapshot snapshot,
+            @NotNull MyBatisGenerationConfiguration configuration) {
+        return model(snapshot.base(), snapshot.target(), snapshot.dialect(), configuration);
     }
 
     private static RelationChoice chooseRelation(
@@ -329,5 +354,25 @@ public final class MyBatisDatabaseJoinGenerateAction extends AnAction {
         JoinModel {
             relations = List.copyOf(relations);
         }
+    }
+
+    record JoinSnapshot(
+            @NotNull MyBatisDatabaseTable base,
+            @NotNull MyBatisDatabaseTable target,
+            @NotNull MyBatisSqlDialect dialect) {
+    }
+
+    @FunctionalInterface
+    interface JoinSnapshotFactory {
+        @NotNull JoinSnapshot snapshot(
+                @NotNull DbTable[] tables,
+                @NotNull ProgressIndicator indicator);
+    }
+
+    @FunctionalInterface
+    interface JoinModelFactory {
+        @NotNull JoinModel model(
+                @NotNull JoinSnapshot snapshot,
+                @NotNull MyBatisGenerationConfiguration configuration);
     }
 }

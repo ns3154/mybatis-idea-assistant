@@ -12,6 +12,8 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.Presentation;
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
@@ -27,6 +29,8 @@ import java.sql.Types;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MyBatisDatabaseAdvancedSqlGenerateActionTest
         extends BasePlatformTestCase {
@@ -83,6 +87,37 @@ public final class MyBatisDatabaseAdvancedSqlGenerateActionTest
                 "wrapper.select(\"`name`\")"));
         assertTrue(preview.wrapperCode().contains(
                 ".eq(\"`role_id`\", roleId)"));
+    }
+
+    public void testWrapperPreviewUsesOneSelectionForMethodXmlAndWrapperCode() {
+        MyBatisDatabaseTable table = new MyBatisDatabaseTable(
+                Optional.empty(),
+                Optional.empty(),
+                "users",
+                List.of(
+                        column("id", Types.BIGINT, true, false, 0),
+                        column("role_id", Types.BIGINT, false, false, 1),
+                        column("name", Types.VARCHAR, false, false, 2)));
+
+        MyBatisDatabaseWrapperGenerateAction.WrapperPreview preview =
+                MyBatisDatabaseWrapperGenerateAction.buildPreview(
+                        table,
+                        MyBatisSqlDialect.MYSQL,
+                        MyBatisGenerationConfiguration.standard("com.example"),
+                        "findByRoleIdAndName",
+                        MyBatisWrapperFramework.MYBATIS_PLUS,
+                        "3.5.17",
+                        Set.of(1));
+
+        assertTrue(preview.methodDeclaration().contains(
+                "findByRoleIdAndName("));
+        assertTrue(preview.xmlStatement().contains(
+                "  AND `role_id` = #{roleId,jdbcType=BIGINT}"));
+        assertTrue(preview.xmlStatement().contains(
+                "<if test=\"name != null\">AND `name` = "
+                        + "#{name,jdbcType=VARCHAR}</if>"));
+        assertTrue(preview.wrapperCode().contains(
+                ".eq(\"`role_id`\", roleId).eq(name != null, \"`name`\", name)"));
     }
 
     public void testWrapperPreviewCarriesTheSelectedQualifiedTable() {
@@ -196,6 +231,44 @@ public final class MyBatisDatabaseAdvancedSqlGenerateActionTest
                         MyBatisSqlDialect.POSTGRESQL,
                         MyBatisGenerationConfiguration.standard("com.example")))
                 .getMessage().contains("没有可供用户选择"));
+    }
+
+    public void testJoinModelSnapshotsMetadataInsideReadActionAndBuildsOutside()
+            throws Exception {
+        DbDataSource source = dataSource(false);
+        DbTable[] selected = {
+                table(source, true),
+                table(source, true)
+        };
+        AtomicBoolean snapshotReadAccess = new AtomicBoolean();
+        AtomicBoolean modelReadAccess = new AtomicBoolean();
+
+        MyBatisDatabaseJoinGenerateAction.JoinModel model = ApplicationManager
+                .getApplication()
+                .executeOnPooledThread(() -> MyBatisDatabaseJoinGenerateAction.loadModel(
+                selected,
+                MyBatisGenerationConfiguration.standard("com.example"),
+                new EmptyProgressIndicator(),
+                (tables, indicator) -> {
+                    snapshotReadAccess.set(ApplicationManager.getApplication()
+                            .isReadAccessAllowed());
+                    return new MyBatisDatabaseJoinGenerateAction.JoinSnapshot(
+                            users(), roles(), MyBatisSqlDialect.POSTGRESQL);
+                },
+                (snapshot, configuration) -> {
+                    modelReadAccess.set(ApplicationManager.getApplication()
+                            .isReadAccessAllowed());
+                    return MyBatisDatabaseJoinGenerateAction.model(
+                            snapshot.base(),
+                            snapshot.target(),
+                            snapshot.dialect(),
+                            configuration);
+                }))
+                .get();
+
+        assertTrue("Database Tools 元数据快照必须处于短读动作", snapshotReadAccess.get());
+        assertFalse("关系验证与 SQL 模型构建不得延长读锁", modelReadAccess.get());
+        assertEquals(1, model.relations().size());
     }
 
     private Presentation update(AnAction action, DbElement[] elements) {

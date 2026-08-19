@@ -14,27 +14,17 @@ import com.intellij.openapi.ui.Messages;
 import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
 import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
-import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationBundle;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationConfiguration;
-import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationEngine;
-import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationRequest;
-import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodDiagnostic;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodGeneration;
-import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodGenerationRequest;
-import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodNameParser;
-import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodParseResult;
-import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodQuery;
-import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodSchema;
-import io.github.ns3154.mybatisassistant.methodsql.MyBatisMethodSqlGenerator;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisWrapperFramework;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisWrapperGeneration;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisWrapperGenerationRequest;
 import io.github.ns3154.mybatisassistant.methodsql.MyBatisWrapperGenerator;
-import io.github.ns3154.mybatisassistant.util.MyBatisReadActionSupport;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -105,31 +95,38 @@ public final class MyBatisDatabaseWrapperGenerateAction extends AnAction {
             return;
         }
         try {
-            WrapperPreview preview = ProgressManager.getInstance()
+            MyBatisDatabaseMethodGenerationModel methodModel = ProgressManager.getInstance()
                     .runProcessWithProgressSynchronously(
-                            () -> MyBatisReadActionSupport.compute(() -> {
+                            () -> {
                                 ProgressIndicator indicator = ProgressManager.getInstance()
                                         .getProgressIndicator();
                                 if (indicator == null) {
                                     throw new IllegalStateException(MyBatisAssistantBundle.message(
                                             "database.wrapper.error.progress.context"));
                                 }
-                                DbTable table = tables[0];
-                                if (!table.isValid() || table.getDataSource().isLoading()) {
-                                    throw new IllegalStateException(MyBatisAssistantBundle.message(
-                                            "database.generation.error.model.changed"));
-                                }
-                                return buildPreview(
-                                        DatabaseToolsMetadataProvider.table(
-                                                table.getDasObject(), indicator),
-                                        DatabaseToolsMetadataProvider.dialect(
-                                                table.getDataSource().getDbms()),
+                                return prepareMethodModel(
+                                        tables[0],
                                         options.configuration(),
                                         methodName.trim(),
-                                        framework,
-                                        version.trim());
-                            }),
+                                        indicator);
+                            },
                             MyBatisAssistantBundle.message("database.wrapper.progress"),
+                            true,
+                            project);
+            Optional<Set<Integer>> optionalConditionIndexes =
+                    MyBatisOptionalConditionDialog.select(project, methodModel.query());
+            if (optionalConditionIndexes.isEmpty()) {
+                return;
+            }
+            WrapperPreview preview = ProgressManager.getInstance()
+                    .runProcessWithProgressSynchronously(
+                            () -> buildPreview(
+                                    methodModel,
+                                    framework,
+                                    version.trim(),
+                                    optionalConditionIndexes.orElseThrow()),
+                            MyBatisAssistantBundle.message(
+                                    "database.wrapper.progress.preview"),
                             true,
                             project);
             new MyBatisGeneratedTextPreviewDialog(
@@ -153,37 +150,76 @@ public final class MyBatisDatabaseWrapperGenerateAction extends AnAction {
             @NotNull String methodName,
             @NotNull MyBatisWrapperFramework framework,
             @NotNull String frameworkVersion) {
-        MyBatisGenerationBundle bundle = MyBatisGenerationEngine.generate(
-                new MyBatisGenerationRequest("wrapper", dialect, table, configuration));
-        MyBatisMethodSchema schema = MyBatisMethodSchema.from(table, configuration);
-        MyBatisMethodParseResult parsed = MyBatisMethodNameParser.parse(methodName, schema);
-        if (parsed instanceof MyBatisMethodParseResult.Failure failure) {
-            MyBatisMethodDiagnostic diagnostic = failure.diagnostic();
-            throw new IllegalArgumentException(
-                    diagnostic.message() + MyBatisAssistantBundle.message(
-                            "diagnostic.offset.suffix", diagnostic.offset()));
-        }
-        MyBatisMethodQuery query = ((MyBatisMethodParseResult.Success) parsed).query();
-        String entityType = configuration.basePackage() + ".entity." + bundle.entityName();
-        MyBatisMethodGeneration method = MyBatisMethodSqlGenerator.generate(
-                new MyBatisMethodGenerationRequest(
-                        schema,
-                        query,
-                        dialect,
-                        entityType,
-                        configuration.escapeSqlKeywords(),
-                        Set.of()));
+        return buildPreview(
+                table,
+                dialect,
+                configuration,
+                methodName,
+                framework,
+                frameworkVersion,
+                Set.of());
+    }
+
+    static @NotNull MyBatisDatabaseMethodGenerationModel prepareMethodModel(
+            @NotNull DbTable table,
+            @NotNull MyBatisGenerationConfiguration configuration,
+            @NotNull String methodName,
+            @NotNull ProgressIndicator indicator,
+            @NotNull MyBatisDatabaseMethodGenerationModel.SnapshotFactory snapshotFactory,
+            @NotNull MyBatisDatabaseMethodGenerationModel.PreparationFactory preparationFactory) {
+        return MyBatisDatabaseMethodGenerationModel.prepareDatabaseTable(
+                table,
+                configuration,
+                methodName,
+                indicator,
+                snapshotFactory,
+                preparationFactory);
+    }
+
+    private static @NotNull MyBatisDatabaseMethodGenerationModel prepareMethodModel(
+            @NotNull DbTable table,
+            @NotNull MyBatisGenerationConfiguration configuration,
+            @NotNull String methodName,
+            @NotNull ProgressIndicator indicator) {
+        return MyBatisDatabaseMethodGenerationModel.prepareDatabaseTable(
+                table, configuration, methodName, indicator);
+    }
+
+    static @NotNull WrapperPreview buildPreview(
+            @NotNull MyBatisDatabaseTable table,
+            @NotNull MyBatisSqlDialect dialect,
+            @NotNull MyBatisGenerationConfiguration configuration,
+            @NotNull String methodName,
+            @NotNull MyBatisWrapperFramework framework,
+            @NotNull String frameworkVersion,
+            @NotNull Set<Integer> optionalConditionIndexes) {
+        MyBatisDatabaseMethodGenerationModel methodModel =
+                MyBatisDatabaseMethodGenerationModel.prepare(
+                        table, dialect, configuration, methodName);
+        return buildPreview(
+                methodModel, framework, frameworkVersion, optionalConditionIndexes);
+    }
+
+    private static @NotNull WrapperPreview buildPreview(
+            @NotNull MyBatisDatabaseMethodGenerationModel methodModel,
+            @NotNull MyBatisWrapperFramework framework,
+            @NotNull String frameworkVersion,
+            @NotNull Set<Integer> optionalConditionIndexes) {
+        Set<Integer> validatedIndexes = MyBatisOptionalConditionSelectionModel
+                .from(methodModel.query())
+                .validatedIndexes(optionalConditionIndexes);
+        MyBatisMethodGeneration method = methodModel.generateMethod(validatedIndexes);
         MyBatisWrapperGeneration wrapper = MyBatisWrapperGenerator.generate(
                 new MyBatisWrapperGenerationRequest(
-                        schema,
-                        query,
+                        methodModel.schema(),
+                        methodModel.query(),
                         method,
                         framework,
                         frameworkVersion,
-                        entityType,
-                        dialect,
-                        configuration.escapeSqlKeywords(),
-                        Set.of()));
+                        methodModel.entityType(),
+                        methodModel.dialect(),
+                        methodModel.configuration().escapeSqlKeywords(),
+                        validatedIndexes));
         return new WrapperPreview(
                 method.javaMethod(), method.xmlStatement(), wrapper.code());
     }

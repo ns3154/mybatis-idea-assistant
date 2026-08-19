@@ -38,23 +38,28 @@ assert_file_contains() {
 test_inspection_contract() {
     local output="${TEST_ROOT}/inspection"
     local evidence="${TEST_ROOT}/inspection-contract.tsv"
+    local valid_problem="${TEST_ROOT}/inspection-valid-problem.xml"
+    local valid_descriptions="${TEST_ROOT}/inspection-valid-descriptions.xml"
     mkdir -p "${output}"
     printf '%s\n' '<inspections><inspection shortName="MyBatisUnusedStatement"/></inspections>' \
         > "${output}/.descriptions.xml"
     {
         printf '%s\n' '<problems>'
         printf '%s\n' '  <problem>'
-        printf '%s\n' '    <file>file://spring-application/src/main/resources/mappers/UserMapper.xml</file>'
+        printf '%s\n' '    <file>file://$PROJECT_DIR$/src/main/resources/mappers/UserMapper.xml</file>'
         printf '%s\n' '    <line>103</line>'
-        printf '%s\n' '    <problem_class severity="WARNING">statement 未找到 Mapper 方法</problem_class>'
-        printf '%s\n' '    <description>未找到对应的 Java Mapper 方法：io.github.mybatisideaassistant.corpus.java.mapper.UserMapper.findSummary</description>'
+        printf '%s\n' '    <problem_class id="MyBatisUnusedStatement" severity="WARNING">statement 未找到 Mapper 方法</problem_class>'
+        printf '%s\n' '    <description>未找到对应的 Java Mapper 方法：io.github.mybatisideaassistant.lifecycle.UserMapper.findSummary</description>'
+        printf '%s\n' '    <highlighted_element>&quot;findSummary&quot;</highlighted_element>'
         printf '%s\n' '  </problem>'
         printf '%s\n' '</problems>'
     } > "${output}/MyBatisUnusedStatement.xml"
 
     mybatis_assistant_verify_inspection_output "${output}" "${evidence}"
-    assert_file_contains "${evidence}" $'2026-08-12.v2\tMyBatisUnusedStatement\t1\t1'
+    assert_file_contains "${evidence}" $'2026-08-19.v3\tMyBatisUnusedStatement\t1\t1'
     [[ -s "${TEST_ROOT}/inspection-contract-descriptions.xml" ]]
+    cp "${output}/MyBatisUnusedStatement.xml" "${valid_problem}"
+    cp "${output}/.descriptions.xml" "${valid_descriptions}"
 
     {
         printf '%s\n' '<problems>'
@@ -67,14 +72,88 @@ test_inspection_contract() {
     fi
     rm -f -- "${output}/MyBatisMissingStatement.xml"
 
-    sed 's/findSummary/findOther/g' "${output}/MyBatisUnusedStatement.xml" \
-        > "${output}/MyBatisUnusedStatement.invalid.xml"
-    mv "${output}/MyBatisUnusedStatement.invalid.xml" \
-        "${output}/MyBatisUnusedStatement.xml"
+    sed 's/shortName="MyBatisUnusedStatement"/shortName="MyBatisUnusedStatementBackup"/' \
+        "${valid_descriptions}" > "${output}/.descriptions.xml"
     if mybatis_assistant_verify_inspection_output "${output}" "${evidence}"; then
-        echo "错误 statement 不应通过检查契约" >&2
+        echo "description shortName 碰瓷不应通过检查契约" >&2
         return 1
     fi
+    cp "${valid_descriptions}" "${output}/.descriptions.xml"
+
+    sed 's/id="MyBatisUnusedStatement"/id="MyBatisUnusedStatementBackup"/' \
+        "${valid_problem}" > "${output}/MyBatisUnusedStatement.xml"
+    if mybatis_assistant_verify_inspection_output "${output}" "${evidence}"; then
+        echo "错误 Inspection ID 不应通过检查契约" >&2
+        return 1
+    fi
+    sed 's#UserMapper.xml</file>#UserMapper.xml.bak</file>#' \
+        "${valid_problem}" > "${output}/MyBatisUnusedStatement.xml"
+    if mybatis_assistant_verify_inspection_output "${output}" "${evidence}"; then
+        echo "文件后缀碰瓷不应通过检查契约" >&2
+        return 1
+    fi
+    sed 's/io.github.mybatisideaassistant.lifecycle.UserMapper.findSummary/io.github.mybatisideaassistant.lifecycle.UserMapperBackup.findSummary/' \
+        "${valid_problem}" > "${output}/MyBatisUnusedStatement.xml"
+    if mybatis_assistant_verify_inspection_output "${output}" "${evidence}"; then
+        echo "namespace 碰瓷不应通过检查契约" >&2
+        return 1
+    fi
+    sed 's/findSummary/findSummaryExtra/g' \
+        "${valid_problem}" > "${output}/MyBatisUnusedStatement.xml"
+    if mybatis_assistant_verify_inspection_output "${output}" "${evidence}"; then
+        echo "statement 碰瓷不应通过检查契约" >&2
+        return 1
+    fi
+    cp "${valid_problem}" "${output}/MyBatisUnusedStatement.xml"
+}
+
+test_lifecycle_inspection_corpus_contract() {
+    local corpus="${TEST_PROJECT_ROOT}/samples/lifecycle-inspection-corpus"
+    local mapper_java="${corpus}/src/main/java/io/github/mybatisideaassistant/lifecycle/UserMapper.java"
+    local mapper_xml="${corpus}/src/main/resources/mappers/UserMapper.xml"
+    local manifest="${TEST_ROOT}/lifecycle-corpus-manifest.tsv"
+    local ignored_manifest="${TEST_ROOT}/lifecycle-corpus-ignored.tsv"
+
+    [[ -s "${corpus}/.idea/misc.xml" \
+        && -s "${corpus}/.idea/modules.xml" \
+        && -s "${corpus}/lifecycle-inspection-corpus.iml" \
+        && -s "${mapper_java}" \
+        && -s "${mapper_xml}" ]] || {
+        echo "生命周期最小语料结构不完整" >&2
+        return 1
+    }
+    grep -Fq 'src/main/java" isTestSource="false"' \
+        "${corpus}/lifecycle-inspection-corpus.iml"
+    grep -Fq 'src/main/resources" type="java-resource"' \
+        "${corpus}/lifecycle-inspection-corpus.iml"
+    grep -Fq 'interface UserMapper' "${mapper_java}"
+    grep -Fq 'findById(long id)' "${mapper_java}"
+    ! grep -Fq 'findSummary' "${mapper_java}"
+    [[ "$(grep -c '<select ' "${mapper_xml}")" == "2" ]]
+    [[ "$(grep -c 'id="findById"' "${mapper_xml}")" == "1" ]]
+    [[ "$(grep -c 'id="findSummary"' "${mapper_xml}")" == "1" ]]
+    grep -Fq 'namespace="io.github.mybatisideaassistant.lifecycle.UserMapper"' \
+        "${mapper_xml}"
+    [[ ! -e "${corpus}/pom.xml" \
+        && ! -e "${corpus}/build.gradle" \
+        && ! -e "${corpus}/build.gradle.kts" ]]
+
+    mybatis_assistant_write_project_manifest \
+        "${TEST_PROJECT_ROOT}" "${corpus}" "${manifest}"
+    [[ "$(mybatis_assistant_count_lines "${manifest}")" == "7" ]]
+    assert_file_contains "${manifest}" \
+        'samples/lifecycle-inspection-corpus/.idea/modules.xml'
+    assert_file_contains "${manifest}" \
+        'samples/lifecycle-inspection-corpus/.idea/.gitignore'
+    assert_file_contains "${manifest}" \
+        'samples/lifecycle-inspection-corpus/lifecycle-inspection-corpus.iml'
+    assert_file_contains "${manifest}" \
+        'samples/lifecycle-inspection-corpus/src/main/java/io/github/mybatisideaassistant/lifecycle/UserMapper.java'
+    assert_file_contains "${manifest}" \
+        'samples/lifecycle-inspection-corpus/src/main/resources/mappers/UserMapper.xml'
+    mybatis_assistant_write_controlled_ignored_project_manifest \
+        "${TEST_PROJECT_ROOT}" "${corpus}" "${ignored_manifest}"
+    assert_file_empty "${ignored_manifest}"
 }
 
 test_versioned_noise_allowlist() {
@@ -106,6 +185,25 @@ test_versioned_noise_allowlist() {
         "${log_261}" 2026.1.4 "${allowed}" "${unexpected}"
     assert_file_contains "${unexpected}" 'IntelliJ IDEA 2026.1.4'
     assert_file_contains "${unexpected}" 'OS: Linux'
+
+    {
+        printf '%s\n' '2026-08-19 [1] SEVERE - #c.i.s.ComponentManagerImpl - com.intellij.codeInspection.ex.QuickFixAction <clinit> requests com.intellij.notification.NotificationGroupManager instance. Class initialization must not depend on services. Consider using instance of the service on-demand instead.'
+        printf '%s\n' '2026-08-19 [2] SEVERE - #c.i.s.ComponentManagerImpl - IntelliJ IDEA 2026.1.4  Build #IU-261.26222.65'
+        printf '%s\n' '2026-08-19 [3] SEVERE - #c.i.s.ComponentManagerImpl - JDK: 25.0.3; VM: OpenJDK 64-Bit Server VM; Vendor: JetBrains s.r.o.'
+        printf '%s\n' '2026-08-19 [4] SEVERE - #c.i.s.ComponentManagerImpl - OS: Mac OS X'
+        printf '%s\n' '2026-08-19 [5] SEVERE - #c.i.s.ComponentManagerImpl - Plugin to blame: Java version: 261.26222.65'
+        printf '%s\n' '2026-08-19 [6] SEVERE - #c.i.s.ComponentManagerImpl - Last Action: '
+    } > "${log_261}"
+    mybatis_assistant_classify_ide_failures \
+        "${log_261}" 2026.1.4 "${allowed}" "${unexpected}"
+    [[ "$(mybatis_assistant_count_lines "${allowed}")" == "6" ]]
+    assert_file_empty "${unexpected}"
+
+    sed 's/Plugin to blame: Java/Plugin to blame: MyBatis Assistant/' \
+        "${log_261}" > "${log_261}.wrong-plugin"
+    mybatis_assistant_classify_ide_failures \
+        "${log_261}.wrong-plugin" 2026.1.4 "${allowed}" "${unexpected}"
+    assert_file_contains "${unexpected}" 'Plugin to blame: MyBatis Assistant'
 
     {
         printf '%s\n' '2026-08-12 [1] SEVERE - #c.i.d.LoadingState - Should be called at least in the state COMPONENTS_LOADED, the current state is: CONFIGURATION_STORE_INITIALIZED'
@@ -286,6 +384,55 @@ test_cleanup_waits_for_recorded_descendant() {
     fi
 }
 
+test_lifecycle_log_freeze_waits_for_late_writer() {
+    local sandbox_log="${TEST_ROOT}/lifecycle-late-sandbox.log"
+    local frozen_log="${TEST_ROOT}/lifecycle-late-frozen.log"
+    local freeze_evidence="${TEST_ROOT}/lifecycle-late-freeze.tsv"
+    local identity="${TEST_ROOT}/lifecycle-late-processes.tsv"
+    local live="${TEST_ROOT}/lifecycle-late-live.tsv"
+    local allowed="${TEST_ROOT}/lifecycle-late-allowed.log"
+    local unexpected="${TEST_ROOT}/lifecycle-late-unexpected.log"
+    local ide_pid
+    local ide_started_at
+    local ide_command
+    local wrapper_pid
+    local shutdown_line
+
+    : > "${sandbox_log}"
+    : > "${identity}"
+    : > "${live}"
+    /bin/bash -c '
+        printf "%s\n" "2026-08-13 INFO - #c.i.p.i.b.AppStarter - ------------------------------------------------------ IDE SHUTDOWN ------------------------------------------------------" >> "$1"
+        sleep 1
+        /bin/bash -c '\''
+            sleep 2
+            printf "%s\n" "2026-08-13 SEVERE - #c.i.u.c.ThreadingAssertions - shutdown 后新生子进程晚写产品异常" >> "$1"
+        '\'' mybatis-lifecycle-late-child "$1" &
+        sleep 2
+    ' mybatis-lifecycle-late-parent "${sandbox_log}" &
+    ide_pid=$!
+    /bin/bash -c 'exit 0' &
+    wrapper_pid=$!
+    wait "${wrapper_pid}"
+
+    mybatis_assistant_write_process_identity \
+        "${ide_pid}" 'mybatis-lifecycle-late-parent' "${identity}"
+    ide_started_at="$(mybatis_assistant_process_started_at "${ide_pid}")"
+    ide_command="$(mybatis_assistant_process_command "${ide_pid}")"
+    shutdown_line="$(mybatis_assistant_freeze_lifecycle_log_after_process_exit \
+        "${sandbox_log}" 1 \
+        "${ide_pid}" "${ide_started_at}" "${ide_command}" \
+        "${identity}" "${live}" "${frozen_log}" "${freeze_evidence}" 5)"
+    wait "${ide_pid}" || true
+
+    [[ "${shutdown_line}" == "1" ]]
+    assert_file_contains "${freeze_evidence}" $'2026-08-13.v1\t1\t1\t1\t2'
+    assert_file_contains "${frozen_log}" 'shutdown 后新生子进程晚写产品异常'
+    mybatis_assistant_classify_ide_failures \
+        "${frozen_log}" 2025.2.6.2 "${allowed}" "${unexpected}"
+    assert_file_contains "${unexpected}" 'shutdown 后新生子进程晚写产品异常'
+}
+
 test_process_identity_and_resource_bounds() {
     local identities="${TEST_ROOT}/processes.tsv"
     local live="${TEST_ROOT}/live.tsv"
@@ -374,12 +521,14 @@ awk '
     END { exit !found }
 ' "${TEST_PROJECT_ROOT}/scripts/verify-optional-dependency-isolation.sh"
 test_inspection_contract
+test_lifecycle_inspection_corpus_contract
 test_versioned_noise_allowlist
 test_project_manifest
 test_controlled_ignored_project_manifest
 test_process_identity_and_resource_bounds
 test_process_cleanup_identity
 test_cleanup_waits_for_recorded_descendant
+test_lifecycle_log_freeze_waits_for_late_writer
 test_settings_are_restored
 test_mcp_protocol_fingerprint
 

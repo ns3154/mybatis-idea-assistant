@@ -2,7 +2,6 @@ package io.github.ns3154.mybatisassistant.dynamic;
 
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.psi.PsiDocumentManager;
@@ -15,7 +14,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Random;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class MyBatisDynamicSqlCompilerPerformanceTest extends BasePlatformTestCase {
     public void testSamePsiAndDependencyGenerationReuseCachedResult() {
@@ -162,7 +161,7 @@ public final class MyBatisDynamicSqlCompilerPerformanceTest extends BasePlatform
         }
     }
 
-    public void testCancellationDuringLargeCompilationPropagates() throws Exception {
+    public void testCancellationDuringLargeCompilationPropagatesWithinCheckBudget() {
         StringBuilder xml = new StringBuilder(
                 "<mapper namespace=\"com.example.UserMapper\"><select id=\"find\">");
         for (int index = 0; index < 2000; index++) {
@@ -174,31 +173,23 @@ public final class MyBatisDynamicSqlCompilerPerformanceTest extends BasePlatform
         }
         xml.append("</select></mapper>");
         XmlTag statement = statement(configure(xml.toString()));
-        EmptyProgressIndicator indicator = new EmptyProgressIndicator();
-        CountDownLatch compilationStarted = new CountDownLatch(1);
-        Thread canceller = Thread.ofPlatform().start(() -> {
-            try {
-                compilationStarted.await();
-                indicator.cancel();
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-            }
-        });
+        assertEquals("取消夹具必须包含完整的 2000 个动态标签",
+                2_000, statement.findSubTags("if").length);
+        AtomicInteger traversalChecks = new AtomicInteger();
 
         try {
-            ProgressManager.getInstance().runProcess(
-                    () -> {
-                        compilationStarted.countDown();
-                        return MyBatisDynamicSqlCompiler.compileUncached(statement);
-                    },
-                    indicator);
-            fail("编译器必须在遍历大型动态树期间响应取消");
+            MyBatisDynamicSqlCompiler.compileUncached(statement, () -> {
+                if (traversalChecks.incrementAndGet() == 64) {
+                    throw new ProcessCanceledException();
+                }
+            });
+            fail("编译器必须在遍历大型动态树期间响应取消，轮询次数="
+                    + traversalChecks.get());
         } catch (ProcessCanceledException expected) {
             // 取消是平台正常控制流，编译器不得转成诊断或空结果。
-        } finally {
-            canceller.join(5000L);
         }
-        assertFalse(canceller.isAlive());
+        assertEquals("必须在 compileChildren 深遍历的第 64 个子节点边界传播 PCE",
+                64, traversalChecks.get());
     }
 
     private void appendRandomNode(

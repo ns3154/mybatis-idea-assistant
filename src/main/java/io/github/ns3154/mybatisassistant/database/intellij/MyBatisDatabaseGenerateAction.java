@@ -9,6 +9,7 @@ import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -18,6 +19,7 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
 import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
+import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationBundle;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationCommandExecutor;
 import io.github.ns3154.mybatisassistant.generator.MyBatisGenerationConfiguration;
@@ -37,6 +39,7 @@ import java.util.List;
  */
 public final class MyBatisDatabaseGenerateAction extends AnAction {
     public static final String ID = "MyBatisAssistant.Database.Generate";
+    private static final double BUNDLE_PROGRESS_END = 0.5;
 
     @Override
     public @NotNull ActionUpdateThread getActionUpdateThread() {
@@ -77,8 +80,7 @@ public final class MyBatisDatabaseGenerateAction extends AnAction {
         try {
             MyBatisGenerationPlan plan = ProgressManager.getInstance()
                     .runProcessWithProgressSynchronously(
-                            () -> MyBatisReadActionSupport.compute(() -> buildPlan(
-                                    project, projectRoot, selected, configuration)),
+                            () -> buildPlan(project, projectRoot, selected, configuration),
                             MyBatisAssistantBundle.message("database.generation.progress"),
                             true,
                             project);
@@ -130,23 +132,102 @@ public final class MyBatisDatabaseGenerateAction extends AnAction {
             throw new IllegalStateException(MyBatisAssistantBundle.message(
                     "database.generation.error.progress.context"));
         }
-        List<MyBatisGenerationBundle> bundles = new ArrayList<>();
-        for (DbTable table : selected) {
-            indicator.checkCanceled();
-            if (!table.isValid() || table.getDataSource().isLoading()) {
-                throw new IllegalStateException(MyBatisAssistantBundle.message(
-                        "database.generation.error.model.changed"));
-            }
-            MyBatisDatabaseTable model = DatabaseToolsMetadataProvider.table(
-                    table.getDasObject(), indicator);
-            bundles.add(MyBatisGenerationEngine.generate(new MyBatisGenerationRequest(
-                    table.getDataSource().getUniqueId(),
-                    DatabaseToolsMetadataProvider.dialect(
-                            table.getDataSource().getDbms()),
-                    model,
-                    configuration)));
+        return buildPlan(
+                project,
+                projectRoot,
+                selected,
+                configuration,
+                indicator,
+                MyBatisDatabaseGenerateAction::snapshot,
+                MyBatisDatabaseGenerateAction::generateBundle);
+    }
+
+    static @NotNull MyBatisGenerationPlan buildPlan(
+            @NotNull Project project,
+            @NotNull VirtualFile projectRoot,
+            @NotNull DbTable[] selected,
+            @NotNull MyBatisGenerationConfiguration configuration,
+            @NotNull ProgressIndicator indicator) {
+        return buildPlan(
+                project,
+                projectRoot,
+                selected,
+                configuration,
+                indicator,
+                MyBatisDatabaseGenerateAction::snapshot,
+                MyBatisDatabaseGenerateAction::generateBundle);
+    }
+
+    static @NotNull MyBatisGenerationPlan buildPlan(
+            @NotNull Project project,
+            @NotNull VirtualFile projectRoot,
+            @NotNull DbTable[] selected,
+            @NotNull MyBatisGenerationConfiguration configuration,
+            @NotNull ProgressIndicator indicator,
+            @NotNull MetadataSnapshotFactory snapshotFactory,
+            @NotNull GenerationBundleFactory bundleFactory) {
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            throw new IllegalStateException(MyBatisAssistantBundle.message(
+                    "database.generation.error.edt"));
         }
-        return MyBatisGenerationPlanner.plan(project, projectRoot, bundles);
+        indicator.setIndeterminate(false);
+        indicator.setFraction(0.0);
+        List<MyBatisGenerationBundle> bundles = new ArrayList<>();
+        for (int index = 0; index < selected.length; index++) {
+            indicator.checkCanceled();
+            DbTable table = selected[index];
+            DatabaseGenerationSnapshot snapshot = MyBatisReadActionSupport.compute(() -> {
+                indicator.checkCanceled();
+                ensureAvailable(table);
+                return snapshotFactory.snapshot(table, indicator);
+            });
+            indicator.setText2(snapshot.tableName());
+            indicator.checkCanceled();
+            MyBatisGenerationBundle bundle = bundleFactory.generate(
+                    snapshot, configuration, indicator);
+            indicator.checkCanceled();
+            bundles.add(bundle);
+            indicator.setFraction(BUNDLE_PROGRESS_END * (index + 1.0) / selected.length);
+        }
+        indicator.setText2("");
+        return MyBatisGenerationPlanner.plan(
+                project,
+                projectRoot,
+                bundles,
+                indicator,
+                BUNDLE_PROGRESS_END);
+    }
+
+    private static void ensureAvailable(@NotNull DbTable table) {
+        if (!table.isValid() || table.getDataSource().isLoading()) {
+            throw new IllegalStateException(MyBatisAssistantBundle.message(
+                    "database.generation.error.model.changed"));
+        }
+    }
+
+    private static @NotNull DatabaseGenerationSnapshot snapshot(
+            @NotNull DbTable table,
+            @NotNull ProgressIndicator indicator) {
+        MyBatisDatabaseTable model = DatabaseToolsMetadataProvider.table(
+                table.getDasObject(), indicator);
+        return new DatabaseGenerationSnapshot(
+                table.getName(),
+                table.getDataSource().getUniqueId(),
+                DatabaseToolsMetadataProvider.dialect(
+                        table.getDataSource().getDbms()),
+                model);
+    }
+
+    private static @NotNull MyBatisGenerationBundle generateBundle(
+            @NotNull DatabaseGenerationSnapshot snapshot,
+            @NotNull MyBatisGenerationConfiguration configuration,
+            @NotNull ProgressIndicator indicator) {
+        indicator.checkCanceled();
+        return MyBatisGenerationEngine.generate(new MyBatisGenerationRequest(
+                snapshot.dataSourceId(),
+                snapshot.dialect(),
+                snapshot.table(),
+                configuration));
     }
 
     private static @NotNull DbTable[] selectedTables(@NotNull AnActionEvent event) {
@@ -158,6 +239,28 @@ public final class MyBatisDatabaseGenerateAction extends AnAction {
         return Arrays.stream(elements)
                 .map(DbTable.class::cast)
                 .toArray(DbTable[]::new);
+    }
+
+    record DatabaseGenerationSnapshot(
+            @NotNull String tableName,
+            @NotNull String dataSourceId,
+            @NotNull MyBatisSqlDialect dialect,
+            @NotNull MyBatisDatabaseTable table) {
+    }
+
+    @FunctionalInterface
+    interface MetadataSnapshotFactory {
+        @NotNull DatabaseGenerationSnapshot snapshot(
+                @NotNull DbTable table,
+                @NotNull ProgressIndicator indicator);
+    }
+
+    @FunctionalInterface
+    interface GenerationBundleFactory {
+        @NotNull MyBatisGenerationBundle generate(
+                @NotNull DatabaseGenerationSnapshot snapshot,
+                @NotNull MyBatisGenerationConfiguration configuration,
+                @NotNull ProgressIndicator indicator);
     }
 
 }

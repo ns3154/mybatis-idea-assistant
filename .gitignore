@@ -3,11 +3,17 @@
 !samples/semantic-corpus/.idea/
 samples/semantic-corpus/.idea/*
 !samples/semantic-corpus/.idea/misc.xml
+!samples/lifecycle-inspection-corpus/.idea/
+samples/lifecycle-inspection-corpus/.idea/*
+!samples/lifecycle-inspection-corpus/.idea/misc.xml
+!samples/lifecycle-inspection-corpus/.idea/modules.xml
+!samples/lifecycle-inspection-corpus/.idea/.gitignore
 .intellijPlatform/
 .kotlin/
 build/
 out/
 *.iml
+!samples/lifecycle-inspection-corpus/lifecycle-inspection-corpus.iml
 *.ipr
 *.iws
 .DS_Store

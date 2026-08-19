@@ -12,6 +12,9 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.Presentation;
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.progress.EmptyProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
@@ -31,6 +34,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MyBatisDatabaseMethodGenerateActionTest extends BasePlatformTestCase {
     public void testOptionalDescriptorRegistersMethodActionInDatabasePopup() {
@@ -74,6 +80,108 @@ public final class MyBatisDatabaseMethodGenerateActionTest extends BasePlatformT
         assertTrue(plan.entries().stream().allMatch(entry ->
                 entry.status() == io.github.ns3154.mybatisassistant.generator
                         .MyBatisGenerationPlanStatus.CREATE));
+    }
+
+    public void testMethodPreparationSnapshotsUnderReadLockAndGeneratesAfterRelease()
+            throws Exception {
+        AtomicBoolean snapshotReadAccess = new AtomicBoolean();
+        AtomicBoolean preparationReadAccess = new AtomicBoolean();
+        AtomicBoolean preparationCompletedWithReadAccess = new AtomicBoolean();
+        EmptyProgressIndicator indicator = new EmptyProgressIndicator();
+
+        Future<MyBatisDatabaseMethodGenerationModel> future =
+                ApplicationManager.getApplication().executeOnPooledThread(() ->
+                        ProgressManager.getInstance().runProcess(
+                                () -> MyBatisDatabaseMethodGenerateAction.prepareMethodModel(
+                                        table(true, false),
+                                        MyBatisGenerationConfiguration.standard("com.example"),
+                                        "findByName",
+                                        indicator,
+                                        (table, progress) -> {
+                                            snapshotReadAccess.set(ApplicationManager
+                                                    .getApplication().isReadAccessAllowed());
+                                            return new MyBatisDatabaseMethodGenerationModel
+                                                    .DatabaseSnapshot(
+                                                    model(), MyBatisSqlDialect.POSTGRESQL);
+                                        },
+                                        (snapshot, configuration, methodName) -> {
+                                            preparationReadAccess.set(ApplicationManager
+                                                    .getApplication().isReadAccessAllowed());
+                                            MyBatisDatabaseMethodGenerationModel result =
+                                                    MyBatisDatabaseMethodGenerationModel.prepare(
+                                                            snapshot.table(),
+                                                            snapshot.dialect(),
+                                                            configuration,
+                                                            methodName);
+                                            preparationCompletedWithReadAccess.set(
+                                                    ApplicationManager.getApplication()
+                                                            .isReadAccessAllowed());
+                                            return result;
+                                        }),
+                                indicator));
+
+        assertEquals("findByName", future.get(30, TimeUnit.SECONDS).query().methodName());
+        assertTrue("方法入口必须在短读动作中提取 Database Tools 快照",
+                snapshotReadAccess.get());
+        assertFalse("Engine 与方法名解析开始前必须释放读锁",
+                preparationReadAccess.get());
+        assertFalse("Engine 与方法名解析完成后仍不得持有读锁",
+                preparationCompletedWithReadAccess.get());
+    }
+
+    public void testBuildPlanAppliesTheExplicitOptionalConditionIndexesToXml()
+            throws Exception {
+        VirtualFile root = myFixture.getTempDirFixture()
+                .findOrCreateDir("optional-method-action-root");
+
+        MyBatisGenerationPlan plan = MyBatisDatabaseMethodGenerateAction.buildPlan(
+                getProject(),
+                root,
+                model(),
+                MyBatisSqlDialect.POSTGRESQL,
+                MyBatisGenerationConfiguration.standard("com.example"),
+                "findByNameAndAgeGreaterThan",
+                Set.of(1));
+
+        String mapper = proposed(plan, MyBatisGenerationArtifactKind.MAPPER);
+        String xml = proposed(plan, MyBatisGenerationArtifactKind.XML);
+        assertTrue(mapper.contains(
+                "findByNameAndAgeGreaterThan("));
+        assertTrue(xml.contains("  AND \"name\" = #{name,jdbcType=VARCHAR}"));
+        assertTrue(xml.contains(
+                "<if test=\"age != null\">AND \"age\" > "
+                        + "#{age,jdbcType=INTEGER}</if>"));
+        assertFalse(xml.contains("<if test=\"name != null\""));
+    }
+
+    public void testBuildPlanRejectsUnsafeOptionalIndexesBeforePlanning()
+            throws Exception {
+        VirtualFile root = myFixture.getTempDirFixture()
+                .findOrCreateDir("unsafe-optional-method-root");
+
+        IllegalArgumentException orFailure = org.junit.Assert.assertThrows(
+                IllegalArgumentException.class,
+                () -> MyBatisDatabaseMethodGenerateAction.buildPlan(
+                        getProject(),
+                        root,
+                        model(),
+                        MyBatisSqlDialect.GENERIC,
+                        MyBatisGenerationConfiguration.standard("com.example"),
+                        "findByNameOrAgeGreaterThan",
+                        Set.of(0)));
+        assertTrue(orFailure.getMessage().contains("不能设为可选"));
+
+        IllegalArgumentException writeFailure = org.junit.Assert.assertThrows(
+                IllegalArgumentException.class,
+                () -> MyBatisDatabaseMethodGenerateAction.buildPlan(
+                        getProject(),
+                        root,
+                        model(),
+                        MyBatisSqlDialect.GENERIC,
+                        MyBatisGenerationConfiguration.standard("com.example"),
+                        "updateNameByIdAndAgeGreaterThan",
+                        Set.of(0, 1)));
+        assertTrue(writeFailure.getMessage().contains("至少一个必选谓词"));
     }
 
     public void testBuildPlanSupportsExplicitBatchInsertAndSkipsGeneratedKey()

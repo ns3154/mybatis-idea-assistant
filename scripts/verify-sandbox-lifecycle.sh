@@ -7,11 +7,11 @@ set -euo pipefail
 readonly MYBATIS_ASSISTANT_LIFECYCLE_PROJECT_ROOT="$(
     cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd
 )"
-readonly MYBATIS_ASSISTANT_IDE_NOISE_ALLOWLIST_VERSION="2026-08-12.v2"
+readonly MYBATIS_ASSISTANT_IDE_NOISE_ALLOWLIST_VERSION="2026-08-19.v3"
 readonly MYBATIS_ASSISTANT_EXPECTED_INSPECTION="MyBatisUnusedStatement"
-readonly MYBATIS_ASSISTANT_EXPECTED_NAMESPACE="io.github.mybatisideaassistant.corpus.java.mapper.UserMapper"
+readonly MYBATIS_ASSISTANT_EXPECTED_NAMESPACE="io.github.mybatisideaassistant.lifecycle.UserMapper"
 readonly MYBATIS_ASSISTANT_EXPECTED_STATEMENT="findSummary"
-readonly MYBATIS_ASSISTANT_EXPECTED_SOURCE="spring-application/src/main/resources/mappers/UserMapper.xml"
+readonly MYBATIS_ASSISTANT_EXPECTED_SOURCE="src/main/resources/mappers/UserMapper.xml"
 readonly MYBATIS_ASSISTANT_MAX_SANDBOX_GROWTH_BYTES="${MYBATIS_ASSISTANT_MAX_SANDBOX_GROWTH_BYTES:-268435456}"
 readonly MYBATIS_ASSISTANT_MAX_SANDBOX_FILE_GROWTH="${MYBATIS_ASSISTANT_MAX_SANDBOX_FILE_GROWTH:-10000}"
 readonly MYBATIS_ASSISTANT_MAX_IDE_PROCESS_GROWTH="${MYBATIS_ASSISTANT_MAX_IDE_PROCESS_GROWTH:-8}"
@@ -258,20 +258,54 @@ mybatis_assistant_write_live_recorded_processes() {
     done < "${identity_file}"
 }
 
+mybatis_assistant_refresh_recorded_process_forest() {
+    local identity_file="$1"
+    local snapshot_file="${identity_file}.refresh.$$"
+    local process_id
+    local expected_started_at
+    local expected_command
+
+    [[ -f "${identity_file}" ]] || return 1
+    cp "${identity_file}" "${snapshot_file}"
+    while IFS=$'\t' read -r \
+        process_id expected_started_at expected_command; do
+        [[ -n "${process_id}" ]] || continue
+        if mybatis_assistant_process_exact_identity_matches \
+            "${process_id}" "${expected_started_at}" "${expected_command}"; then
+            # Gradle wrapper 退出后，IDEA 仍可能启动新的分析器或清理子进程。
+            # 每轮等待都扩展已知进程森林，不能只依赖 wrapper 存活期的快照。
+            mybatis_assistant_record_process_tree \
+                "${process_id}" "${identity_file}"
+        fi
+    done < "${snapshot_file}"
+    rm -f -- "${snapshot_file}"
+}
+
 mybatis_assistant_wait_for_recorded_processes_exit() {
     local identity_file="$1"
     local live_file="$2"
     local timeout_seconds="$3"
     local elapsed=0
+    local empty_polls=0
 
     while (( elapsed < timeout_seconds )); do
+        mybatis_assistant_refresh_recorded_process_forest "${identity_file}" \
+            || return 1
         mybatis_assistant_write_live_recorded_processes "${identity_file}" "${live_file}"
         if [[ ! -s "${live_file}" ]]; then
-            return 0
+            empty_polls=$((empty_polls + 1))
+            # 连续两轮都为空才冻结日志，覆盖父进程退出边界附近刚登记的后代。
+            if (( empty_polls >= 2 )); then
+                return 0
+            fi
+        else
+            empty_polls=0
         fi
         sleep 1
         elapsed=$((elapsed + 1))
     done
+    mybatis_assistant_refresh_recorded_process_forest "${identity_file}" \
+        || return 1
     mybatis_assistant_write_live_recorded_processes "${identity_file}" "${live_file}"
     return 1
 }
@@ -301,6 +335,85 @@ mybatis_assistant_observe_until_run_exit() {
         elapsed=$((elapsed + 1))
     done
     return 0
+}
+
+mybatis_assistant_freeze_lifecycle_log_after_process_exit() {
+    local sandbox_log="$1"
+    local start_line="$2"
+    local ide_pid="$3"
+    local ide_started_at="$4"
+    local ide_command="$5"
+    local process_identity_file="$6"
+    local live_process_file="$7"
+    local frozen_log="$8"
+    local evidence_file="$9"
+    local timeout_seconds="${10}"
+    local shutdown_line_before_exit
+    local shutdown_line_after_exit
+    local frozen_line_count
+
+    mybatis_assistant_wait_for_pattern \
+        "${sandbox_log}" 'IDE SHUTDOWN' "${start_line}" \
+        "${timeout_seconds}" || return 1
+    shutdown_line_before_exit="$(awk -v start="${start_line}" '
+        BEGIN {
+            marker = " INFO - #c.i.p.i.b.AppStarter - ------------------------------------------------------ IDE SHUTDOWN ------------------------------------------------------"
+        }
+        NR >= start && length($0) >= length(marker) \
+            && substr($0, length($0) - length(marker) + 1) == marker {
+            count++
+            marker_line = NR
+        }
+        END {
+            if (count != 1) exit 1
+            print marker_line
+        }
+    ' "${sandbox_log}")" || return 1
+
+    # shutdown marker 只是顺序证据，不能作为日志已经写完的证明。若 IDEA 仍在，
+    # 再记录一次此刻的完整子树，然后等待所有精确身份退出。
+    if mybatis_assistant_process_exact_identity_matches \
+        "${ide_pid}" "${ide_started_at}" "${ide_command}"; then
+        mybatis_assistant_record_process_tree \
+            "${ide_pid}" "${process_identity_file}"
+    fi
+    mybatis_assistant_wait_for_recorded_processes_exit \
+        "${process_identity_file}" "${live_process_file}" \
+        "${timeout_seconds}" || return 1
+    if mybatis_assistant_process_exact_identity_matches \
+        "${ide_pid}" "${ide_started_at}" "${ide_command}"; then
+        return 1
+    fi
+
+    # 精确进程全部退出后才冻结本轮完整日志；marker 后的任何晚写内容都会被
+    # 后续异常分类与插件错误计数覆盖。
+    sed -n "${start_line},\$p" "${sandbox_log}" > "${frozen_log}"
+    shutdown_line_after_exit="$(awk -v start="${start_line}" '
+        BEGIN {
+            marker = " INFO - #c.i.p.i.b.AppStarter - ------------------------------------------------------ IDE SHUTDOWN ------------------------------------------------------"
+        }
+        NR >= start && length($0) >= length(marker) \
+            && substr($0, length($0) - length(marker) + 1) == marker {
+            count++
+            marker_line = NR
+        }
+        END {
+            if (count != 1) exit 1
+            print marker_line
+        }
+    ' "${sandbox_log}")" || return 1
+    [[ "${shutdown_line_after_exit}" == "${shutdown_line_before_exit}" ]] \
+        || return 1
+    frozen_line_count="$(wc -l < "${frozen_log}" | tr -d '[:space:]')"
+    (( frozen_line_count >= shutdown_line_after_exit - start_line + 1 )) \
+        || return 1
+
+    printf 'contract_version\tshutdown_marker_line\trecorded_processes_exited\tide_process_exited\tfrozen_line_count\n' \
+        > "${evidence_file}"
+    printf '%s\t%s\t1\t1\t%s\n' \
+        '2026-08-13.v1' "${shutdown_line_after_exit}" \
+        "${frozen_line_count}" >> "${evidence_file}"
+    printf '%s\n' "${shutdown_line_after_exit}"
 }
 
 mybatis_assistant_signal_verified_process() {
@@ -708,6 +821,22 @@ mybatis_assistant_classify_ide_failures() {
                 || "${line}" == *" SEVERE - #c.i.d.LoadingState - Last Action: "* ) ]]; then
             printf '%s\n' "${line}" >> "${allowlisted_output}"
             active_context_remaining=$((active_context_remaining - 1))
+        elif [[ "${platform_version}" == "2026.1.4" \
+            && "${line}" == *" SEVERE - #c.i.s.ComponentManagerImpl - com.intellij.codeInspection.ex.QuickFixAction <clinit> requests com.intellij.notification.NotificationGroupManager instance. Class initialization must not depend on services. Consider using instance of the service on-demand instead." ]]; then
+            # IDEA 2026.1.4 自带 Java 检查在离线 Inspection 初始化 Quick Fix 时
+            # 会记录这一条平台错误；仅接受精确正文及紧随其后的 Java 插件归责块。
+            printf '%s\n' "${line}" >> "${allowlisted_output}"
+            active_logger="QuickFixAction"
+            active_context_remaining=128
+        elif [[ "${active_logger}" == "QuickFixAction" \
+            && ${active_context_remaining} -gt 0 \
+            && ( "${line}" == *" SEVERE - #c.i.s.ComponentManagerImpl - IntelliJ IDEA 2026.1.4  Build #IU-261.26222.65"* \
+                || "${line}" == *" SEVERE - #c.i.s.ComponentManagerImpl - JDK: "*"; VM: OpenJDK 64-Bit Server VM; Vendor: JetBrains s.r.o."* \
+                || "${line}" == *" SEVERE - #c.i.s.ComponentManagerImpl - OS: "* \
+                || "${line}" == *" SEVERE - #c.i.s.ComponentManagerImpl - Plugin to blame: Java version: 261.26222.65"* \
+                || "${line}" == *" SEVERE - #c.i.s.ComponentManagerImpl - Last Action: "* ) ]]; then
+            printf '%s\n' "${line}" >> "${allowlisted_output}"
+            active_context_remaining=$((active_context_remaining - 1))
         else
             printf '%s\n' "${line}" >> "${unexpected_output}"
             active_logger=""
@@ -731,18 +860,65 @@ mybatis_assistant_verify_inspection_output() {
     local expected_file="${inspection_output}/${MYBATIS_ASSISTANT_EXPECTED_INSPECTION}.xml"
     local descriptions_file="${inspection_output}/.descriptions.xml"
     local inspection_file
+    local problem_block
+    local normalized_problem_block
+    local description_match_count
     local expected_problem_count
     local total_problem_count=0
 
     [[ -s "${descriptions_file}" ]] || return 1
     [[ -s "${expected_file}" ]] || return 1
+    description_match_count="$({
+        grep -oF -- \
+            "<inspection shortName=\"${MYBATIS_ASSISTANT_EXPECTED_INSPECTION}\"" \
+            "${descriptions_file}" || true
+    } | wc -l | tr -d '[:space:]')"
+    (( description_match_count == 1 )) || return 1
     expected_problem_count="$(grep -c '<problem>' "${expected_file}" || true)"
     (( expected_problem_count == 1 )) || return 1
-    grep -Fq -- "${MYBATIS_ASSISTANT_EXPECTED_SOURCE}" "${expected_file}" || return 1
-    grep -Fq -- "${MYBATIS_ASSISTANT_EXPECTED_NAMESPACE}" "${expected_file}" || return 1
-    grep -Fq -- "${MYBATIS_ASSISTANT_EXPECTED_STATEMENT}" "${expected_file}" || return 1
-    grep -Eq '<line>[1-9][0-9]*</line>' "${expected_file}" || return 1
-    grep -Fq '<problem_class' "${expected_file}" || return 1
+    problem_block="$(awk '
+        /<problem>/ {
+            count++
+            if (count > 1 || active) exit 2
+            active = 1
+        }
+        active { print }
+        /<\/problem>/ {
+            if (!active) exit 2
+            active = 0
+            closed++
+        }
+        END {
+            if (count != 1 || closed != 1 || active) exit 1
+        }
+    ' "${expected_file}")" || return 1
+    normalized_problem_block="$(printf '%s\n' "${problem_block}" \
+        | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    printf '%s\n' "${normalized_problem_block}" | awk '
+        /^<file>/ { file_count++ }
+        /^<line>/ { line_count++ }
+        /^<problem_class[ >]/ { class_count++ }
+        /^<description>/ { description_count++ }
+        /^<highlighted_element>/ { highlighted_count++ }
+        END {
+            exit !(file_count == 1 && line_count == 1 && class_count == 1 \
+                && description_count == 1 && highlighted_count == 1)
+        }
+    ' || return 1
+    printf '%s\n' "${normalized_problem_block}" | grep -Fxq -- \
+        "<file>file://\$PROJECT_DIR\$/${MYBATIS_ASSISTANT_EXPECTED_SOURCE}</file>" \
+        || return 1
+    printf '%s\n' "${normalized_problem_block}" \
+        | grep -Eq '^<line>[1-9][0-9]*</line>$' || return 1
+    printf '%s\n' "${normalized_problem_block}" | grep -Eq -- \
+        "^<problem_class id=\"${MYBATIS_ASSISTANT_EXPECTED_INSPECTION}\"([[:space:]][^>]*)?>statement 未找到 Mapper 方法</problem_class>$" \
+        || return 1
+    printf '%s\n' "${normalized_problem_block}" | grep -Fxq -- \
+        "<description>未找到对应的 Java Mapper 方法：${MYBATIS_ASSISTANT_EXPECTED_NAMESPACE}.${MYBATIS_ASSISTANT_EXPECTED_STATEMENT}</description>" \
+        || return 1
+    printf '%s\n' "${normalized_problem_block}" | grep -Fxq -- \
+        "<highlighted_element>&quot;${MYBATIS_ASSISTANT_EXPECTED_STATEMENT}&quot;</highlighted_element>" \
+        || return 1
 
     while IFS= read -r inspection_file; do
         total_problem_count=$((total_problem_count \
@@ -967,9 +1143,9 @@ mybatis_assistant_lifecycle_main() {
         local run_pid
         local ide_pid=""
         local run_exit_code
-        local shutdown_relative_line
         local shutdown_line
         local cycle_slice
+        local freeze_evidence
         local process_identity_file
         local live_process_file
         local plugin_loaded=0
@@ -1009,6 +1185,7 @@ mybatis_assistant_lifecycle_main() {
         cycle_output="${report_dir}/cycle-${cycle_name}.log"
         process_identity_file="${report_dir}/cycle-${cycle_name}-processes.tsv"
         live_process_file="${report_dir}/cycle-${cycle_name}-orphan-processes.tsv"
+        freeze_evidence="${report_dir}/cycle-${cycle_name}-log-freeze.tsv"
         : > "${process_identity_file}"
         : > "${live_process_file}"
         : > "${sandbox_log}"
@@ -1090,6 +1267,8 @@ mybatis_assistant_lifecycle_main() {
         fi
         MYBATIS_ASSISTANT_ACTIVE_IDE_STARTED_AT="${ide_started_at}"
         MYBATIS_ASSISTANT_ACTIVE_IDE_COMMAND="${ide_command}"
+        mybatis_assistant_record_process_tree \
+            "${ide_pid}" "${process_identity_file}"
 
         if [[ -n "${project_path}" ]]; then
             if ! mybatis_assistant_wait_for_pattern "${sandbox_log}" \
@@ -1116,7 +1295,6 @@ mybatis_assistant_lifecycle_main() {
                 echo "第 ${cycle} 次端口不是预期的 MyBatis Assistant MCP 安全端点" >&2
                 return 1
             fi
-            mybatis_assistant_record_process_tree "${ide_pid}" "${process_identity_file}"
             if ! mybatis_assistant_observe_until_run_exit \
                 "${run_pid}" "${ide_pid}" "${process_identity_file}" 600; then
                 echo "第 ${cycle} 次项目检查未在 600 秒内退出" >&2
@@ -1130,16 +1308,17 @@ mybatis_assistant_lifecycle_main() {
         run_exit_code=$?
         set -e
 
-        if ! mybatis_assistant_wait_for_pattern "${sandbox_log}" \
-            "IDE SHUTDOWN" "${start_line}" 30; then
-            echo "第 ${cycle} 次关闭未记录 IDE SHUTDOWN，详见 ${cycle_output}" >&2
+        cycle_slice="${report_dir}/cycle-${cycle_name}-idea.log"
+        if ! shutdown_line="$(mybatis_assistant_freeze_lifecycle_log_after_process_exit \
+            "${sandbox_log}" "${start_line}" \
+            "${ide_pid}" "${ide_started_at}" "${ide_command}" \
+            "${process_identity_file}" "${live_process_file}" \
+            "${cycle_slice}" "${freeze_evidence}" 30)"; then
+            orphan_process_count="$(mybatis_assistant_count_lines \
+                "${live_process_file}")"
+            echo "第 ${cycle} 次未在精确进程退出后冻结完整 IDEA 日志，详见 ${cycle_output}" >&2
             return 1
         fi
-        shutdown_relative_line="$(tail -n "+${start_line}" "${sandbox_log}" \
-            | grep -n -- "IDE SHUTDOWN" | tail -n 1 | cut -d: -f1)"
-        shutdown_line=$((start_line + shutdown_relative_line - 1))
-        cycle_slice="${report_dir}/cycle-${cycle_name}-idea.log"
-        sed -n "${start_line},${shutdown_line}p" "${sandbox_log}" > "${cycle_slice}"
 
         if grep -Fq -- "Loaded custom plugins: MyBatis Assistant" "${cycle_slice}"; then
             plugin_loaded=1
@@ -1185,10 +1364,6 @@ mybatis_assistant_lifecycle_main() {
 
             if ! mybatis_assistant_wait_for_port_release "${mcp_port}" 30; then
                 mcp_port_released=0
-            fi
-            if ! mybatis_assistant_wait_for_recorded_processes_exit \
-                "${process_identity_file}" "${live_process_file}" 30; then
-                orphan_process_count="$(mybatis_assistant_count_lines "${live_process_file}")"
             fi
         else
             inspection_verified=0

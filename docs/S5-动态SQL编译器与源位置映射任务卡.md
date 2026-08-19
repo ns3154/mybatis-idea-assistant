@@ -67,9 +67,9 @@
 mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
 mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 ./gradlew check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin
-./scripts/verify-sandbox-lifecycle.sh 1
-./scripts/verify-sandbox-lifecycle.sh 100
+./scripts/verify-sandbox-lifecycle.sh 1 samples/lifecycle-inspection-corpus true 2026.1.4
+./scripts/verify-sandbox-lifecycle.sh 100 samples/lifecycle-inspection-corpus true 2026.1.4
 ./scripts/verify-optional-dependency-isolation.sh
 ```
 
-截至 2026-08-12，S5-A～S5-E 已随当前工作区通过独占本地统一门：722/722 平台测试、整体行覆盖率 15135/17958（84.28%）、各分区覆盖率、最低 `IU-252.28539.54` Verifier、结构、本地化和 SBOM 均通过。新 HEAD 远端门、加固生命周期 1/100、5/5 隔离和副屏真实 IDEA 验收仍是阻断项；全部通过后，S5 才能标记为已验收。
+截至 2026-08-19，S5-A～S5-E 已随当前工作区通过禁用构建缓存的独占本地统一门：744/744 平台测试、整体行覆盖率 15385/18230（84.39%）、各分区覆盖率、最低 `IU-252.28539.54` Verifier、结构、本地化和 SBOM 均通过；本地加固生命周期 1/1 与隔离 5/5 也已通过。新 HEAD 远端门、同一 SHA 生命周期 100/100 和副屏真实 IDEA 验收仍是阻断项；全部通过后，S5 才能标记为已验收。

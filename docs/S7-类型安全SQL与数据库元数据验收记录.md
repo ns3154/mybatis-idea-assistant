@@ -3,7 +3,7 @@
 > 日期：2026-08-12
 > 当前结论：代码与平台自动化开发完成；最终阶段验收尚未关闭
 
-> 证据分层：下列 386 个测试与覆盖率是 ResultMap 增量前的 S7 阶段快照。`column` 补全与缺失映射保守 Quick Fix 已随 2026-08-12 当前工作区完成统一本地门，新 HEAD 远端门仍待。
+> 证据分层：下列 386 个测试与覆盖率是 ResultMap 增量前的 S7 阶段快照。`column` 补全与缺失映射保守 Quick Fix 已随 2026-08-19 当前工作区完成统一本地门，新 HEAD 远端门仍待。
 
 ## 已实现范围
 
@@ -40,12 +40,12 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 - Checkstyle、覆盖率、项目配置、插件结构和打包全部通过；Plugin Verifier 对最低 `IU-261.22158.277` 判定 `Compatible`，并判定插件可动态启停；
 - 该阶段 `0.1.0-SNAPSHOT` ZIP 大小为 684971 字节，SHA-256 为 `e7400a2b3eecf2b16fd857d76d6cce3bb64321a672d4b353cab039a4628959b2`。
 
-## 2026-08-12 当前候选本地证据
+## 2026-08-19 当前候选本地证据
 
-- 独占执行 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m25s）；101 个测试套件中的 722/722 平台测试通过，失败、错误和跳过均为 0。
-- 整体行覆盖率 15135/17958（84.28%）；各分区覆盖率、Checkstyle、本地化、SBOM、项目与插件结构均通过。
+- 禁用构建缓存并强制重跑 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m37s）；103 个测试套件中的 744/744 平台测试通过，失败、错误和跳过均为 0。
+- 整体行覆盖率 15385/18230（84.39%）；各分区覆盖率、Checkstyle、本地化、SBOM、项目与插件结构均通过。
 - Java/MyBatis 样例 8/8、语义语料 11/11、Gradle Spring 四模块 2/2 及 `bootJar` 通过；最低 `IU-252.28539.54` Verifier 为 `Compatible`。
-- 候选 ZIP SHA-256 为 `85992cb50b0656c4745aac9eda68f0b18ec2d8ba64099c3caebdab1d423a87e9`。本地证据不替代新 HEAD 远端或副屏 Database Tools 实机证据。
+- 候选 ZIP SHA-256 为 `bbffd60fe0a88b4be2f2d73806b27f98d9fa58aee2136defcb133f8b557b09a9`。本地证据不替代新 HEAD 远端或副屏 Database Tools 实机证据。
 
 ## 关键保守边界
 
@@ -57,10 +57,10 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 
 ## 尚未关闭的验收项
 
-- 当前 S7 产物的加固生命周期 1 次报告审查及同 HEAD 100/100；
-- 当前 S7 产物的 5/5 可选依赖隔离，重点验证禁用 `com.intellij.database` 后核心导航、引用、OGNL 和非数据库检查仍正常加载；
+- 当前 S7 工作区的加固生命周期 1/1 报告已审查通过，仍需推送后同一 SHA 100/100；
+- 当前 S7 工作区的 5/5 可选依赖隔离已通过，已验证禁用 `com.intellij.database` 后核心插件加载和专用语义 Inspection；仍需远端同一 SHA 复验；
 - 新 HEAD 三系统/兼容/CodeQL 远端门；
 - 检测到真实副屏后，只在副屏运行 IDEA 2026.1，人工验证动态 SQL 注入、方言、表列/函数/别名补全、表列与 ResultMap 警告刷新及数据库模型变化失效；
 - 提交并推送 S7 分支后的远端 CI 证据。
 
-当前系统未检测到可用副屏，因此本批没有启动 IDEA 或 Computer Use，也没有运行会启动真实 IDE 的生命周期与依赖隔离脚本。当前候选本地统一门已通过；以上远端、生命周期/隔离与副屏门禁全部通过前，S7 状态保持“开发完成，待最终验收”，不得写成“已验收”。
+本批没有启动可见 IDEA 或 Computer Use；生命周期与依赖隔离仅以无界面模式运行，当前候选本地统一门、生命周期 1/1 和隔离 5/5 已通过。以上远端、生命周期 100/100 与副屏门禁全部通过前，S7 状态保持“开发完成，待最终验收”，不得写成“已验收”。

@@ -1,12 +1,15 @@
 package io.github.ns3154.mybatisassistant.generator;
 
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.ProgressIndicator;
 import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
+import io.github.ns3154.mybatisassistant.util.MyBatisReadActionSupport;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -17,7 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * 一次读取全部目标并在写入前计算新建、更新、无变化与冲突。
+ * 在写入前逐目标短读并计算新建、更新、无变化与冲突。
  */
 public final class MyBatisGenerationPlanner {
     private MyBatisGenerationPlanner() {
@@ -27,15 +30,42 @@ public final class MyBatisGenerationPlanner {
             @NotNull Project project,
             @NotNull VirtualFile projectRoot,
             @NotNull List<MyBatisGenerationBundle> bundles) {
+        return planInternal(project, projectRoot, bundles, null, 0.0);
+    }
+
+    /**
+     * 在已有进度区间的后半段构建预览计划，供批量生成持续报告进度。
+     */
+    public static @NotNull MyBatisGenerationPlan plan(
+            @NotNull Project project,
+            @NotNull VirtualFile projectRoot,
+            @NotNull List<MyBatisGenerationBundle> bundles,
+            @NotNull ProgressIndicator indicator,
+            double startFraction) {
+        if (!Double.isFinite(startFraction)
+                || startFraction < 0.0
+                || startFraction > 1.0) {
+            throw new IllegalArgumentException("startFraction must be between 0 and 1");
+        }
+        return planInternal(project, projectRoot, bundles, indicator, startFraction);
+    }
+
+    private static @NotNull MyBatisGenerationPlan planInternal(
+            @NotNull Project project,
+            @NotNull VirtualFile projectRoot,
+            @NotNull List<MyBatisGenerationBundle> bundles,
+            @Nullable ProgressIndicator indicator,
+            double startFraction) {
         if (!projectRoot.isDirectory()) {
             throw new IllegalArgumentException(MyBatisAssistantBundle.message(
                     "generator.error.base.directory.invalid"));
         }
+        updateProgress(indicator, startFraction);
         Map<String, MyBatisGeneratedArtifact> unique = new LinkedHashMap<>();
         Map<String, String> collisions = new LinkedHashMap<>();
         for (MyBatisGenerationBundle bundle : bundles) {
             for (MyBatisGeneratedArtifact artifact : bundle.artifacts()) {
-                ProgressManager.checkCanceled();
+                checkCanceled(indicator);
                 MyBatisGeneratedArtifact previous = unique.putIfAbsent(
                         artifact.relativePath(), artifact);
                 if (previous != null && !previous.content().equals(artifact.content())) {
@@ -45,11 +75,41 @@ public final class MyBatisGenerationPlanner {
             }
         }
         List<MyBatisGenerationPlanEntry> entries = new ArrayList<>();
-        unique.values().stream()
+        List<MyBatisGeneratedArtifact> sortedArtifacts = unique.values().stream()
                 .sorted(Comparator.comparing(MyBatisGeneratedArtifact::relativePath))
-                .forEach(artifact -> entries.add(entry(
-                        project, projectRoot, artifact, collisions.get(artifact.relativePath()))));
+                .toList();
+        for (int index = 0; index < sortedArtifacts.size(); index++) {
+            checkCanceled(indicator);
+            MyBatisGeneratedArtifact artifact = sortedArtifacts.get(index);
+            entries.add(indicator == null
+                    ? entry(project, projectRoot, artifact,
+                            collisions.get(artifact.relativePath()))
+                    : MyBatisReadActionSupport.compute(() -> entry(
+                            project,
+                            projectRoot,
+                            artifact,
+                            collisions.get(artifact.relativePath()))));
+            updateProgress(indicator, startFraction
+                    + (1.0 - startFraction) * (index + 1.0) / sortedArtifacts.size());
+        }
+        updateProgress(indicator, 1.0);
         return new MyBatisGenerationPlan(entries);
+    }
+
+    private static void checkCanceled(@Nullable ProgressIndicator indicator) {
+        if (indicator == null) {
+            ProgressManager.checkCanceled();
+        } else {
+            indicator.checkCanceled();
+        }
+    }
+
+    private static void updateProgress(
+            @Nullable ProgressIndicator indicator,
+            double fraction) {
+        if (indicator != null) {
+            indicator.setFraction(fraction);
+        }
     }
 
     private static @NotNull MyBatisGenerationPlanEntry entry(

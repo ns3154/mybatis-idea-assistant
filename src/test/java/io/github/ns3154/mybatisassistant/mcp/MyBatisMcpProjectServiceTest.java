@@ -2,6 +2,7 @@ package io.github.ns3154.mybatisassistant.mcp;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.command.undo.UndoManager;
@@ -32,6 +33,7 @@ import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
 import io.github.ns3154.mybatisassistant.database.jdbc.MyBatisJdbcDataSourceConfig;
 import io.github.ns3154.mybatisassistant.database.jdbc.MyBatisJdbcDataSourceManager;
 import io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettings;
+import io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettingsListener;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
@@ -80,6 +82,41 @@ public final class MyBatisMcpProjectServiceTest extends BasePlatformTestCase {
 
         assertFalse(service.isRunning());
         assertTrue(service.endpoint().isEmpty());
+    }
+
+    public void testSettingsInitializationEventUsesPublishedStateWithoutServiceReentry() {
+        assertFalse(MyBatisAssistantSettings.getInstance().isMcpEnabled());
+        MyBatisAssistantSettings.SettingsState loadingState = enabledState();
+
+        ApplicationManager.getApplication()
+                .getMessageBus()
+                .syncPublisher(MyBatisAssistantSettingsListener.TOPIC)
+                .settingsChanged(loadingState);
+
+        assertFalse(MyBatisAssistantSettings.getInstance().isMcpEnabled());
+        assertTrue(service.isRunning());
+        assertTrue(service.endpoint().isPresent());
+    }
+
+    public void testSettingsInitializationFailureDefersLocalizedMessageWithoutServiceReentry()
+            throws Exception {
+        assertFalse(MyBatisAssistantSettings.getInstance().isMcpEnabled());
+        try (ServerSocket occupied = new ServerSocket(
+                0, 1, InetAddress.getByName("127.0.0.1"))) {
+            MyBatisAssistantSettings.SettingsState loadingState = enabledState();
+            loadingState.mcpPort = occupied.getLocalPort();
+
+            ApplicationManager.getApplication()
+                    .getMessageBus()
+                    .syncPublisher(MyBatisAssistantSettingsListener.TOPIC)
+                    .settingsChanged(loadingState);
+
+            assertFalse(MyBatisAssistantSettings.getInstance().isMcpEnabled());
+            assertFalse(service.isRunning());
+            assertTrue(service.endpoint().isEmpty());
+            assertTrue(service.lastFailure().orElseThrow()
+                    .startsWith("本地 MCP 服务启动失败"));
+        }
     }
 
     public void testExplicitConnectionConfigurationContainsOnlyEndpointAndCurrentToken() {

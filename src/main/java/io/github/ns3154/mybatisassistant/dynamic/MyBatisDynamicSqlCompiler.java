@@ -64,9 +64,22 @@ public final class MyBatisDynamicSqlCompiler {
         return compileInternal(statement, false);
     }
 
+    static @NotNull MyBatisDynamicSqlCompileResult compileUncached(
+            @NotNull XmlTag statement,
+            @NotNull Runnable traversalCancellationCheck) {
+        return compileInternal(statement, false, traversalCancellationCheck);
+    }
+
     private static @NotNull MyBatisDynamicSqlCompileResult compileInternal(
             @NotNull XmlTag statement,
             boolean useCache) {
+        return compileInternal(statement, useCache, ProgressManager::checkCanceled);
+    }
+
+    private static @NotNull MyBatisDynamicSqlCompileResult compileInternal(
+            @NotNull XmlTag statement,
+            boolean useCache,
+            @NotNull Runnable traversalCancellationCheck) {
         ProgressManager.checkCanceled();
         if (!statement.isValid()) {
             return new MyBatisDynamicSqlCompileResult.SourceInvalid();
@@ -93,7 +106,11 @@ public final class MyBatisDynamicSqlCompiler {
         try {
             MyBatisDynamicSqlCompileResult result = useCache
                     ? compileCached(statement, project, namespace)
-                    : compute(statement, project, namespace).result();
+                    : compute(
+                            statement,
+                            project,
+                            namespace,
+                            traversalCancellationCheck).result();
             if (!statement.isValid() || project.isDisposed() || !project.isOpen()) {
                 return new MyBatisDynamicSqlCompileResult.SourceInvalid();
             }
@@ -142,6 +159,14 @@ public final class MyBatisDynamicSqlCompiler {
             @NotNull XmlTag statement,
             @NotNull Project project,
             @NotNull String namespace) {
+        return compute(statement, project, namespace, ProgressManager::checkCanceled);
+    }
+
+    private static @NotNull CompileComputation compute(
+            @NotNull XmlTag statement,
+            @NotNull Project project,
+            @NotNull String namespace,
+            @NotNull Runnable traversalCancellationCheck) {
         List<MyBatisDynamicSqlDiagnostic> diagnostics = new ArrayList<>();
         CompilationDependencies dependencies = new CompilationDependencies();
         CompilerContext context = new CompilerContext(
@@ -152,7 +177,8 @@ public final class MyBatisDynamicSqlCompiler {
                 List.of(),
                 false,
                 diagnostics,
-                dependencies);
+                dependencies,
+                traversalCancellationCheck);
         Compilation compilation = compileChildren(statement, context);
         ProgressManager.checkCanceled();
         if (!statement.isValid() || project.isDisposed() || !project.isOpen()) {
@@ -180,7 +206,8 @@ public final class MyBatisDynamicSqlCompiler {
         List<MyBatisDynamicSqlNode> nodes = new ArrayList<>();
         boolean allStatic = true;
         for (PsiElement child : container.getValue().getChildren()) {
-            ProgressManager.checkCanceled();
+            // 逐子节点检查是大型动态 SQL 的主要深遍历取消边界。
+            context.traversalCancellationCheck().run();
             if (child instanceof XmlComment) {
                 continue;
             }
@@ -971,7 +998,8 @@ public final class MyBatisDynamicSqlCompiler {
             @NotNull List<String> includeChain,
             boolean strictProperties,
             @NotNull List<MyBatisDynamicSqlDiagnostic> diagnostics,
-            @NotNull CompilationDependencies dependencies) {
+            @NotNull CompilationDependencies dependencies,
+            @NotNull Runnable traversalCancellationCheck) {
         private @NotNull CompilerContext withProperties(
                 @NotNull Map<String, PropertyValue> replacements,
                 boolean strict) {
@@ -983,7 +1011,8 @@ public final class MyBatisDynamicSqlCompiler {
                     includeChain,
                     strict,
                     diagnostics,
-                    dependencies);
+                    dependencies,
+                    traversalCancellationCheck);
         }
 
         private @NotNull CompilerContext forInclude(
@@ -999,7 +1028,8 @@ public final class MyBatisDynamicSqlCompiler {
                     List.copyOf(chain),
                     false,
                     diagnostics,
-                    dependencies);
+                    dependencies,
+                    traversalCancellationCheck);
         }
     }
 

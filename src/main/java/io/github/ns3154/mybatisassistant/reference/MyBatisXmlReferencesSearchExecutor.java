@@ -16,6 +16,7 @@ import com.intellij.util.Processor;
 import com.intellij.util.QueryExecutor;
 import io.github.ns3154.mybatisassistant.model.MyBatisXmlModel;
 import io.github.ns3154.mybatisassistant.model.MyBatisXmlSymbolKind;
+import io.github.ns3154.mybatisassistant.util.MyBatisReadActionSupport;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -26,15 +27,25 @@ public final class MyBatisXmlReferencesSearchExecutor
             @NotNull ReferencesSearch.SearchParameters parameters,
             @NotNull Processor<? super PsiReference> consumer) {
         ProgressManager.checkCanceled();
-        XmlTag declaration = declarationTag(parameters.getElementToSearch());
+        return MyBatisReadActionSupport.compute(() -> executeInReadAction(parameters));
+    }
+
+    private static boolean executeInReadAction(
+            @NotNull ReferencesSearch.SearchParameters parameters) {
+        ProgressManager.checkCanceled();
+        if (!parameters.areValid()) {
+            return true;
+        }
+        PsiElement element = parameters.getElementToSearch();
+        XmlTag declaration = declarationTag(element);
         SymbolDescriptor descriptor = descriptor(declaration);
         if (descriptor != null) {
             schedule(parameters, descriptor.id(), declaration);
             return true;
         }
-        String alternateName = alternateSearchName(parameters.getElementToSearch());
+        String alternateName = alternateSearchName(element);
         if (alternateName != null) {
-            schedule(parameters, alternateName, parameters.getElementToSearch());
+            schedule(parameters, alternateName, element);
         }
         return true;
     }

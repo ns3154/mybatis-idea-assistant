@@ -3,7 +3,7 @@
 > 日期：2026-08-12
 > 当前结论：代码与自动化开发完成；最终阶段验收尚未关闭
 
-> 证据分层：下列 280 个测试与覆盖率是 S5 原阶段快照；`dynamic-sql-golden/v1` 三组版本化黄金已随 2026-08-12 当前工作区完成统一本地门，新 HEAD 远端门仍待。
+> 证据分层：下列 280 个测试与覆盖率是 S5 原阶段快照；`dynamic-sql-golden/v1` 三组版本化黄金已随 2026-08-19 当前工作区完成统一本地门，新 HEAD 远端门仍待。
 
 ## 已实现范围
 
@@ -44,18 +44,18 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 - Plugin Verifier 对最低 `IU-261.22158.277` 判定 `Compatible`，并判定插件可动态启停；
 - 当前 `0.1.0-SNAPSHOT` ZIP 的 SHA-256 为 `9b733183e18cf8ed151cf62739113f6ff0bad91728394de6fdcd15361821eb06`；包内描述包含 S5 能力，`since-build="261"` 且没有 `until-build`。
 
-### 2026-08-12 当前候选本地证据
+### 2026-08-19 当前候选本地证据
 
-- 独占执行 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m25s）；101 个测试套件中的 722/722 平台测试通过，失败、错误和跳过均为 0。
-- 整体行覆盖率为 15135/17958（84.28%）；各分区覆盖率、Checkstyle、本地化、SBOM、项目与插件结构均通过。
+- 禁用构建缓存并强制重跑 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m37s）；103 个测试套件中的 744/744 平台测试通过，失败、错误和跳过均为 0。
+- 整体行覆盖率为 15385/18230（84.39%）；各分区覆盖率、Checkstyle、本地化、SBOM、项目与插件结构均通过。
 - Java/MyBatis 样例 8/8、语义语料 11/11、Gradle Spring 四模块 2/2 及 `bootJar` 通过；最低 `IU-252.28539.54` Verifier 为 `Compatible`。
-- 当前候选 ZIP SHA-256 为 `85992cb50b0656c4745aac9eda68f0b18ec2d8ba64099c3caebdab1d423a87e9`。
+- 当前候选 ZIP SHA-256 为 `bbffd60fe0a88b4be2f2d73806b27f98d9fa58aee2136defcb133f8b557b09a9`。
 
 ## 尚未关闭的验收项
 
-- 当前 S5 产物的加固生命周期 1 次报告审查及同 HEAD 100/100；
-- 当前 S5 产物的 5/5 可选依赖隔离；
+- 当前 S5 工作区的加固生命周期 1/1 报告已审查通过，仍需推送后同一 SHA 100/100；
+- 当前 S5 工作区的 5/5 可选依赖隔离已通过，仍需远端同一 SHA 复验；
 - 新 HEAD 的主 CI、三系统、CodeQL 和五宿主远端门；
 - 检测到真实副屏后，在副屏运行 IDEA 2026.1 的动态 XML 编辑、缓存刷新和日志验收。
 
-当前候选本地统一代码/数据门已通过；在以上远端、生命周期/隔离与副屏项全部通过前，S5 状态保持“开发完成，待最终验收”，不得写成“已验收”。
+当前候选本地统一代码/数据门、生命周期 1/1 和隔离 5/5 已通过；在以上远端、生命周期 100/100 与副屏项全部通过前，S5 状态保持“开发完成，待最终验收”，不得写成“已验收”。

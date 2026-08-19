@@ -76,9 +76,9 @@
 mvn --batch-mode --file samples/java-mybatis-minimal/pom.xml clean verify
 mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 ./gradlew check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin
-./scripts/verify-sandbox-lifecycle.sh 1
-./scripts/verify-sandbox-lifecycle.sh 100
+./scripts/verify-sandbox-lifecycle.sh 1 samples/lifecycle-inspection-corpus true 2026.1.4
+./scripts/verify-sandbox-lifecycle.sh 100 samples/lifecycle-inspection-corpus true 2026.1.4
 ./scripts/verify-optional-dependency-isolation.sh
 ```
 
-当前代码已经覆盖 S4-A～S4-D，并叠加了 ResultMap `column` 补全与保守缺失映射 Quick Fix。截至 2026-08-12，包含该新路径的工作区已通过独占本地统一门：722/722 平台测试，整体行覆盖率 15135/17958（84.28%），各分区覆盖率、最低 `IU-252.28539.54` Verifier、结构、本地化和 SBOM 均通过。新 HEAD 远端门、加固生命周期 1/100、5/5 可选依赖隔离和副屏真实 IDEA 验收仍待补齐；以上全部通过前，S4 不得标记为已验收。
+当前代码已经覆盖 S4-A～S4-D，并叠加了 ResultMap `column` 补全与保守缺失映射 Quick Fix。截至 2026-08-19，包含该新路径的工作区已通过禁用构建缓存的独占本地统一门：744/744 平台测试，整体行覆盖率 15385/18230（84.39%），各分区覆盖率、最低 `IU-252.28539.54` Verifier、结构、本地化和 SBOM 均通过；同一工作区的加固生命周期 1/1 与可选依赖隔离 5/5 也已通过。新 HEAD 远端门、同一 SHA 生命周期 100/100 和副屏真实 IDEA 验收仍待补齐；以上全部通过前，S4 不得标记为已验收。
