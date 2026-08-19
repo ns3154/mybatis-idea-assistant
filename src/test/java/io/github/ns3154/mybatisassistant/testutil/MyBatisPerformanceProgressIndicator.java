@@ -5,8 +5,8 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProgressIndicator;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -16,11 +16,11 @@ public final class MyBatisPerformanceProgressIndicator implements ProgressIndica
     private final EmptyProgressIndicator delegate = new EmptyProgressIndicator();
     private final AtomicInteger checkCount = new AtomicInteger();
     private final AtomicInteger canceledCheckCount = new AtomicInteger();
-    private final List<Double> fractions = new ArrayList<>();
-    private final List<Boolean> fractionReadAccess = new ArrayList<>();
-    private final List<CancellationPoll> cancellationPolls = new ArrayList<>();
-    private final List<String> secondaryTexts = new ArrayList<>();
-    private final List<Boolean> secondaryTextReadAccess = new ArrayList<>();
+    private final List<Double> fractions = new CopyOnWriteArrayList<>();
+    private final List<Boolean> fractionReadAccess = new CopyOnWriteArrayList<>();
+    private final List<CancellationPoll> cancellationPolls = new CopyOnWriteArrayList<>();
+    private final List<String> secondaryTexts = new CopyOnWriteArrayList<>();
+    private final List<Boolean> secondaryTextReadAccess = new CopyOnWriteArrayList<>();
     private volatile String secondaryText = "";
     private volatile double fraction;
     private volatile int cancelAtCheck = Integer.MAX_VALUE;

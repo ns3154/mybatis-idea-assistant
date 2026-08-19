@@ -40,10 +40,10 @@ go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
 
 ## 2026-08-19 当前候选本地证据
 
-- 禁用构建缓存并强制重跑 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m37s）；103 个测试套件中的 744/744 平台测试通过，失败、错误和跳过均为 0。
-- 整体行覆盖率为 15385/18230（84.39%）；各分区覆盖率、Checkstyle、SBOM、`verifyLocalizedUserInterface`、项目与插件结构均通过。
+- 禁用构建缓存并强制重跑 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m33s）；103 个测试套件中的 744/744 平台测试通过，失败、错误和跳过均为 0。
+- 整体行覆盖率为 15389/18234（84.40%）；各分区覆盖率、Checkstyle、SBOM、`verifyLocalizedUserInterface`、项目与插件结构均通过。
 - Java/MyBatis 样例 8/8、语义语料 11/11、Gradle Spring 四模块 2/2 及 `bootJar` 通过；最低 `IU-252.28539.54` Verifier 为 `Compatible`。
-- 临时密钥签名、验签、篡改拒绝、归档身份、加固生命周期 1/1、可选依赖隔离 5/5 以及发布静态契约均通过；本地候选 ZIP SHA-256 为 `bbffd60fe0a88b4be2f2d73806b27f98d9fa58aee2136defcb133f8b557b09a9`。
+- 临时密钥签名、验签、篡改拒绝、归档身份、加固生命周期 1/1、可选依赖隔离 5/5 以及发布静态契约均通过；本地候选 ZIP SHA-256 为 `57b1d53bd1a8f359b3d41206408e78dbb04c7150619f3b936f756a6ce5697e12`。
 - 这些签名证据使用临时密钥，只验证失败关闭与制品契约，不代表生产证书、Environment 审批或 Marketplace 发布已完成。
 
 ## 仍未验收

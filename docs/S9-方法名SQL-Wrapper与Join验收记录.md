@@ -42,10 +42,10 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 
 ### 2026-08-19 当前候选本地证据
 
-- 禁用构建缓存并强制重跑 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m37s）；103 个测试套件中的 744/744 平台测试通过，失败、错误和跳过均为 0。
-- 整体行覆盖率 15385/18230（84.39%）；各分区覆盖率、Checkstyle、本地化、SBOM、项目与插件结构均通过。
+- 禁用构建缓存并强制重跑 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m33s）；103 个测试套件中的 744/744 平台测试通过，失败、错误和跳过均为 0。
+- 整体行覆盖率 15389/18234（84.40%）；各分区覆盖率、Checkstyle、本地化、SBOM、项目与插件结构均通过。
 - Java/MyBatis 样例 8/8、语义语料 11/11、Gradle Spring 四模块 2/2 及 `bootJar` 通过；最低 `IU-252.28539.54` Verifier 为 `Compatible`。
-- 候选 ZIP SHA-256 为 `bbffd60fe0a88b4be2f2d73806b27f98d9fa58aee2136defcb133f8b557b09a9`。
+- 候选 ZIP SHA-256 为 `57b1d53bd1a8f359b3d41206408e78dbb04c7150619f3b936f756a6ce5697e12`。
 
 ## 尚未关闭的验收项
 
