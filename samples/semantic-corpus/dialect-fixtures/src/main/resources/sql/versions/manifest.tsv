@@ -1,0 +1,6 @@
+# database	version	resource	feature-token
+mysql	8.0.36	sql/versions/mysql-8.0.36.sql	generated always
+postgresql	16.2	sql/versions/postgresql-16.2.sql	jsonb_path_query
+oracle	21c	sql/versions/oracle-21c.sql	json_object
+sqlserver	2022	sql/versions/sqlserver-2022.sql	string_agg
+sqlite	3.45.1	sql/versions/sqlite-3.45.1.sql	json_extract

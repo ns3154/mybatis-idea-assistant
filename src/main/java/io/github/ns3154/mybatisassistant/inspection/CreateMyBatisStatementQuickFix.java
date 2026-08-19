@@ -94,7 +94,8 @@ final class CreateMyBatisStatementQuickFix extends ModCommandQuickFix {
             }
             XmlTag template = XmlElementFactory.getInstance(project).createTagFromText(
                     "<" + statementTag + " id=\"" + statementId + "\">\n"
-                            + "    <!-- TODO: 补充 SQL -->\n"
+                            + "    <!-- " + MyBatisAssistantBundle.message(
+                            "quickfix.create.statement.todo") + " -->\n"
                             + "</" + statementTag + ">");
             XmlTag added = writableMapper.addSubTag(template, false);
             CodeStyleManager.getInstance(project).reformat(added);

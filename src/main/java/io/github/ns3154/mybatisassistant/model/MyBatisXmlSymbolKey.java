@@ -16,12 +16,14 @@ public final class MyBatisXmlSymbolKey {
         String normalizedNamespace = normalizedSegment(namespace, "namespace");
         if (!kind.isNamed()) {
             if (id != null) {
-                throw new IllegalArgumentException("namespace 符号不能包含 id");
+                throw new IllegalArgumentException(MyBatisModelMessages.message(
+                        "model.error.xml.namespace.id"));
             }
             return kind.name() + SEPARATOR + normalizedNamespace;
         }
         if (id == null) {
-            throw new IllegalArgumentException("具名 MyBatis XML 符号必须包含 id");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.xml.named.id"));
         }
         return kind.name() + SEPARATOR + normalizedNamespace + SEPARATOR + normalizedSegment(id, "id");
     }
@@ -29,10 +31,12 @@ public final class MyBatisXmlSymbolKey {
     private static @NotNull String normalizedSegment(@NotNull String value, @NotNull String name) {
         String normalized = value.trim();
         if (normalized.isEmpty()) {
-            throw new IllegalArgumentException("MyBatis XML " + name + " 不能为空");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.xml.segment.empty", name));
         }
         if (normalized.indexOf(SEPARATOR) >= 0) {
-            throw new IllegalArgumentException("MyBatis XML " + name + " 不能包含索引分隔符");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.xml.segment.separator", name));
         }
         return normalized;
     }

@@ -14,7 +14,8 @@ public record MyBatisParameterModel(
         Objects.requireNonNull(canonicalType, "canonicalType");
         Objects.requireNonNull(entity, "entity");
         if (name.isBlank() || canonicalType.isBlank()) {
-            throw new IllegalArgumentException("Mapper 参数名称和类型不能为空");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.parameter.model.empty"));
         }
     }
 }

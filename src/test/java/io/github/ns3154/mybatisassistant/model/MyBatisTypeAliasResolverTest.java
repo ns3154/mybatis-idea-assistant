@@ -26,6 +26,8 @@ public final class MyBatisTypeAliasResolverTest extends BasePlatformTestCase {
         assertEquals(
                 "java.lang.String",
                 ((MyBatisTypeAliasResolution.Unique) resolution).canonicalType());
+        assertUnique("int[]", resolve(context, "_INTEGER[]"));
+        assertUnique("java.sql.ResultSet", resolve(context, "ResultSet"));
     }
 
     public void testResolvesExplicitAndDefaultTypeAliases() {
@@ -102,6 +104,39 @@ public final class MyBatisTypeAliasResolverTest extends BasePlatformTestCase {
 
         assertUnique("com.example.domain.URLValue", first);
         assertUnique("com.example.domain.URLValue", second);
+    }
+
+    public void testVariantsIncludeBuiltInExplicitPackageAndAnnotatedAliases() {
+        PsiClass context = addClass("src/main/java/com/example/Context.java", """
+                package com.example;
+                public final class Context {}
+                """);
+        myFixture.addFileToProject("src/main/java/org/apache/ibatis/type/Alias.java", """
+                package org.apache.ibatis.type;
+                public @interface Alias { String value(); }
+                """);
+        addClass("src/main/java/com/example/domain/User.java", """
+                package com.example.domain;
+                public final class User {}
+                """);
+        addClass("src/main/java/com/example/domain/Account.java", """
+                package com.example.domain;
+                import org.apache.ibatis.type.Alias;
+                @Alias("customer")
+                public final class Account {}
+                """);
+        addConfig("config/mybatis-config.xml", """
+                <configuration><typeAliases>
+                    <typeAlias alias="Person" type="com.example.domain.User"/>
+                    <package name="com.example.domain"/>
+                </typeAliases></configuration>
+                """);
+
+        List<String> variants = ReadAction.compute(
+                () -> MyBatisTypeAliasResolver.variants(context));
+
+        assertTrue(variants.containsAll(List.of("string", "Person", "User", "customer")));
+        assertFalse("带 @Alias 的类型不能同时暴露默认简单类名", variants.contains("Account"));
     }
 
     public void testResolvesBootConfiguredTypeAliasPackage() {

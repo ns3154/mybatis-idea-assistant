@@ -55,7 +55,7 @@ public final class MyBatisMissingStatementInspection extends AbstractBaseJavaLoc
         };
     }
 
-    private static LocalQuickFix @NotNull [] quickFixes(
+    private static @NotNull LocalQuickFix[] quickFixes(
             @NotNull PsiMethod method,
             @NotNull MyBatisStatementResolution.StatementMissing missing) {
         List<XmlTag> mapperRoots = MyBatisXmlSymbolLocator.findMapperRoots(

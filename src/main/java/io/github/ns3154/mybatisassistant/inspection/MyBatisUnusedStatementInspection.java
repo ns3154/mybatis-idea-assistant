@@ -71,7 +71,7 @@ public final class MyBatisUnusedStatementInspection extends LocalInspectionTool 
         };
     }
 
-    private static LocalQuickFix @NotNull [] navigationFixes(
+    private static @NotNull LocalQuickFix[] navigationFixes(
             @NotNull List<PsiClass> mappers,
             @NotNull String namespace) {
         SmartPointerManager pointerManager = SmartPointerManager.getInstance(

@@ -1,0 +1,22 @@
+<mapper namespace="golden.v1.BatchMapper">
+    <sql id="Columns">${prefix}_id, name</sql>
+    <sql id="Selected">
+        <include refid="Columns">
+            <property name="prefix" value="${alias}"/>
+        </include>
+    </sql>
+    <select id="findBatch">
+        <bind name="pattern" value="'%' + keyword + '%'"/>
+        select
+        <include refid="Selected">
+            <property name="alias" value="user"/>
+        </include>
+        from users
+        <where>
+            <foreach collection="items" item="item" index="position"
+                     open="(" close=")" separator=" or " nullable="true">
+                <if test="item != null">#{position} = #{item}</if>
+            </foreach>
+        </where>
+    </select>
+</mapper>

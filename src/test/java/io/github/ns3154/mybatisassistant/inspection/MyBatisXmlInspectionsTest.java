@@ -30,6 +30,7 @@ public final class MyBatisXmlInspectionsTest extends BasePlatformTestCase {
     private static final String INVALID_NAMESPACE = "MyBatisInvalidNamespace";
     private static final String DUPLICATE_STATEMENT = "MyBatisDuplicateStatement";
     private static final String UNUSED_STATEMENT = "MyBatisUnusedStatement";
+    private static final String DANGEROUS_STATEMENT = "MyBatisDangerousStatement";
 
     @Override
     protected void setUp() throws Exception {
@@ -37,7 +38,8 @@ public final class MyBatisXmlInspectionsTest extends BasePlatformTestCase {
         for (String shortName : List.of(
                 INVALID_NAMESPACE,
                 DUPLICATE_STATEMENT,
-                UNUSED_STATEMENT)) {
+                UNUSED_STATEMENT,
+                DANGEROUS_STATEMENT)) {
             myFixture.enableInspections(registeredExtension(shortName).instantiateTool());
         }
     }
@@ -61,7 +63,13 @@ public final class MyBatisXmlInspectionsTest extends BasePlatformTestCase {
                         false,
                         "statement 未找到 Mapper 方法",
                         MyBatisUnusedStatementInspection.class,
-                        "默认关闭"));
+                        "默认关闭"),
+                DANGEROUS_STATEMENT,
+                new RegistrationExpectation(
+                        false,
+                        "update/delete 可能缺少 WHERE",
+                        MyBatisDangerousStatementInspection.class,
+                        "代表 SQL 不覆盖全部运行期分支"));
 
         for (Map.Entry<String, RegistrationExpectation> entry : expectations.entrySet()) {
             LocalInspectionEP extension = registeredExtension(entry.getKey());
@@ -220,6 +228,83 @@ public final class MyBatisXmlInspectionsTest extends BasePlatformTestCase {
         assertEmpty(warnings(UNUSED_STATEMENT));
     }
 
+    public void testDangerousStatementReportsUpdateAndDeleteWithoutWhere() {
+        configureXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <update id="updateAll">UPDATE users SET active = 0</update>
+                    <delete id="deleteAll">DELETE FROM users</delete>
+                    <insert id="insertOne">INSERT INTO users(id) VALUES (1)</insert>
+                    <select id="findAll">SELECT * FROM users</select>
+                </mapper>
+                """);
+
+        List<HighlightInfo> warnings = warnings(DANGEROUS_STATEMENT);
+
+        assertSize(2, warnings);
+        assertContainsElements(
+                warnings.stream().map(HighlightInfo::getDescription).toList(),
+                "MyBatis update statement 的代表 SQL 中未找到 WHERE",
+                "MyBatis delete statement 的代表 SQL 中未找到 WHERE");
+    }
+
+    public void testDangerousStatementRecognizesOnlyRealWhereKeyword() {
+        configureXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <update id="safeUpdate">
+                        UPDATE users SET note = 'where' WHERE id = #{id}
+                    </update>
+                    <delete id="safeDelete">
+                        DELETE FROM users /* where archived */ WHERE id = #{id}
+                    </delete>
+                    <update id="stringOnly">
+                        UPDATE users SET note = 'where'
+                    </update>
+                    <delete id="commentOnly">
+                        DELETE FROM users -- where archived
+                    </delete>
+                </mapper>
+                """);
+
+        List<HighlightInfo> warnings = warnings(DANGEROUS_STATEMENT);
+
+        assertSize(2, warnings);
+        assertContainsElements(
+                warnings.stream().map(HighlightInfo::getDescription).toList(),
+                "MyBatis update statement 的代表 SQL 中未找到 WHERE",
+                "MyBatis delete statement 的代表 SQL 中未找到 WHERE");
+    }
+
+    public void testDangerousStatementSkipsUncertainDynamicOrIncludeSource() {
+        configureXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <update id="dynamic">
+                        UPDATE users SET active = 0 ${runtimePredicate}
+                    </update>
+                    <delete id="unresolvedInclude">
+                        DELETE FROM users <include refid="missingPredicate"/>
+                    </delete>
+                    <sql id="safePredicate">WHERE id = #{id}</sql>
+                    <delete id="safeInclude">
+                        DELETE FROM users <include refid="safePredicate"/>
+                    </delete>
+                </mapper>
+                """);
+
+        assertEmpty(warnings(DANGEROUS_STATEMENT));
+    }
+
+    public void testDangerousStatementSkipsMultipleStatements() {
+        configureXml("""
+                <mapper namespace="com.example.UserMapper">
+                    <update id="multiple">
+                        UPDATE users SET active = 0; DELETE FROM audit_log
+                    </update>
+                </mapper>
+                """);
+
+        assertEmpty(warnings(DANGEROUS_STATEMENT));
+    }
+
     public void testUnsavedIdChangeRefreshesDuplicateInspection() {
         addJava("com/example/UserMapper.java", """
                 package com.example;
@@ -267,6 +352,8 @@ public final class MyBatisXmlInspectionsTest extends BasePlatformTestCase {
             assertEmpty(inspect(new MyBatisDuplicateStatementInspection(), xmlFile, statement)
                     .getResults());
             assertEmpty(inspect(new MyBatisUnusedStatementInspection(), xmlFile, statement)
+                    .getResults());
+            assertEmpty(inspect(new MyBatisDangerousStatementInspection(), xmlFile, statement)
                     .getResults());
         });
 

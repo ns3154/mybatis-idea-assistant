@@ -1,0 +1,25 @@
+<mapper namespace="golden.v1.ControlMapper">
+    <select id="find">
+        select * from users
+        <where>
+            <if test="active != null">
+                and active = #{active}
+            </if>
+            <choose>
+                <when test="name != null">and name = #{name}</when>
+                <when test="id != null">and id = #{id}</when>
+                <otherwise>and deleted = 0</otherwise>
+            </choose>
+            <trim prefix="and (" suffix=")"
+                  prefixOverrides="AND |OR " suffixOverrides=",">
+                <if test="tenantId != null">and tenant_id = #{tenantId},</if>
+            </trim>
+        </where>
+    </select>
+    <update id="update">
+        update users
+        <set>
+            <if test="name != null">name = #{name},</if>
+        </set>
+    </update>
+</mapper>

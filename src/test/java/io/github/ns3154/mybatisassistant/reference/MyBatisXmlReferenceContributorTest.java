@@ -1,27 +1,35 @@
 package io.github.ns3154.mybatisassistant.reference;
 
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiEnumConstant;
+import com.intellij.psi.PsiJavaFile;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiPolyVariantReference;
 import com.intellij.psi.PsiReference;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.ResolveResult;
+import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.psi.search.PsiSearchRequest;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.xml.XmlFile;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.testFramework.DumbModeTestUtils;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import io.github.ns3154.mybatisassistant.model.MyBatisXmlModel;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public final class MyBatisXmlReferenceContributorTest extends BasePlatformTestCase {
     public void testNamespaceAndStatementIdResolveToExactJavaTargets() {
@@ -208,6 +216,51 @@ public final class MyBatisXmlReferenceContributorTest extends BasePlatformTestCa
         assertEquals(1, resultMapReferences.size());
     }
 
+    public void testSearchExecutorAcquiresReadActionForEnumConstantOnBackgroundThread()
+            throws Exception {
+        PsiEnumConstant constant = addEnumConstant();
+        ReferencesSearch.SearchParameters parameters = searchParameters(constant);
+
+        boolean completed = executeWithoutCallerReadAction(parameters);
+
+        assertTrue(completed);
+        List<PsiSearchRequest> requests = parameters.getOptimizer().takeSearchRequests();
+        assertSize(1, requests);
+        assertEquals("ACTIVE", requests.get(0).word);
+    }
+
+    public void testSearchExecutorPropagatesCancellation() {
+        ReferencesSearch.SearchParameters parameters = searchParameters(addEnumConstant());
+        EmptyProgressIndicator indicator = new EmptyProgressIndicator();
+        try {
+            ProgressManager.getInstance().runProcess(
+                    () -> {
+                        indicator.cancel();
+                        return new MyBatisXmlReferencesSearchExecutor().execute(
+                                parameters,
+                                reference -> true);
+                    },
+                    indicator);
+            fail("取消后的引用搜索调度必须抛出 ProcessCanceledException");
+        } catch (ProcessCanceledException expected) {
+            // 取消是平台正常控制流，读动作边界不得吞掉。
+        }
+        assertEmpty(parameters.getOptimizer().takeSearchRequests());
+    }
+
+    public void testSearchExecutorIgnoresInvalidPsiWithoutScheduling() throws Exception {
+        PsiEnumConstant constant = addEnumConstant();
+        ReferencesSearch.SearchParameters parameters = searchParameters(constant);
+        PsiJavaFile file = (PsiJavaFile) constant.getContainingFile();
+        WriteCommandAction.runWriteCommandAction(getProject(), file::delete);
+        assertFalse(constant.isValid());
+
+        boolean completed = executeWithoutCallerReadAction(parameters);
+
+        assertTrue(completed);
+        assertEmpty(parameters.getOptimizer().takeSearchRequests());
+    }
+
     public void testUnsupportedDynamicPrefixedAndNestedAttributesHaveNoReference() {
         configureMapperXml("""
                 <mapper namespace="com.example.UserMapper" xmlns:x="urn:test">
@@ -301,6 +354,36 @@ public final class MyBatisXmlReferenceContributorTest extends BasePlatformTestCa
         return ((com.intellij.psi.PsiJavaFile) myFixture.addFileToProject(
                 "src/main/java/com/example/UserMapper.java",
                 source)).getClasses()[0];
+    }
+
+    private PsiEnumConstant addEnumConstant() {
+        PsiJavaFile file = (PsiJavaFile) myFixture.addFileToProject(
+                "src/main/java/com/example/Status.java",
+                """
+                        package com.example;
+                        public enum Status { ACTIVE }
+                        """);
+        PsiElement field = file.getClasses()[0].findFieldByName("ACTIVE", false);
+        assertTrue(field instanceof PsiEnumConstant);
+        return (PsiEnumConstant) field;
+    }
+
+    private ReferencesSearch.SearchParameters searchParameters(PsiElement target) {
+        return new ReferencesSearch.SearchParameters(
+                target,
+                GlobalSearchScope.projectScope(getProject()),
+                false);
+    }
+
+    private boolean executeWithoutCallerReadAction(
+            ReferencesSearch.SearchParameters parameters) throws Exception {
+        return AppExecutorUtil.getAppExecutorService().submit(() -> {
+            assertFalse("测试入口必须真实运行在无读锁的后台线程",
+                    ApplicationManager.getApplication().isReadAccessAllowed());
+            return new MyBatisXmlReferencesSearchExecutor().execute(
+                    parameters,
+                    reference -> true);
+        }).get(5, TimeUnit.SECONDS);
     }
 
     private XmlFile configureMapperXml(String source) {

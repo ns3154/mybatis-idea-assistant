@@ -6,6 +6,7 @@ import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElementResolveResult;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiPolyVariantReferenceBase;
 import com.intellij.psi.ResolveResult;
 import com.intellij.psi.xml.XmlAttributeValue;
@@ -43,7 +44,7 @@ final class MyBatisXmlSymbolReference extends PsiPolyVariantReferenceBase<XmlAtt
     }
 
     @Override
-    public ResolveResult @NotNull [] multiResolve(boolean incompleteCode) {
+    public @NotNull ResolveResult[] multiResolve(boolean incompleteCode) {
         ProgressManager.checkCanceled();
         if (!getElement().isValid()) {
             return ResolveResult.EMPTY_ARRAY;
@@ -72,6 +73,25 @@ final class MyBatisXmlSymbolReference extends PsiPolyVariantReferenceBase<XmlAtt
         } catch (IndexNotReadyException ignored) {
             return ResolveResult.EMPTY_ARRAY;
         }
+    }
+
+    @Override
+    public boolean isReferenceTo(@NotNull PsiElement element) {
+        ResolveResult[] results = multiResolve(false);
+        return results.length == 1
+                && element.getManager().areElementsEquivalent(
+                element,
+                results[0].getElement());
+    }
+
+    @Override
+    public PsiElement handleElementRename(@NotNull String newElementName) {
+        String current = getRangeInElement().substring(getElement().getText());
+        int separator = current.lastIndexOf('.');
+        String replacement = separator < 0
+                ? newElementName
+                : current.substring(0, separator + 1) + newElementName;
+        return MyBatisReferenceRenameSupport.renameRange(this, replacement);
     }
 
     private record QualifiedSymbol(@NotNull String namespace, @NotNull String id) {

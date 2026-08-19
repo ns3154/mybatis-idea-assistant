@@ -88,7 +88,8 @@ final class CreateMyBatisMapperXmlQuickFix extends ModCommandQuickFix {
                     XMLLanguage.INSTANCE,
                     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                             + "<mapper namespace=\"" + namespace + "\">\n"
-                            + "    <!-- TODO: 添加 statement -->\n"
+                            + "    <!-- " + MyBatisAssistantBundle.message(
+                            "quickfix.create.mapper.xml.todo") + " -->\n"
                             + "</mapper>\n");
             PsiElement added = mapperDirectory.add(template);
             CodeStyleManager.getInstance(project).reformat(added);

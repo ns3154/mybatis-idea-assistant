@@ -20,4 +20,116 @@
         INSERT INTO users (username, email)
         VALUES (#{username}, #{email})
     </insert>
+
+    <insert id="insertBatch">
+        <bind name="_mybatisAssistantBatchEntities" value="@java.util.Collections@list(@java.util.Collections@enumeration(@java.util.Objects@requireNonNull(entities)))"/>
+        <bind name="_mybatisAssistantBatchFirst" value="_mybatisAssistantBatchEntities.iterator().next()"/>
+        <bind name="_mybatisAssistantBatchNullFree" value="@java.util.Objects@checkIndex(@java.util.Collections@frequency(_mybatisAssistantBatchEntities, null), 1)"/>
+        INSERT INTO "users" ("username", "email") VALUES
+        <foreach collection="_mybatisAssistantBatchEntities" item="entity" separator=",">
+            (#{entity.username,jdbcType=VARCHAR}, #{entity.email,jdbcType=VARCHAR})
+        </foreach>
+    </insert>
+
+    <!-- 以下 statement 锁定 S9 方法名 SQL 生成器的真实 MyBatis/H2 行为。 -->
+    <select id="findByUsernameContainingAndIdGreaterThanOrderByIdDesc"
+            resultType="io.github.mybatisideaassistant.sample.domain.User">
+        <bind name="usernamePattern" value="'%' + username + '%'"/>
+        SELECT "id", "username", "email" FROM "users"
+        WHERE "username" LIKE #{usernamePattern}
+          AND "id" &gt; #{id,jdbcType=BIGINT}
+        ORDER BY "id" DESC
+    </select>
+
+    <select id="findByIdIn"
+            resultType="io.github.mybatisideaassistant.sample.domain.User">
+        SELECT "id", "username", "email" FROM "users"
+        WHERE
+        <choose>
+            <when test="idValues != null and !idValues.isEmpty() and @java.util.Collections@frequency(idValues, null) == 0">
+                "id" IN
+                <foreach collection="idValues" item="item" open="(" separator="," close=")">
+                    #{item,jdbcType=BIGINT}
+                </foreach>
+            </when>
+            <otherwise>1 = 0</otherwise>
+        </choose>
+    </select>
+
+    <select id="findByIdInOrUsername"
+            resultType="io.github.mybatisideaassistant.sample.domain.User">
+        SELECT "id", "username", "email" FROM "users"
+        WHERE
+        <choose>
+            <when test="idValues != null and !idValues.isEmpty() and @java.util.Collections@frequency(idValues, null) == 0">
+                "id" IN
+                <foreach collection="idValues" item="item" open="(" separator="," close=")">
+                    #{item,jdbcType=BIGINT}
+                </foreach>
+                OR "username" = #{username,jdbcType=VARCHAR}
+            </when>
+            <otherwise>1 = 0</otherwise>
+        </choose>
+    </select>
+
+    <select id="findByUsernameAndEmail"
+            resultType="io.github.mybatisideaassistant.sample.domain.User">
+        SELECT "id", "username", "email" FROM "users"
+        <where>
+            <if test="username != null">AND "username" = #{username,jdbcType=VARCHAR}</if>
+            <if test="email != null">AND "email" = #{email,jdbcType=VARCHAR}</if>
+        </where>
+    </select>
+
+    <update id="updateEmailById">
+        UPDATE "users" SET "email" = #{newEmail,jdbcType=VARCHAR}
+        WHERE "id" = #{id,jdbcType=BIGINT}
+    </update>
+
+    <update id="updateEmailByIdIn">
+        UPDATE "users" SET "email" = #{newEmail,jdbcType=VARCHAR}
+        WHERE
+        <choose>
+            <when test="idValues != null and !idValues.isEmpty() and @java.util.Collections@frequency(idValues, null) == 0">
+                "id" IN
+                <foreach collection="idValues" item="item" open="(" separator="," close=")">
+                    #{item,jdbcType=BIGINT}
+                </foreach>
+            </when>
+            <otherwise>1 = 0</otherwise>
+        </choose>
+    </update>
+
+    <update id="updateEmailByIdInOrUsername">
+        UPDATE "users" SET "email" = #{newEmail,jdbcType=VARCHAR}
+        WHERE
+        <choose>
+            <when test="idValues != null and !idValues.isEmpty() and @java.util.Collections@frequency(idValues, null) == 0">
+                "id" IN
+                <foreach collection="idValues" item="item" open="(" separator="," close=")">
+                    #{item,jdbcType=BIGINT}
+                </foreach>
+                OR "username" = #{username,jdbcType=VARCHAR}
+            </when>
+            <otherwise>1 = 0</otherwise>
+        </choose>
+    </update>
+
+    <delete id="deleteByIdIn">
+        DELETE FROM "users" WHERE
+        <choose>
+            <when test="idValues != null and !idValues.isEmpty() and @java.util.Collections@frequency(idValues, null) == 0">
+                "id" IN
+                <foreach collection="idValues" item="item" open="(" separator="," close=")">
+                    #{item,jdbcType=BIGINT}
+                </foreach>
+            </when>
+            <otherwise>1 = 0</otherwise>
+        </choose>
+    </delete>
+
+    <select id="countByUsername" resultType="long">
+        SELECT COUNT(*) FROM "users"
+        WHERE "username" = #{username,jdbcType=VARCHAR}
+    </select>
 </mapper>

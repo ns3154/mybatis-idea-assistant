@@ -1,0 +1,7 @@
+MyBatis Assistant
+版权所有 2026 ns3154
+
+本产品依据 Apache License 2.0 许可分发，完整英文许可证见 LICENSE 文件。
+
+插件发布包不捆绑 IntelliJ Platform、MyBatis、数据库驱动，或本源码仓库使用的
+构建与测试工具。相关名称与商标归各自权利人所有。

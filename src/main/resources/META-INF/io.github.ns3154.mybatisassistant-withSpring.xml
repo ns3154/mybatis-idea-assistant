@@ -1,5 +1,7 @@
 <idea-plugin>
     <extensions defaultExtensionNs="com.intellij">
-        <!-- Spring 能力在 S11 实现时只在本描述符中注册。 -->
+        <codeInsight.lineMarkerProvider
+                language="JAVA"
+                implementationClass="io.github.ns3154.mybatisassistant.spring.MyBatisSpringInjectionLineMarkerProvider"/>
     </extensions>
 </idea-plugin>

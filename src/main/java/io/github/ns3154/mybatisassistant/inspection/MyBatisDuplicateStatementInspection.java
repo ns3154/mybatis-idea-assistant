@@ -91,7 +91,8 @@ public final class MyBatisDuplicateStatementInspection extends LocalInspectionTo
         }
 
         private @NotNull String displayName() {
-            return Objects.requireNonNullElse(value, "默认");
+            return Objects.requireNonNullElse(value, MyBatisAssistantBundle.message(
+                    "inspection.duplicate.statement.database.default"));
         }
     }
 }

@@ -1,0 +1,9 @@
+# IntelliJ IDEA 默认忽略文件
+/shelf/
+/workspace.xml
+# HTTP Client 请求
+/httpRequests/
+# 数据库查询与本地数据源状态
+/queries/
+/dataSources/
+/dataSources.local.xml

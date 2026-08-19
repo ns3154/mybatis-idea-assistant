@@ -1,0 +1,44 @@
+<component name="InspectionProjectProfileManager">
+    <profile version="1.0">
+        <option name="myName" value="MyBatis Assistant 生命周期验收"/>
+        <inspection_tool
+                class="MyBatisDuplicateStatement"
+                enabled="true"
+                level="WARNING"
+                enabled_by_default="true"/>
+        <inspection_tool
+                class="MyBatisMissingStatement"
+                enabled="true"
+                level="WARNING"
+                enabled_by_default="true"/>
+        <!--
+        lifecycle-inspection-corpus 中 findSummary 没有对应 Mapper 方法。该检查必须
+        稳定产出且在 MyBatis 检查结果中仅产出这一条问题，生命周期脚本据此证明插件
+        检查确实执行过，而不是只证明 IDEA 进程以 0 退出。
+        -->
+        <inspection_tool
+                class="MyBatisUnusedStatement"
+                enabled="true"
+                level="WARNING"
+                enabled_by_default="true"/>
+        <!--
+        生命周期门只验证本插件的确定性语义检查。Package Checker 依赖项目同步与
+        外部漏洞数据，显式关闭可避免其无界面同步超时污染长稳结果。
+        -->
+        <inspection_tool
+                class="VulnerableLibrariesGlobal"
+                enabled="false"
+                level="WARNING"
+                enabled_by_default="false"/>
+        <inspection_tool
+                class="VulnerableLibrariesLocal"
+                enabled="false"
+                level="WARNING"
+                enabled_by_default="false"/>
+        <inspection_tool
+                class="MaliciousLibrariesLocal"
+                enabled="false"
+                level="WARNING"
+                enabled_by_default="false"/>
+    </profile>
+</component>

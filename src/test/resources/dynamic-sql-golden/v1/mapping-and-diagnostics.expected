@@ -1,0 +1,80 @@
+format=dynamic-sql-golden-v1
+fixture="mapping-and-diagnostics"
+statement="mapped"
+  result=COMPILED
+  diagnostics=0
+  root:
+    text:
+      value="select * from scores where score > 10 and grade < 5 and active = 1"
+      source-map virtual-length=66 segments=6
+        segment kind=EXACT virtual=[0,33) source=mapping-and-diagnostics.xml:[69,102)
+        segment kind=DECODED virtual=[33,34) source=mapping-and-diagnostics.xml:[102,106)
+        segment kind=EXACT virtual=[34,48) source=mapping-and-diagnostics.xml:[106,120)
+        segment kind=DECODED virtual=[48,49) source=mapping-and-diagnostics.xml:[120,124)
+        segment kind=EXACT virtual=[49,52) source=mapping-and-diagnostics.xml:[124,127)
+        segment kind=EXACT virtual=[52,66) source=mapping-and-diagnostics.xml:[136,150)
+  static-sql:
+    value="select * from scores where score > 10 and grade < 5 and active = 1"
+    source-map virtual-length=66 segments=6
+      segment kind=EXACT virtual=[0,33) source=mapping-and-diagnostics.xml:[69,102)
+      segment kind=DECODED virtual=[33,34) source=mapping-and-diagnostics.xml:[102,106)
+      segment kind=EXACT virtual=[34,48) source=mapping-and-diagnostics.xml:[106,120)
+      segment kind=DECODED virtual=[48,49) source=mapping-and-diagnostics.xml:[120,124)
+      segment kind=EXACT virtual=[49,52) source=mapping-and-diagnostics.xml:[124,127)
+      segment kind=EXACT virtual=[52,66) source=mapping-and-diagnostics.xml:[136,150)
+statement="invalid"
+  result=COMPILED
+  diagnostics=5
+    diagnostic code=MISSING_REQUIRED_ATTRIBUTE message="when 缺少非空 test 属性" source=mapping-and-diagnostics.xml:[234,255)
+    diagnostic code=DUPLICATE_OTHERWISE message="choose 只能包含一个 otherwise" source=mapping-and-diagnostics.xml:[312,343)
+    diagnostic code=INVALID_CHOOSE_CHILD message="choose 只允许 when 和 otherwise，实际为：if" source=mapping-and-diagnostics.xml:[356,383)
+    diagnostic code=INVALID_BOOLEAN_ATTRIBUTE message="foreach 的 nullable 必须是 true 或 false" source=mapping-and-diagnostics.xml:[410,474)
+    diagnostic code=UNSUPPORTED_DYNAMIC_TAG message="S5 当前尚未编译动态标签：unknown" source=mapping-and-diagnostics.xml:[483,513)
+  root:
+    sequence children=7
+      text:
+        value="\n        "
+        source-map virtual-length=9 segments=1
+          segment kind=EXACT virtual=[0,9) source=mapping-and-diagnostics.xml:[204,213)
+      choose branches=1 otherwise=true source=mapping-and-diagnostics.xml:[213,401)
+        when index=0 source=mapping-and-diagnostics.xml:[234,255)
+          condition text="" source=mapping-and-diagnostics.xml:[234,255)
+          body:
+            text:
+              value="select 1"
+              source-map virtual-length=8 segments=1
+                segment kind=EXACT virtual=[0,8) source=mapping-and-diagnostics.xml:[240,248)
+        otherwise:
+          text:
+            value="select 2"
+            source-map virtual-length=8 segments=1
+              segment kind=EXACT virtual=[0,8) source=mapping-and-diagnostics.xml:[279,287)
+      text:
+        value="\n        "
+        source-map virtual-length=9 segments=1
+          segment kind=EXACT virtual=[0,9) source=mapping-and-diagnostics.xml:[401,410)
+      foreach open="" close="" separator="" nullable=<unset> source=mapping-and-diagnostics.xml:[410,474)
+        collection text="ids" source=mapping-and-diagnostics.xml:[431,434)
+        bindings=2
+          binding name="item" kind=FOREACH_ITEM source=mapping-and-diagnostics.xml:[410,474)
+            initializer=<none>
+          binding name="index" kind=FOREACH_INDEX source=mapping-and-diagnostics.xml:[410,474)
+            initializer=<none>
+        body:
+          text:
+            value="#{item}"
+            source-map virtual-length=7 segments=1
+              segment kind=EXACT virtual=[0,7) source=mapping-and-diagnostics.xml:[457,464)
+      text:
+        value="\n        "
+        source-map virtual-length=9 segments=1
+          segment kind=EXACT virtual=[0,9) source=mapping-and-diagnostics.xml:[474,483)
+      text:
+        value="unavailable"
+        source-map virtual-length=11 segments=1
+          segment kind=EXACT virtual=[0,11) source=mapping-and-diagnostics.xml:[492,503)
+      text:
+        value="\n    "
+        source-map virtual-length=5 segments=1
+          segment kind=EXACT virtual=[0,5) source=mapping-and-diagnostics.xml:[513,518)
+  static-sql=<dynamic>

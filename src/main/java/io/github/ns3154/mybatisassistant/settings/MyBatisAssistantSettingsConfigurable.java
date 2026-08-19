@@ -1,6 +1,7 @@
 package io.github.ns3154.mybatisassistant.settings;
 
 import com.intellij.openapi.options.SearchableConfigurable;
+import com.intellij.openapi.options.ConfigurationException;
 import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
@@ -26,6 +27,9 @@ public final class MyBatisAssistantSettingsConfigurable implements SearchableCon
     @Override
     public @Nullable JComponent createComponent() {
         settingsPanel = new MyBatisAssistantSettingsPanel();
+        settingsPanel.setImportAction(this::importSettings);
+        settingsPanel.setExportAction(this::exportSettings);
+        settingsPanel.setRestoreDefaultsAction(settingsPanel::restoreDefaults);
         settingsPanel.resetFrom(MyBatisAssistantSettings.getInstance());
         return settingsPanel.getComponent();
     }
@@ -41,9 +45,13 @@ public final class MyBatisAssistantSettingsConfigurable implements SearchableCon
     }
 
     @Override
-    public void apply() {
+    public void apply() throws ConfigurationException {
         if (settingsPanel != null) {
-            settingsPanel.applyTo(MyBatisAssistantSettings.getInstance());
+            try {
+                settingsPanel.applyTo(MyBatisAssistantSettings.getInstance());
+            } catch (IllegalArgumentException failure) {
+                throw new ConfigurationException(failure.getMessage());
+            }
         }
     }
 
@@ -61,5 +69,23 @@ public final class MyBatisAssistantSettingsConfigurable implements SearchableCon
 
     MyBatisAssistantSettingsPanel getSettingsPanel() {
         return settingsPanel;
+    }
+
+    private void importSettings() {
+        if (settingsPanel == null) {
+            return;
+        }
+        MyBatisAssistantSettingsTransferDialog dialog =
+                MyBatisAssistantSettingsTransferDialog.importDialog();
+        if (dialog.showAndGet()) {
+            settingsPanel.resetFromState(dialog.importedState());
+        }
+    }
+
+    private void exportSettings() {
+        if (settingsPanel != null) {
+            MyBatisAssistantSettingsTransferDialog.exportDialog(
+                    settingsPanel.exportText()).show();
+        }
     }
 }

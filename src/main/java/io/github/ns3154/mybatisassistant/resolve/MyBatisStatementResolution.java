@@ -2,6 +2,7 @@ package io.github.ns3154.mybatisassistant.resolve;
 
 import com.intellij.psi.SmartPsiElementPointer;
 import com.intellij.psi.xml.XmlTag;
+import io.github.ns3154.mybatisassistant.MyBatisAssistantBundle;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -34,7 +35,8 @@ public sealed interface MyBatisStatementResolution {
         public MultipleMatches {
             targets = List.copyOf(targets);
             if (targets.size() < 2) {
-                throw new IllegalArgumentException("多候选结果至少需要两个目标");
+                throw new IllegalArgumentException(MyBatisAssistantBundle.message(
+                        "resolve.error.multiple.targets.minimum"));
             }
         }
     }

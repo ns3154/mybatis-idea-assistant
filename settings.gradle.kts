@@ -4,6 +4,7 @@ rootProject.name = "mybatis-idea-assistant"
 
 pluginManagement {
     plugins {
+        id("org.cyclonedx.bom") version "3.4.1"
         id("org.jetbrains.intellij.platform") version "2.18.1"
     }
 }

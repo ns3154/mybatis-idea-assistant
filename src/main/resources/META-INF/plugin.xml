@@ -4,9 +4,17 @@
     <vendor url="https://github.com/ns3154/mybatis-idea-assistant">ns3154</vendor>
 
     <description><![CDATA[
-        <p>MyBatis Assistant provides conservative MyBatis navigation, inspection, and incremental semantic models for IntelliJ IDEA.</p>
-        <p>当前开发预览版提供双向精确导航、XML/Java 引用、保守检查、安全 Quick Fix，以及 XML 符号、Java/Kotlin Mapper、配置、TypeAlias 和模块可见性的增量语义模型。</p>
+        <p>MyBatis Assistant provides conservative MyBatis navigation, inspections, references, refactoring, dynamic SQL analysis, database metadata, code generation, and local SQL tools for IntelliJ IDEA.</p>
+        <p>支持 Java、Kotlin K2、XML、OGNL、Spring、MyBatis-Plus/Flex/TkMapper、六类数据库方言、可选 Database Tools 与 Community JDBC。所有数据库生成与 MCP 写操作都先预览，再复核冲突并使用可撤销 IDE Command。</p>
+        <p>默认离线；本地 MCP 默认关闭且只绑定 127.0.0.1，使用随机内存令牌和工具白名单。插件不包含遥测，不会把项目源码、SQL、数据库结构或凭据上传给维护者。</p>
     ]]></description>
+
+    <extensionPoints>
+        <extensionPoint
+                name="databaseMetadataProvider"
+                interface="io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataProvider"
+                dynamic="true"/>
+    </extensionPoints>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>
@@ -18,7 +26,20 @@
 
     <resource-bundle>messages.MyBatisAssistantBundle</resource-bundle>
 
+    <extensions defaultExtensionNs="io.github.ns3154.mybatis-idea-assistant">
+        <databaseMetadataProvider
+                implementation="io.github.ns3154.mybatisassistant.database.jdbc.MyBatisJdbcMetadataProvider"/>
+    </extensions>
+
     <extensions defaultExtensionNs="com.intellij">
+        <lang.parserDefinition
+                language="MyBatisOGNL"
+                implementationClass="io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlParserDefinition"/>
+        <lang.syntaxHighlighterFactory
+                language="MyBatisOGNL"
+                implementationClass="io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlSyntaxHighlighterFactory"/>
+        <multiHostInjector
+                implementation="io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlXmlInjector"/>
         <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisXmlSymbolIndex"/>
         <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisConfigurationIndex"/>
         <fileBasedIndex implementation="io.github.ns3154.mybatisassistant.index.MyBatisBootConfigurationIndex"/>
@@ -28,8 +49,22 @@
         <psi.referenceContributor
                 language="JAVA"
                 implementation="io.github.ns3154.mybatisassistant.reference.MyBatisJavaReferenceContributor"/>
+        <psi.referenceContributor
+                language="MyBatisOGNL"
+                implementation="io.github.ns3154.mybatisassistant.reference.MyBatisOgnlReferenceContributor"/>
+        <completion.contributor
+                language="MyBatisOGNL"
+                implementationClass="io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlCompletionContributor"/>
         <referencesSearch
                 implementation="io.github.ns3154.mybatisassistant.reference.MyBatisXmlReferencesSearchExecutor"/>
+        <renamePsiElementProcessor
+                implementation="io.github.ns3154.mybatisassistant.refactoring.MyBatisParamRenameProcessor"/>
+        <renameHandler
+                implementation="io.github.ns3154.mybatisassistant.refactoring.MyBatisParamRenameHandler"/>
+        <renamePsiElementProcessor
+                implementation="io.github.ns3154.mybatisassistant.refactoring.MyBatisXmlSymbolRenameProcessor"/>
+        <renamePsiElementProcessor
+                implementation="io.github.ns3154.mybatisassistant.refactoring.MyBatisOgnlBindingRenameProcessor"/>
         <codeInsight.lineMarkerProvider
                 language="JAVA"
                 implementationClass="io.github.ns3154.mybatisassistant.navigation.MyBatisMapperLineMarkerProvider"/>
@@ -64,6 +99,15 @@
                 level="WEAK WARNING"
                 implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisMissingParamAnnotationInspection"/>
         <localInspection
+                language="JAVA"
+                shortName="MyBatisInvalidAnnotationParameter"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.invalid.annotation.parameter.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisInvalidAnnotationParameterInspection"/>
+        <localInspection
                 language="XML"
                 shortName="MyBatisInvalidNamespace"
                 bundle="messages.MyBatisAssistantBundle"
@@ -90,14 +134,64 @@
                 enabledByDefault="false"
                 level="WARNING"
                 implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisUnusedStatementInspection"/>
+        <localInspection
+                language="XML"
+                shortName="MyBatisDangerousStatement"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.dangerous.statement.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="false"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisDangerousStatementInspection"/>
+        <localInspection
+                language="XML"
+                shortName="MyBatisInvalidParameterPath"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.invalid.parameter.path.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisInvalidParameterPathInspection"/>
+        <localInspection
+                language="XML"
+                shortName="MyBatisInvalidResultMapping"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.invalid.result.mapping.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisInvalidResultMappingInspection"/>
+        <localInspection
+                language="MyBatisOGNL"
+                shortName="MyBatisOgnlUnresolvedSymbol"
+                bundle="messages.MyBatisAssistantBundle"
+                key="inspection.ognl.unresolved.symbol.display.name"
+                groupKey="inspection.group.name"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="io.github.ns3154.mybatisassistant.inspection.MyBatisOgnlUnresolvedSymbolInspection"/>
         <applicationService
                 serviceImplementation="io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettings"/>
+        <projectService
+                serviceImplementation="io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataService"/>
+        <projectService
+                serviceImplementation="io.github.ns3154.mybatisassistant.database.jdbc.MyBatisJdbcDataSourceManager"/>
+        <projectService
+                serviceImplementation="io.github.ns3154.mybatisassistant.mcp.MyBatisMcpProjectService"/>
+        <postStartupActivity
+                implementation="io.github.ns3154.mybatisassistant.mcp.MyBatisMcpStartupActivity"/>
         <applicationConfigurable
                 parentId="tools"
                 id="io.github.ns3154.mybatisassistant.settings"
                 instance="io.github.ns3154.mybatisassistant.settings.MyBatisAssistantSettingsConfigurable"
                 bundle="messages.MyBatisAssistantBundle"
                 key="settings.display.name"/>
+        <projectConfigurable
+                parentId="tools"
+                id="io.github.ns3154.mybatisassistant.settings.jdbc"
+                instance="io.github.ns3154.mybatisassistant.settings.MyBatisJdbcDataSourcesConfigurable"
+                bundle="messages.MyBatisAssistantBundle"
+                key="settings.jdbc.display.name"/>
         <notificationGroup
                 id="MyBatis Assistant"
                 key="notification.group.name"
@@ -106,4 +200,50 @@
     <extensions defaultExtensionNs="org.jetbrains.kotlin">
         <supportsKotlinPluginMode supportsK2="true"/>
     </extensions>
+    <actions>
+        <action
+                id="MyBatisAssistant.Mcp.CopyConnection"
+                class="io.github.ns3154.mybatisassistant.mcp.MyBatisMcpCopyConnectionAction">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action
+                id="MyBatisAssistant.SqlTool.RestoreLogSql"
+                class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisLogSqlRestoreAction">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action
+                id="MyBatisAssistant.SqlTool.FormatMapperXml"
+                class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisXmlFormatAction">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+        <action
+                id="MyBatisAssistant.SqlTool.DdlToArtifacts"
+                class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisDdlToArtifactsAction">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action
+                id="MyBatisAssistant.SqlTool.SelectToArtifacts"
+                class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisSelectToArtifactsAction">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action
+                id="MyBatisAssistant.SqlTool.JavaToDdl"
+                class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisJavaToDdlAction">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+        <action
+                id="MyBatisAssistant.SqlTool.MapperJUnitSkeleton"
+                class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisMapperJUnitSkeletonAction">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+        <action
+                id="MyBatisAssistant.SqlTool.MigrateAnnotationSql"
+                class="io.github.ns3154.mybatisassistant.sqltool.intellij.MyBatisAnnotationSqlMigrateAction">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>

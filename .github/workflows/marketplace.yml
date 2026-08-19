@@ -1,0 +1,294 @@
+name: 发布已签名候选到 Marketplace
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 已生成草稿 Release 的不可变 v* 标签
+        required: true
+        type: string
+      channel:
+        description: 必须与标签版本后缀一致
+        required: true
+        type: choice
+        options:
+          - alpha
+          - beta
+          - rc
+          - default
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketplace-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: 发布同一签名制品
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: ${{ inputs.channel == 'default' && 'marketplace-production' || 'marketplace-preview' }}
+    permissions:
+      contents: read
+      attestations: read
+    outputs:
+      prerelease: ${{ steps.release.outputs.prerelease }}
+      candidate_sha: ${{ steps.release.outputs.candidate_sha }}
+
+    steps:
+      - name: 检出可信发布工具
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          fetch-depth: 0
+
+      - name: 固定发布工具提交
+        run: test "$(git rev-parse HEAD)" = "${{ github.workflow_sha }}"
+
+      - name: 配置 Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: zulu
+          java-version: 21
+
+      - name: 配置 Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+
+      - name: 校验标签、渠道与默认分支
+        id: release
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_CHANNEL: ${{ inputs.channel }}
+        run: |
+          version="${INPUT_TAG#v}"
+          ./scripts/validate-release-inputs.sh \
+            "${version}" "${INPUT_CHANNEL}" workflow_dispatch tag "${INPUT_TAG}" \
+            >> "${GITHUB_OUTPUT}"
+          git fetch --force origin \
+            main:refs/remotes/origin/main \
+            "refs/tags/${INPUT_TAG}:refs/tags/${INPUT_TAG}"
+          candidate_sha="$(git rev-parse "refs/tags/${INPUT_TAG}^{commit}")"
+          if ! git merge-base --is-ancestor "${candidate_sha}" refs/remotes/origin/main; then
+            echo "Marketplace 只能发布 main 已包含的标签提交" >&2
+            exit 1
+          fi
+          echo "candidate_sha=${candidate_sha}" >> "${GITHUB_OUTPUT}"
+
+      - name: 下载 GitHub Release 中的同一签名制品
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_json="$(gh release view "${{ inputs.tag }}" \
+            --json isDraft,tagName,assets)"
+          if [[ "$(jq -r .tagName <<<"${release_json}")" != "${{ inputs.tag }}" ]]; then
+            echo "Release 标签与请求不一致" >&2
+            exit 1
+          fi
+          if [[ "$(jq -r .isDraft <<<"${release_json}")" != "true" ]]; then
+            echo "Marketplace 发布前 GitHub Release 必须保持草稿状态" >&2
+            exit 1
+          fi
+          mapfile -t release_assets < <(jq -r '.assets[].name' <<<"${release_json}")
+          signed_asset_count=0
+          bom_json_count=0
+          bom_xml_count=0
+          checksums_count=0
+          metadata_count=0
+          notes_count=0
+          for asset_name in "${release_assets[@]}"; do
+            case "${asset_name}" in
+              *-signed.zip) signed_asset_count=$((signed_asset_count + 1)) ;;
+              bom.json) bom_json_count=$((bom_json_count + 1)) ;;
+              bom.xml) bom_xml_count=$((bom_xml_count + 1)) ;;
+              SHA256SUMS) checksums_count=$((checksums_count + 1)) ;;
+              release-metadata.txt) metadata_count=$((metadata_count + 1)) ;;
+              release-notes.md) notes_count=$((notes_count + 1)) ;;
+              *)
+                echo "Release 包含未经允许的资产：${asset_name}" >&2
+                exit 1
+                ;;
+            esac
+          done
+          if [[ "${#release_assets[@]}" -ne 6 \
+              || "${signed_asset_count}" -ne 1 \
+              || "${bom_json_count}" -ne 1 \
+              || "${bom_xml_count}" -ne 1 \
+              || "${checksums_count}" -ne 1 \
+              || "${metadata_count}" -ne 1 \
+              || "${notes_count}" -ne 1 ]]; then
+            echo "Release 资产必须恰为 1 个签名 ZIP 和 5 个固定文件" >&2
+            exit 1
+          fi
+          mkdir -p build/marketplace-input
+          gh release download "${{ inputs.tag }}" \
+            --pattern '*-signed.zip' \
+            --pattern 'bom.json' \
+            --pattern 'bom.xml' \
+            --pattern 'SHA256SUMS' \
+            --pattern 'release-metadata.txt' \
+            --pattern 'release-notes.md' \
+            --dir build/marketplace-input
+          (cd build/marketplace-input && sha256sum -c SHA256SUMS)
+          grep -qx \
+            "commit=${{ steps.release.outputs.candidate_sha }}" \
+            build/marketplace-input/release-metadata.txt
+
+          mapfile -t signed_zips < <(
+            find build/marketplace-input -maxdepth 1 -type f \
+              -name '*-signed.zip' -print
+          )
+          if [[ "${#signed_zips[@]}" -ne 1 ]]; then
+            echo "Marketplace 签名 ZIP 数量必须为 1，实际为 ${#signed_zips[@]}" >&2
+            exit 1
+          fi
+          signed_zip="${signed_zips[0]}"
+          ./scripts/verify-plugin-archive-identity.sh \
+            "${signed_zip}" "${{ steps.release.outputs.version }}"
+          gh attestation verify "${signed_zip}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow \
+              "${GITHUB_REPOSITORY}/.github/workflows/release.yml" \
+            --source-ref "refs/tags/${{ inputs.tag }}" \
+            --source-digest "${{ steps.release.outputs.candidate_sha }}" \
+            --deny-self-hosted-runners
+          gh attestation verify build/marketplace-input/SHA256SUMS \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow \
+              "${GITHUB_REPOSITORY}/.github/workflows/release.yml" \
+            --source-ref "refs/tags/${{ inputs.tag }}" \
+            --source-digest "${{ steps.release.outputs.candidate_sha }}" \
+            --deny-self-hosted-runners
+
+      - name: 验证 Marketplace 已完成首次人工建档
+        run: |
+          response="$(mktemp)"
+          status="$(curl --silent --show-error --output "${response}" --write-out '%{http_code}' \
+            --get 'https://plugins.jetbrains.com/plugins/list' \
+            --data-urlencode 'pluginId=io.github.ns3154.mybatis-idea-assistant')"
+          if [[ "${status}" == "404" ]]; then
+            echo "Marketplace 尚无插件条目；首次发布必须先由维护者人工上传并决定 Hidden 状态" >&2
+            exit 1
+          fi
+          if [[ "${status}" != "200" ]] || \
+            ! grep -Fq 'io.github.ns3154.mybatis-idea-assistant' "${response}"; then
+            echo "无法确认 Marketplace 插件身份，停止自动发布（HTTP ${status}）" >&2
+            exit 1
+          fi
+
+      - name: 发布签名候选
+        env:
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+        run: |
+          if [[ -z "${PUBLISH_TOKEN}" ]]; then
+            echo "受保护环境缺少 PUBLISH_TOKEN" >&2
+            exit 1
+          fi
+          mapfile -t signed_zips < <(
+            find build/marketplace-input -maxdepth 1 -type f \
+              -name '*-signed.zip' -print
+          )
+          if [[ "${#signed_zips[@]}" -ne 1 ]]; then
+            echo "待发布签名 ZIP 数量必须为 1，实际为 ${#signed_zips[@]}" >&2
+            exit 1
+          fi
+          signed_zip="${signed_zips[0]}"
+          ./gradlew publishPlugin -x signPlugin -x buildPlugin \
+            -PpluginVersion=${{ steps.release.outputs.version }} \
+            -PpluginChannel=${{ steps.release.outputs.channel }} \
+            -PpluginArchiveFile="${signed_zip}"
+
+  finalize-release:
+    name: Marketplace 成功后发布 GitHub Release
+    if: github.ref == 'refs/heads/main'
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: release-github
+    permissions:
+      contents: write
+      attestations: read
+
+    steps:
+      - name: 重新核验并发布同一草稿 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          release_json="$(gh release view "${{ inputs.tag }}" \
+            --json isDraft,tagName,assets)"
+          test "$(jq -r .tagName <<<"${release_json}")" = "${{ inputs.tag }}"
+          test "$(jq -r .isDraft <<<"${release_json}")" = "true"
+
+          mapfile -t release_assets < <(jq -r '.assets[].name' <<<"${release_json}")
+          signed_asset_count=0
+          bom_json_count=0
+          bom_xml_count=0
+          checksums_count=0
+          metadata_count=0
+          notes_count=0
+          for asset_name in "${release_assets[@]}"; do
+            case "${asset_name}" in
+              *-signed.zip) signed_asset_count=$((signed_asset_count + 1)) ;;
+              bom.json) bom_json_count=$((bom_json_count + 1)) ;;
+              bom.xml) bom_xml_count=$((bom_xml_count + 1)) ;;
+              SHA256SUMS) checksums_count=$((checksums_count + 1)) ;;
+              release-metadata.txt) metadata_count=$((metadata_count + 1)) ;;
+              release-notes.md) notes_count=$((notes_count + 1)) ;;
+              *)
+                echo "Release 包含未经允许的资产：${asset_name}" >&2
+                exit 1
+                ;;
+            esac
+          done
+          if [[ "${#release_assets[@]}" -ne 6 \
+              || "${signed_asset_count}" -ne 1 \
+              || "${bom_json_count}" -ne 1 \
+              || "${bom_xml_count}" -ne 1 \
+              || "${checksums_count}" -ne 1 \
+              || "${metadata_count}" -ne 1 \
+              || "${notes_count}" -ne 1 ]]; then
+            echo "Release 资产必须恰为 1 个签名 ZIP 和 5 个固定文件" >&2
+            exit 1
+          fi
+
+          mkdir -p release-finalize-input
+          gh release download "${{ inputs.tag }}" \
+            --pattern '*-signed.zip' \
+            --pattern 'bom.json' \
+            --pattern 'bom.xml' \
+            --pattern 'SHA256SUMS' \
+            --pattern 'release-metadata.txt' \
+            --pattern 'release-notes.md' \
+            --dir release-finalize-input
+          (cd release-finalize-input && sha256sum -c SHA256SUMS)
+          grep -qx \
+            "commit=${{ needs.publish.outputs.candidate_sha }}" \
+            release-finalize-input/release-metadata.txt
+          mapfile -t signed_zips < <(
+            find release-finalize-input -maxdepth 1 -type f \
+              -name '*-signed.zip' -print
+          )
+          test "${#signed_zips[@]}" -eq 1
+          gh attestation verify "${signed_zips[0]}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow \
+              "${GITHUB_REPOSITORY}/.github/workflows/release.yml" \
+            --source-ref "refs/tags/${{ inputs.tag }}" \
+            --source-digest "${{ needs.publish.outputs.candidate_sha }}" \
+            --deny-self-hosted-runners
+          gh attestation verify release-finalize-input/SHA256SUMS \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow \
+              "${GITHUB_REPOSITORY}/.github/workflows/release.yml" \
+            --source-ref "refs/tags/${{ inputs.tag }}" \
+            --source-digest "${{ needs.publish.outputs.candidate_sha }}" \
+            --deny-self-hosted-runners
+
+          release_args=("${{ inputs.tag }}" --draft=false)
+          if [[ "${{ needs.publish.outputs.prerelease }}" == "true" ]]; then
+            release_args+=(--prerelease)
+          fi
+          gh release edit "${release_args[@]}" --repo "${GITHUB_REPOSITORY}"

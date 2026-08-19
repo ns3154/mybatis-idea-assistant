@@ -13,6 +13,7 @@ import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiJavaFile;
@@ -29,6 +30,7 @@ import com.intellij.psi.PsiManager;
 import com.intellij.testFramework.PsiTestUtil;
 import com.intellij.testFramework.VfsTestUtil;
 import com.intellij.testFramework.HeavyPlatformTestCase;
+import com.intellij.refactoring.rename.RenameProcessor;
 import io.github.ns3154.mybatisassistant.resolve.MyBatisStatementResolution;
 import io.github.ns3154.mybatisassistant.resolve.MyBatisStatementResolver;
 import io.github.ns3154.mybatisassistant.resolve.MyBatisMapperMethodResolver;
@@ -36,6 +38,11 @@ import io.github.ns3154.mybatisassistant.resolve.MyBatisProviderMethodResolver;
 import io.github.ns3154.mybatisassistant.inspection.MyBatisDuplicateStatementInspection;
 import io.github.ns3154.mybatisassistant.inspection.MyBatisInvalidNamespaceInspection;
 import io.github.ns3154.mybatisassistant.inspection.MyBatisUnusedStatementInspection;
+import io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlOccurrence;
+import io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlSemanticAnalyzer;
+import io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlSemanticModel;
+import io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlSemanticStatus;
+import io.github.ns3154.mybatisassistant.ognl.MyBatisOgnlSymbolKind;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -332,6 +339,107 @@ public final class MyBatisMultiModuleScopeTest extends HeavyPlatformTestCase {
                 .getResults());
         assertEmpty(inspect(new MyBatisUnusedStatementInspection(), appXml, statement)
                 .getResults());
+    }
+
+    public void testMapperMethodRenameDoesNotCrossIntoUnrelatedModule() throws Exception {
+        addModule("app");
+        addModule("unrelated");
+        PsiFile mapperFile = addModuleFile("app", "src/com/example/UserMapper.java", """
+                package com.example;
+                public interface UserMapper { Object findById(Long id); }
+                """);
+        PsiFile appXml = addModuleFile("app", "resources/mapper/UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <select id="findById">select 1</select>
+                </mapper>
+                """);
+        PsiFile unrelatedXml = addModuleFile(
+                "unrelated",
+                "resources/mapper/UserMapper.xml",
+                """
+                        <mapper namespace="com.example.UserMapper">
+                            <select id="findById">select 2</select>
+                        </mapper>
+                        """);
+        PsiMethod method = ((PsiJavaFile) mapperFile).getClasses()[0].getMethods()[0];
+
+        new RenameProcessor(getProject(), method, "findRenamed", false, false).run();
+        PsiDocumentManager.getInstance(getProject()).commitAllDocuments();
+
+        assertTrue(mapperFile.getText().contains("findRenamed("));
+        assertTrue(appXml.getText().contains("id=\"findRenamed\""));
+        assertTrue("无依赖模块中的同名 XML 不得被跨模块误写",
+                unrelatedXml.getText().contains("id=\"findById\""));
+    }
+
+    public void testOgnlMapperAndStaticTypesFollowXmlModuleScope() throws Exception {
+        Module app = addModule("app");
+        Module visible = addModule("visible");
+        Module unrelated = addModule("unrelated");
+        XmlFile xml = (XmlFile) addModuleFile("app", "resources/mapper/UserMapper.xml", """
+                <mapper namespace="com.example.UserMapper">
+                    <select id="find">
+                        <if test="query.name != null and @com.shared.Constants@MAX > 0">x</if>
+                    </select>
+                </mapper>
+                """);
+        addModuleFile("visible", "src/com/example/UserMapper.java", """
+                package com.example;
+                public interface UserMapper { Object find(com.example.Query query); }
+                """);
+        addModuleFile("visible", "src/com/example/Query.java", """
+                package com.example;
+                public class Query { public String getName() { return ""; } }
+                """);
+        PsiFile visibleConstants = addModuleFile(
+                "visible",
+                "src/com/shared/Constants.java",
+                """
+                package com.shared;
+                public final class Constants { public static final int MAX = 1; }
+                """);
+        addModuleFile("unrelated", "src/com/shared/Constants.java", """
+                package com.shared;
+                public final class Constants { public static final int MAX = 2; }
+                """);
+        XmlAttributeValue source = PsiTreeUtil.findChildrenOfType(
+                xml,
+                XmlAttribute.class).stream()
+                .filter(attribute -> "test".equals(attribute.getName()))
+                .map(XmlAttribute::getValueElement)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(
+                MyBatisOgnlSemanticStatus.UNSUPPORTED_SOURCE,
+                ReadAction.compute(() -> MyBatisOgnlSemanticAnalyzer.analyze(source))
+                        .rootResult().status());
+
+        ModuleRootModificationUtil.addDependency(app, visible);
+        MyBatisOgnlSemanticModel resolved = ReadAction.compute(
+                () -> MyBatisOgnlSemanticAnalyzer.analyze(source));
+        assertEquals(MyBatisOgnlSemanticStatus.FOUND, resolved.rootResult().status());
+        MyBatisOgnlOccurrence staticClass = resolved.occurrences().stream()
+                .filter(occurrence -> occurrence.kind() == MyBatisOgnlSymbolKind.STATIC_CLASS)
+                .findFirst()
+                .orElseThrow();
+        assertSize(1, staticClass.result().targets());
+        assertEquals(
+                visibleConstants.getVirtualFile(),
+                staticClass.result().targets().getFirst().getContainingFile().getVirtualFile());
+
+        ModuleRootModificationUtil.addDependency(app, unrelated);
+        MyBatisOgnlSemanticModel ambiguous = ReadAction.compute(
+                () -> MyBatisOgnlSemanticAnalyzer.analyze(source));
+        MyBatisOgnlOccurrence ambiguousMember = ambiguous.occurrences().stream()
+                .filter(occurrence -> occurrence.kind()
+                        == MyBatisOgnlSymbolKind.STATIC_MEMBER)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(MyBatisOgnlSemanticStatus.UNKNOWN,
+                ambiguousMember.result().status());
+        assertEmpty(ambiguousMember.result().targets());
     }
 
     private Module addModule(String name) throws Exception {

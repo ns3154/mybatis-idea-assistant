@@ -1,0 +1,35 @@
+<component name="InspectionProjectProfileManager">
+    <profile version="1.0">
+        <option name="myName" value="MyBatis Assistant 可选依赖隔离验收"/>
+        <!--
+        隔离门只验证不依赖 Kotlin、Spring、YAML、Database Tools 的核心检查。
+        专用语料中 findSummary 没有对应 Mapper 方法，因此必须精确产出一条；
+        其他默认检查全部保持关闭，防止可选插件禁用后产生无关诊断噪声。
+        -->
+        <inspection_tool
+                class="MyBatisUnusedStatement"
+                enabled="true"
+                level="WARNING"
+                enabled_by_default="true"/>
+        <!--
+        Package Checker 的检查依赖项目同步与外部漏洞数据。在无界面隔离门中显式
+        关闭，避免其 10 分钟同步超时掩盖 MyBatis 核心检查结果；隔离脚本仍会对
+        其余平台异常和所有本插件异常严格失败。
+        -->
+        <inspection_tool
+                class="VulnerableLibrariesGlobal"
+                enabled="false"
+                level="WARNING"
+                enabled_by_default="false"/>
+        <inspection_tool
+                class="VulnerableLibrariesLocal"
+                enabled="false"
+                level="WARNING"
+                enabled_by_default="false"/>
+        <inspection_tool
+                class="MaliciousLibrariesLocal"
+                enabled="false"
+                level="WARNING"
+                enabled_by_default="false"/>
+    </profile>
+</component>

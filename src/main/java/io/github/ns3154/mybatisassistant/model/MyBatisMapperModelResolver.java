@@ -31,6 +31,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -114,7 +115,7 @@ public final class MyBatisMapperModelResolver {
                         project);
         List<Object> dependencies = new ArrayList<>();
         dependencies.add(sourceFileTracker);
-        collectDeclaringFileTrackers(mapper, dependencies);
+        collectHierarchyFileTrackers(mapper, dependencies);
         dependencies.add(MyBatisMapperScanRegistry.getInstance(project).getModificationTracker());
         dependencies.add(indexTracker);
         dependencies.add(configurationIndexTracker);
@@ -136,6 +137,7 @@ public final class MyBatisMapperModelResolver {
         }
 
         List<MyBatisMapperEvidence> evidence = new ArrayList<>();
+        List<MyBatisFrameworkMapperBinding> frameworkBindings = new ArrayList<>();
         GlobalSearchScope scope = mapper.getResolveScope();
         List<XmlTag> mapperRoots = MyBatisXmlSymbolLocator.findMapperRoots(
                 project,
@@ -153,17 +155,44 @@ public final class MyBatisMapperModelResolver {
         }
         evidence.addAll(MyBatisMapperScanRegistry.getInstance(project).findEvidence(mapper));
         collectConfigurationEvidence(project, qualifiedName, scope, evidence);
+        MyBatisFrameworkMapperResolution frameworkResolution =
+                MyBatisFrameworkMapperResolver.resolve(mapper);
+        if (frameworkResolution instanceof MyBatisFrameworkMapperResolution.IndexNotReady) {
+            return new MyBatisMapperModelResolution.IndexNotReady();
+        }
+        if (frameworkResolution instanceof MyBatisFrameworkMapperResolution.SourceInvalid) {
+            return new MyBatisMapperModelResolution.SourceInvalid();
+        }
+        if (frameworkResolution instanceof MyBatisFrameworkMapperResolution.Unsupported) {
+            return new MyBatisMapperModelResolution.UnsupportedSource();
+        }
+        if (frameworkResolution instanceof MyBatisFrameworkMapperResolution.Found found) {
+            MyBatisFrameworkMapperBinding binding = found.binding();
+            frameworkBindings.add(binding);
+            evidence.add(new MyBatisMapperEvidence(
+                    MyBatisMapperEvidenceKind.FRAMEWORK_BASE_MAPPER,
+                    binding.framework().displayName()
+                            + "#entity=" + binding.entity().qualifiedName()));
+        }
         if (evidence.isEmpty()) {
             return new MyBatisMapperModelResolution.NotMapper();
         }
 
-        List<MyBatisMapperMethodModel> methods = collectMethods(mapper);
+        List<MyBatisMapperMethodModel> methods = collectMethods(
+                mapper,
+                frameworkBindings);
         evidence.sort(Comparator.comparing(item -> item.kind().name()));
         return new MyBatisMapperModelResolution.Found(
-                new MyBatisMapperModel(qualifiedName, evidence, methods));
+                new MyBatisMapperModel(
+                        qualifiedName,
+                        evidence,
+                        methods,
+                        frameworkBindings));
     }
 
-    private static @NotNull List<MyBatisMapperMethodModel> collectMethods(@NotNull PsiClass mapper) {
+    private static @NotNull List<MyBatisMapperMethodModel> collectMethods(
+            @NotNull PsiClass mapper,
+            @NotNull List<MyBatisFrameworkMapperBinding> frameworkBindings) {
         List<MyBatisMapperMethodModel> methods = new ArrayList<>();
         Set<String> stableSignatures = new LinkedHashSet<>();
         for (HierarchicalMethodSignature signature : mapper.getVisibleSignatures()) {
@@ -183,6 +212,12 @@ public final class MyBatisMapperModelResolver {
                     method,
                     declaringClass,
                     signature.getSubstitutor());
+            if (isFrameworkMethod(
+                    declaringClass,
+                    model.stableSignature(),
+                    frameworkBindings)) {
+                continue;
+            }
             if (stableSignatures.add(model.stableSignature())) {
                 methods.add(model);
             }
@@ -190,6 +225,24 @@ public final class MyBatisMapperModelResolver {
         methods.sort(Comparator.comparing(MyBatisMapperMethodModel::stableSignature)
                 .thenComparing(MyBatisMapperMethodModel::declaringType));
         return List.copyOf(methods);
+    }
+
+    private static boolean isFrameworkMethod(
+            @NotNull PsiClass declaringClass,
+            @NotNull String stableSignature,
+            @NotNull List<MyBatisFrameworkMapperBinding> frameworkBindings) {
+        String declaringType = declaringClass.getQualifiedName();
+        if (declaringType == null) {
+            return false;
+        }
+        for (MyBatisFrameworkMapperBinding binding : frameworkBindings) {
+            ProgressManager.checkCanceled();
+            if (binding.frameworkDeclaringTypes().contains(declaringType)
+                    && binding.frameworkMethodSignatures().contains(stableSignature)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void collectConfigurationEvidence(
@@ -265,7 +318,7 @@ public final class MyBatisMapperModelResolver {
         return !project.isDisposed() && project.isOpen() && mapper.isValid();
     }
 
-    private static void collectDeclaringFileTrackers(
+    private static void collectHierarchyFileTrackers(
             @NotNull PsiClass mapper,
             @NotNull List<Object> dependencies) {
         Set<PsiFile> files = new LinkedHashSet<>();
@@ -277,6 +330,27 @@ public final class MyBatisMapperModelResolver {
                         ? file.getModificationStamp()
                         : Long.MAX_VALUE);
             }
+        }
+        collectSuperTypeFileTrackers(mapper, files, new HashSet<>(), dependencies);
+    }
+
+    private static void collectSuperTypeFileTrackers(
+            @NotNull PsiClass type,
+            @NotNull Set<PsiFile> files,
+            @NotNull Set<PsiClass> visited,
+            @NotNull List<Object> dependencies) {
+        if (!visited.add(type)) {
+            return;
+        }
+        for (PsiClass superType : type.getSupers()) {
+            ProgressManager.checkCanceled();
+            PsiFile file = superType.getContainingFile();
+            if (file != null && file.isValid() && files.add(file)) {
+                dependencies.add((ModificationTracker) () -> file.isValid()
+                        ? file.getModificationStamp()
+                        : Long.MAX_VALUE);
+            }
+            collectSuperTypeFileTrackers(superType, files, visited, dependencies);
         }
     }
 

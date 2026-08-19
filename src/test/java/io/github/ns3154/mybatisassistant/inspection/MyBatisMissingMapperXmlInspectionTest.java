@@ -106,6 +106,40 @@ public final class MyBatisMissingMapperXmlInspectionTest extends BasePlatformTes
         assertEmpty(warnings());
     }
 
+    public void testFrameworkBaseMethodsDoNotRequireXmlButCustomMethodDoes() {
+        myFixture.addFileToProject(
+                "src/main/java/com/baomidou/mybatisplus/core/mapper/BaseMapper.java",
+                """
+                        package com.baomidou.mybatisplus.core.mapper;
+                        public interface BaseMapper<T> {
+                            int insert(T entity);
+                            T selectById(Object id);
+                        }
+                        """);
+        configureJava("""
+                package com.example;
+                public interface UserMapper
+                        extends com.baomidou.mybatisplus.core.mapper.BaseMapper<User> {}
+                final class User {}
+                """);
+        assertEmpty(warnings());
+
+        configureJava("""
+                package com.example;
+                public interface UserMapper
+                        extends com.baomidou.mybatisplus.core.mapper.BaseMapper<User> {
+                    User findByName(String name);
+                }
+                final class User {}
+                """);
+
+        List<HighlightInfo> customWarnings = warnings();
+        assertSize(1, customWarnings);
+        assertEquals(
+                "已确认的 Mapper 接口缺少 Mapper XML：com.example.UserMapper",
+                customWarnings.getFirst().getDescription());
+    }
+
     public void testExistingMapperXmlSuppressesWarning() {
         myFixture.addFileToProject("resources/mapper/UserMapper.xml", """
                 <mapper namespace="com.example.UserMapper">

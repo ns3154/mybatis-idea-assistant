@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="io.github.mybatisideaassistant.lifecycle.UserMapper">
+    <select id="findById">
+        SELECT 1
+    </select>
+
+    <!-- 唯一预期问题：没有对应 Java Mapper 方法。 -->
+    <select id="findSummary">
+        SELECT 1
+    </select>
+</mapper>

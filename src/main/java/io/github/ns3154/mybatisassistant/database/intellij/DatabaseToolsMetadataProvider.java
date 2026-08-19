@@ -1,0 +1,298 @@
+package io.github.ns3154.mybatisassistant.database.intellij;
+
+import com.intellij.database.Dbms;
+import com.intellij.database.model.DasColumn;
+import com.intellij.database.model.DasForeignKey;
+import com.intellij.database.model.DasObject;
+import com.intellij.database.model.DasTable;
+import com.intellij.database.model.ObjectKind;
+import com.intellij.database.psi.DbDataSource;
+import com.intellij.database.psi.DbPsiFacade;
+import com.intellij.database.types.DasBuiltinType;
+import com.intellij.database.types.DasType;
+import com.intellij.database.types.DasTypeCategory;
+import com.intellij.database.types.DasTypeFacade;
+import com.intellij.database.util.DasUtil;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.project.Project;
+import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseColumn;
+import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseMetadataProvider;
+import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseObjectKind;
+import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseRequest;
+import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseSnapshot;
+import io.github.ns3154.mybatisassistant.database.MyBatisDatabaseTable;
+import io.github.ns3154.mybatisassistant.database.MyBatisForeignKeyReference;
+import io.github.ns3154.mybatisassistant.database.MyBatisMetadataFreshness;
+import io.github.ns3154.mybatisassistant.database.MyBatisSqlDialect;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * 只读取 Database Tools 已加载模型的可选适配器，不主动连接或刷新。
+ */
+public final class DatabaseToolsMetadataProvider implements MyBatisDatabaseMetadataProvider {
+    private static final String PROVIDER_ID = "jetbrains-database-tools";
+
+    @Override
+    public @NotNull String id() {
+        return PROVIDER_ID;
+    }
+
+    @Override
+    public @NotNull List<MyBatisDatabaseSnapshot> load(
+            @NotNull Project project,
+            @NotNull MyBatisDatabaseRequest request,
+            @NotNull ProgressIndicator indicator) {
+        DatabaseToolsMetadataInvalidationService.getInstance(project);
+        List<MyBatisDatabaseSnapshot> snapshots = new ArrayList<>();
+        for (DbDataSource dataSource : DbPsiFacade.getInstance(project).getDataSources()) {
+            indicator.checkCanceled();
+            if (request.dataSourceId().isPresent()
+                    && !request.dataSourceId().orElseThrow().equals(dataSource.getUniqueId())) {
+                continue;
+            }
+            snapshots.add(snapshot(dataSource, indicator));
+        }
+        snapshots.sort(Comparator.comparing(MyBatisDatabaseSnapshot::displayName)
+                .thenComparing(MyBatisDatabaseSnapshot::dataSourceId));
+        return List.copyOf(snapshots);
+    }
+
+    static @NotNull MyBatisDatabaseSnapshot snapshot(
+            @NotNull DbDataSource dataSource,
+            @NotNull ProgressIndicator indicator) {
+        List<MyBatisDatabaseTable> tables = new ArrayList<>();
+        for (DasObject object : dataSource.getModel().traverser()) {
+            indicator.checkCanceled();
+            if (object instanceof DasTable table) {
+                tables.add(table(table, indicator));
+            }
+        }
+        tables.sort(Comparator
+                .comparing((MyBatisDatabaseTable table) -> table.schema().orElse(""))
+                .thenComparing(MyBatisDatabaseTable::name));
+        return new MyBatisDatabaseSnapshot(
+                dataSource.getUniqueId(),
+                dataSource.getName(),
+                dialect(dataSource.getDbms()),
+                dataSource.isLoading()
+                        ? MyBatisMetadataFreshness.LOADING
+                        : MyBatisMetadataFreshness.READY,
+                Math.max(0, dataSource.getModificationTracker().getModificationCount()),
+                tables);
+    }
+
+    static @NotNull MyBatisDatabaseTable table(
+            @NotNull DasTable table,
+            @NotNull ProgressIndicator indicator) {
+        List<MyBatisDatabaseColumn> columns = new ArrayList<>();
+        Map<String, MyBatisForeignKeyReference> foreignKeyReferences =
+                foreignKeyReferences(table, indicator);
+        for (DasObject child : table.getDasChildren(ObjectKind.COLUMN)) {
+            indicator.checkCanceled();
+            if (!(child instanceof DasColumn column)) {
+                continue;
+            }
+            Set<DasColumn.Attribute> attributes = table.getColumnAttrs(column);
+            columns.add(new MyBatisDatabaseColumn(
+                    column.getName(),
+                    column.getDasType().getSpecification(),
+                    jdbcType(column),
+                    !column.isNotNull(),
+                    attributes.contains(DasColumn.Attribute.PRIMARY_KEY),
+                    attributes.contains(DasColumn.Attribute.FOREIGN_KEY),
+                    DasUtil.isAutoGenerated(column),
+                    DasUtil.isComputed(column),
+                    Optional.ofNullable(nonBlank(column.getComment())),
+                    Math.max(0, column.getPosition()),
+                    Optional.ofNullable(foreignKeyReferences.get(column.getName()))));
+        }
+        columns.sort(Comparator.comparingInt(MyBatisDatabaseColumn::position)
+                .thenComparing(MyBatisDatabaseColumn::name));
+        return new MyBatisDatabaseTable(
+                namespace(table, ObjectKind.DATABASE),
+                namespace(table, ObjectKind.SCHEMA),
+                table.getName(),
+                Optional.ofNullable(nonBlank(table.getComment())),
+                isView(table)
+                        ? MyBatisDatabaseObjectKind.VIEW
+                        : MyBatisDatabaseObjectKind.TABLE,
+                columns);
+    }
+
+    private static @NotNull Map<String, MyBatisForeignKeyReference> foreignKeyReferences(
+            @NotNull DasTable table,
+            @NotNull ProgressIndicator indicator) {
+        Map<String, Set<MyBatisForeignKeyReference>> candidates = new HashMap<>();
+        for (DasForeignKey foreignKey : DasUtil.getForeignKeys(table)) {
+            indicator.checkCanceled();
+            Optional<ReferencedTable> referencedTable = referencedTable(foreignKey);
+            if (referencedTable.isEmpty()) {
+                continue;
+            }
+            List<String> foreignColumns = names(foreignKey.getColumnsRef().names());
+            List<String> primaryColumns = names(foreignKey.getRefColumns().names());
+            if (foreignColumns.isEmpty() || foreignColumns.size() != primaryColumns.size()) {
+                continue;
+            }
+            ReferencedTable target = referencedTable.orElseThrow();
+            for (int index = 0; index < foreignColumns.size(); index++) {
+                MyBatisForeignKeyReference reference = new MyBatisForeignKeyReference(
+                        target.catalog(),
+                        target.schema(),
+                        target.table(),
+                        primaryColumns.get(index),
+                        Optional.ofNullable(nonBlank(foreignKey.getName())),
+                        index + 1,
+                        foreignColumns.size());
+                candidates.computeIfAbsent(
+                                foreignColumns.get(index), ignored -> new java.util.HashSet<>())
+                        .add(reference);
+            }
+        }
+        Map<String, MyBatisForeignKeyReference> references = new HashMap<>();
+        candidates.forEach((column, targets) -> {
+            if (targets.size() == 1) {
+                references.put(column, targets.iterator().next());
+            }
+        });
+        return Map.copyOf(references);
+    }
+
+    private static @NotNull Optional<ReferencedTable> referencedTable(
+            @NotNull DasForeignKey foreignKey) {
+        DasTable resolved = foreignKey.getRefTable();
+        String tableName = nonBlank(foreignKey.getRefTableName());
+        if (tableName == null && resolved != null) {
+            tableName = nonBlank(resolved.getName());
+        }
+        if (tableName == null) {
+            return Optional.empty();
+        }
+        Optional<String> catalog = Optional.ofNullable(
+                nonBlank(foreignKey.getRefTableCatalog()));
+        Optional<String> schema = Optional.ofNullable(
+                nonBlank(foreignKey.getRefTableSchema()));
+        if (resolved != null) {
+            if (catalog.isEmpty()) {
+                catalog = namespace(resolved, ObjectKind.DATABASE);
+            }
+            if (schema.isEmpty()) {
+                schema = namespace(resolved, ObjectKind.SCHEMA);
+            }
+        }
+        return Optional.of(new ReferencedTable(catalog, schema, tableName));
+    }
+
+    private static @NotNull List<String> names(@NotNull Iterable<String> values) {
+        List<String> names = new ArrayList<>();
+        for (String value : values) {
+            String name = nonBlank(value);
+            if (name == null) {
+                return List.of();
+            }
+            names.add(name);
+        }
+        return List.copyOf(names);
+    }
+
+    private static boolean isView(@NotNull DasTable table) {
+        ObjectKind kind = DasUtil.getKind(table);
+        return ObjectKind.VIEW.equals(kind) || ObjectKind.MAT_VIEW.equals(kind);
+    }
+
+    private static @NotNull Optional<String> namespace(
+            @NotNull DasObject object,
+            @NotNull ObjectKind kind) {
+        DasObject current = object.getDasParent();
+        while (current != null) {
+            if (kind.equals(current.getKind())) {
+                return Optional.ofNullable(nonBlank(current.getName()));
+            }
+            current = current.getDasParent();
+        }
+        return Optional.empty();
+    }
+
+    private static int jdbcType(@NotNull DasColumn column) {
+        DasType resolved = DasTypeFacade.resolve(column.getDasType(), column);
+        if (!(resolved instanceof DasBuiltinType<?> builtin)) {
+            return java.sql.Types.OTHER;
+        }
+        DasTypeCategory category = builtin.getTypeClass().getCategory();
+        if (category == DasTypeCategory.INTEGER) {
+            return java.sql.Types.BIGINT;
+        }
+        if (category == DasTypeCategory.REAL) {
+            return java.sql.Types.DECIMAL;
+        }
+        if (category == DasTypeCategory.STRING || category == DasTypeCategory.ENUM) {
+            return java.sql.Types.VARCHAR;
+        }
+        if (category == DasTypeCategory.BOOLEAN) {
+            return java.sql.Types.BOOLEAN;
+        }
+        if (category == DasTypeCategory.DATE) {
+            return java.sql.Types.DATE;
+        }
+        if (category == DasTypeCategory.TIME) {
+            return java.sql.Types.TIME;
+        }
+        if (category == DasTypeCategory.DATE_TIME
+                || category == DasTypeCategory.TIMESTAMP) {
+            return java.sql.Types.TIMESTAMP;
+        }
+        if (category == DasTypeCategory.BYTES) {
+            return java.sql.Types.VARBINARY;
+        }
+        return java.sql.Types.OTHER;
+    }
+
+    private static @Nullable String nonBlank(@Nullable String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    static @NotNull MyBatisSqlDialect dialect(@NotNull Dbms dbms) {
+        MyBatisSqlDialect explicit = dialectName(dbms.getName());
+        if (explicit != MyBatisSqlDialect.GENERIC) {
+            return explicit;
+        }
+        if (dbms.isMysql()) {
+            return MyBatisSqlDialect.MYSQL;
+        }
+        if (dbms.isPostgres()) {
+            return MyBatisSqlDialect.POSTGRESQL;
+        }
+        if (dbms.isOracle()) {
+            return MyBatisSqlDialect.ORACLE;
+        }
+        if (dbms.isMicrosoft()) {
+            return MyBatisSqlDialect.SQL_SERVER;
+        }
+        if (dbms.isSqlite()) {
+            return MyBatisSqlDialect.SQLITE;
+        }
+        if (dbms.isH2()) {
+            return MyBatisSqlDialect.H2;
+        }
+        return MyBatisSqlDialect.GENERIC;
+    }
+
+    static @NotNull MyBatisSqlDialect dialectName(@Nullable String dbmsName) {
+        return MyBatisSqlDialect.fromDatabaseId(dbmsName);
+    }
+
+    private record ReferencedTable(
+            @NotNull Optional<String> catalog,
+            @NotNull Optional<String> schema,
+            @NotNull String table) {
+    }
+}

@@ -51,6 +51,16 @@ public final class MyBatisTypeAliasResolver {
             Map.entry("double", "java.lang.Double"),
             Map.entry("float", "java.lang.Float"),
             Map.entry("boolean", "java.lang.Boolean"),
+            Map.entry("byte[]", "java.lang.Byte[]"),
+            Map.entry("char[]", "java.lang.Character[]"),
+            Map.entry("character[]", "java.lang.Character[]"),
+            Map.entry("long[]", "java.lang.Long[]"),
+            Map.entry("short[]", "java.lang.Short[]"),
+            Map.entry("int[]", "java.lang.Integer[]"),
+            Map.entry("integer[]", "java.lang.Integer[]"),
+            Map.entry("double[]", "java.lang.Double[]"),
+            Map.entry("float[]", "java.lang.Float[]"),
+            Map.entry("boolean[]", "java.lang.Boolean[]"),
             Map.entry("date", "java.util.Date"),
             Map.entry("decimal", "java.math.BigDecimal"),
             Map.entry("bigdecimal", "java.math.BigDecimal"),
@@ -62,6 +72,7 @@ public final class MyBatisTypeAliasResolver {
             Map.entry("arraylist", "java.util.ArrayList"),
             Map.entry("collection", "java.util.Collection"),
             Map.entry("iterator", "java.util.Iterator"),
+            Map.entry("resultset", "java.sql.ResultSet"),
             Map.entry("_byte", "byte"),
             Map.entry("_char", "char"),
             Map.entry("_character", "char"),
@@ -71,7 +82,22 @@ public final class MyBatisTypeAliasResolver {
             Map.entry("_integer", "int"),
             Map.entry("_double", "double"),
             Map.entry("_float", "float"),
-            Map.entry("_boolean", "boolean"));
+            Map.entry("_boolean", "boolean"),
+            Map.entry("_byte[]", "byte[]"),
+            Map.entry("_char[]", "char[]"),
+            Map.entry("_character[]", "char[]"),
+            Map.entry("_long[]", "long[]"),
+            Map.entry("_short[]", "short[]"),
+            Map.entry("_int[]", "int[]"),
+            Map.entry("_integer[]", "int[]"),
+            Map.entry("_double[]", "double[]"),
+            Map.entry("_float[]", "float[]"),
+            Map.entry("_boolean[]", "boolean[]"),
+            Map.entry("date[]", "java.util.Date[]"),
+            Map.entry("decimal[]", "java.math.BigDecimal[]"),
+            Map.entry("bigdecimal[]", "java.math.BigDecimal[]"),
+            Map.entry("biginteger[]", "java.math.BigInteger[]"),
+            Map.entry("object[]", "java.lang.Object[]"));
 
     private MyBatisTypeAliasResolver() {
     }
@@ -126,6 +152,46 @@ public final class MyBatisTypeAliasResolver {
         }
     }
 
+    /**
+     * 返回当前模块可见的保守 TypeAlias 补全候选。
+     */
+    public static @NotNull List<String> variants(@NotNull PsiElement context) {
+        ProgressManager.checkCanceled();
+        if (!context.isValid()) {
+            return List.of();
+        }
+        Project project = context.getProject();
+        if (project.isDisposed() || !project.isOpen() || DumbService.isDumb(project)) {
+            return List.of();
+        }
+        try {
+            GlobalSearchScope scope = context.getResolveScope();
+            Set<String> aliases = new LinkedHashSet<>(BUILT_IN_ALIASES.keySet());
+            for (XmlTag declaration : MyBatisConfigurationLocator.findAll(
+                    project,
+                    MyBatisConfigurationEntryKind.TYPE_ALIAS,
+                    scope)) {
+                ProgressManager.checkCanceled();
+                String alias = declaration.getAttributeValue("alias");
+                String type = declaration.getAttributeValue("type");
+                String effective = alias == null || alias.isBlank()
+                        ? simpleName(type)
+                        : alias.trim();
+                if (effective != null && !effective.isBlank()) {
+                    aliases.add(effective);
+                }
+            }
+            List<String> packages = aliasPackages(project, scope);
+            if (!packages.isEmpty()) {
+                AliasClassDirectory directory = aliasClassDirectory(context, scope);
+                collectPackageAliasVariants(project, scope, packages, directory, aliases);
+            }
+            return aliases.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        } catch (IndexNotReadyException ignored) {
+            return List.of();
+        }
+    }
+
     private static void collectExplicitAliases(
             @NotNull Project project,
             @NotNull GlobalSearchScope scope,
@@ -157,24 +223,7 @@ public final class MyBatisTypeAliasResolver {
             @NotNull GlobalSearchScope scope,
             @NotNull String alias,
             @NotNull Set<String> targets) {
-        List<String> collectedPackages = MyBatisConfigurationLocator.findAll(
-                        project,
-                        MyBatisConfigurationEntryKind.TYPE_ALIAS_PACKAGE,
-                        scope)
-                .stream()
-                .map(tag -> tag.getAttributeValue("name"))
-                .filter(java.util.Objects::nonNull)
-                .map(String::trim)
-                .filter(name -> !name.isEmpty())
-                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-        collectedPackages.addAll(MyBatisBootConfigurationLocator.findAll(
-                        project,
-                        MyBatisBootConfigurationEntryKind.TYPE_ALIASES_PACKAGE,
-                        scope)
-                .stream()
-                .map(MyBatisBootConfigurationEntry::value)
-                .toList());
-        List<String> packages = collectedPackages.stream().distinct().toList();
+        List<String> packages = aliasPackages(project, scope);
         if (packages.isEmpty()) {
             return;
         }
@@ -196,6 +245,67 @@ public final class MyBatisTypeAliasResolver {
                 targets.add(qualifiedName);
             }
         }
+    }
+
+    private static @NotNull List<String> aliasPackages(
+            @NotNull Project project,
+            @NotNull GlobalSearchScope scope) {
+        List<String> collectedPackages = MyBatisConfigurationLocator.findAll(
+                        project,
+                        MyBatisConfigurationEntryKind.TYPE_ALIAS_PACKAGE,
+                        scope)
+                .stream()
+                .map(tag -> tag.getAttributeValue("name"))
+                .filter(java.util.Objects::nonNull)
+                .map(String::trim)
+                .filter(name -> !name.isEmpty())
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        collectedPackages.addAll(MyBatisBootConfigurationLocator.findAll(
+                        project,
+                        MyBatisBootConfigurationEntryKind.TYPE_ALIASES_PACKAGE,
+                        scope)
+                .stream()
+                .map(MyBatisBootConfigurationEntry::value)
+                .toList());
+        return collectedPackages.stream().distinct().toList();
+    }
+
+    private static void collectPackageAliasVariants(
+            @NotNull Project project,
+            @NotNull GlobalSearchScope scope,
+            @NotNull List<String> packages,
+            @NotNull AliasClassDirectory directory,
+            @NotNull Set<String> aliases) {
+        PsiShortNamesCache shortNames = PsiShortNamesCache.getInstance(project);
+        for (Map.Entry<String, List<String>> entry : directory.classNames().entrySet()) {
+            ProgressManager.checkCanceled();
+            for (String className : entry.getValue()) {
+                for (PsiClass candidate : shortNames.getClassesByName(className, scope)) {
+                    ProgressManager.checkCanceled();
+                    String qualifiedName = candidate.getQualifiedName();
+                    if (qualifiedName != null && packages.stream().anyMatch(
+                            packageName -> qualifiedName.startsWith(packageName + '.'))) {
+                        String alias = annotationAlias(candidate);
+                        aliases.add(alias == null ? className : alias);
+                    }
+                }
+            }
+        }
+        for (Map.Entry<String, List<String>> entry : directory.annotatedTypes().entrySet()) {
+            if (entry.getValue().stream().anyMatch(qualifiedName -> packages.stream().anyMatch(
+                    packageName -> qualifiedName.startsWith(packageName + '.')))) {
+                aliases.add(entry.getKey());
+            }
+        }
+    }
+
+    private static @Nullable String simpleName(@Nullable String canonicalType) {
+        if (canonicalType == null || canonicalType.isBlank()) {
+            return null;
+        }
+        String trimmed = canonicalType.trim();
+        int separator = Math.max(trimmed.lastIndexOf('.'), trimmed.lastIndexOf('$'));
+        return separator < 0 ? trimmed : trimmed.substring(separator + 1);
     }
 
     private static @NotNull AliasClassDirectory aliasClassDirectory(

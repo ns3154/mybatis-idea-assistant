@@ -11,7 +11,8 @@ public record MyBatisMapperEvidence(
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(detail, "detail");
         if (detail.isBlank()) {
-            throw new IllegalArgumentException("Mapper 识别证据不能为空");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.mapper.evidence.empty"));
         }
     }
 }

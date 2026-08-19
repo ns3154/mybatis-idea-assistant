@@ -88,6 +88,43 @@ public final class MyBatisKotlinMapperModelTest extends BasePlatformTestCase {
         assertEquals(MyBatisStatementSourceKind.ANNOTATION_SQL, count.statementSource());
     }
 
+    public void testRecognizesKotlinMapperThroughFrameworkBaseClass() {
+        myFixture.addFileToProject(
+                "src/main/java/com/baomidou/mybatisplus/core/mapper/BaseMapper.java",
+                """
+                        package com.baomidou.mybatisplus.core.mapper;
+                        public interface BaseMapper<T> {
+                            int insert(T entity);
+                            T selectById(Object id);
+                        }
+                        """);
+        myFixture.addFileToProject("src/main/kotlin/com/example/KotlinUserMapper.kt", """
+                package com.example
+
+                interface KotlinUserMapper :
+                        com.baomidou.mybatisplus.core.mapper.BaseMapper<KotlinUser> {
+                    fun findByName(name: String): KotlinUser?
+                }
+
+                data class KotlinUser(val id: Long, val name: String)
+                """);
+        PsiClass mapper = findClass("com.example.KotlinUserMapper");
+        assertNotNull(mapper);
+
+        MyBatisMapperModelResolution resolution = ReadAction.compute(
+                () -> MyBatisMapperModelResolver.resolve(mapper));
+
+        assertInstanceOf(resolution, MyBatisMapperModelResolution.Found.class);
+        MyBatisMapperModel model = ((MyBatisMapperModelResolution.Found) resolution).model();
+        assertSize(1, model.frameworkBindings());
+        MyBatisFrameworkMapperBinding binding = model.frameworkBindings().getFirst();
+        assertEquals(MyBatisFrameworkKind.MYBATIS_PLUS, binding.framework());
+        assertEquals("com.example.KotlinUser", binding.entity().qualifiedName());
+        assertEquals(java.util.List.of("findByName"), model.methods().stream()
+                .map(MyBatisMapperMethodModel::name)
+                .toList());
+    }
+
     private PsiClass findClass(String qualifiedName) {
         return ReadAction.compute(() -> JavaPsiFacade.getInstance(getProject()).findClass(
                 qualifiedName,

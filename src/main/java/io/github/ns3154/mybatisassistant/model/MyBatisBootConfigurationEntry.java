@@ -12,7 +12,8 @@ public record MyBatisBootConfigurationEntry(
         Objects.requireNonNull(value, "value");
         value = value.trim();
         if (value.isEmpty()) {
-            throw new IllegalArgumentException("MyBatis Boot 配置值不能为空");
+            throw new IllegalArgumentException(MyBatisModelMessages.message(
+                    "model.error.boot.configuration.value.empty"));
         }
     }
 
