@@ -70,7 +70,7 @@ dependencyLocking {
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
-    testImplementation("com.h2database:h2:2.3.232")
+    testImplementation("com.h2database:h2:2.4.240")
 
     intellijPlatform {
         val platformVersion = configuredPlatformVersion.get()
