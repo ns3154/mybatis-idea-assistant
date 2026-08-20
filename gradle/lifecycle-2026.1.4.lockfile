@@ -1,6 +1,7 @@
 # This is a Gradle generated file for dependency locking.
 # Manual edits can break the build and are not advised.
 # This file is expected to be part of source control.
+# To regenerate this file, run: ./gradlew :dependencies --write-locks
 bundledModule:fleet.andel:IU-261.26222.65=compileClasspath,intellijPlatformBundledPlugins,intellijPlatformDependencies,intellijPlatformTestBundledPlugins,intellijPlatformTestClasspath,intellijPlatformTestDependencies,testCompileClasspath
 bundledModule:fleet.bifurcan:IU-261.26222.65=compileClasspath,intellijPlatformBundledPlugins,intellijPlatformDependencies,intellijPlatformTestBundledPlugins,intellijPlatformTestClasspath,intellijPlatformTestDependencies,testCompileClasspath
 bundledModule:fleet.fastutil:IU-261.26222.65=compileClasspath,intellijPlatformBundledPlugins,intellijPlatformDependencies,intellijPlatformTestBundledPlugins,intellijPlatformTestClasspath,intellijPlatformTestDependencies,testCompileClasspath
@@ -272,7 +273,7 @@ com.google.guava:failureaccess:1.0.3=checkstyle
 com.google.guava:guava:33.6.0-jre=checkstyle
 com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava=checkstyle
 com.google.j2objc:j2objc-annotations:3.1=checkstyle
-com.h2database:h2:2.3.232=intellijPlatformTestRuntimeClasspath,testCompileClasspath,testRuntimeClasspath
+com.h2database:h2:2.4.240=intellijPlatformTestRuntimeClasspath,testCompileClasspath,testRuntimeClasspath
 com.jetbrains.intellij.java:java-compiler-ant-tasks:261.26222.65=intellijPlatformJavaCompiler
 com.jetbrains.intellij.java:java-compiler-instrumentation-util-java8:261.26222.65=intellijPlatformJavaCompiler
 com.jetbrains.intellij.java:java-compiler-instrumentation-util:261.26222.65=intellijPlatformJavaCompiler
@@ -325,10 +326,12 @@ org.jacoco:org.jacoco.report:0.8.15=jacocoAnt
 org.javassist:javassist:3.28.0-GA=checkstyle
 org.jetbrains.compose.hot-reload:hot-reload-agent:1.1.0-alpha03=composeHotReloadAgent
 org.jetbrains.intellij.deps:asm-all:9.6.1=intellijPlatformJavaCompiler
+org.jetbrains.intellij.plugins:verifier-cli:1.409=intellijPluginVerifier
 org.jetbrains.kotlinx:kotlinx-collections-immutable-jvm:0.4.0=intellijPlatformTestClasspath,intellijPlatformTestDependencies,testCompileClasspath
 org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.9.0=intellijPlatformTestClasspath,intellijPlatformTestDependencies
 org.jetbrains.runtime:jbr-api:1.9.0=intellijPlatformTestClasspath,intellijPlatformTestDependencies,testCompileClasspath
 org.jetbrains:annotations:26.0.2=intellijPlatformJavaCompiler,intellijPlatformTestClasspath,intellijPlatformTestDependencies
+org.jetbrains:marketplace-zip-signer:0.1.43=marketplaceZipSigner
 org.jspecify:jspecify:1.0.0=checkstyle
 org.junit.jupiter:junit-jupiter-api:5.13.4=intellijPlatformTestClasspath,intellijPlatformTestDependencies
 org.junit.jupiter:junit-jupiter-engine:5.13.4=intellijPlatformTestClasspath,intellijPlatformTestDependencies

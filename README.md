@@ -2,7 +2,9 @@
 
 面向 IntelliJ IDEA 的 MyBatis 智能开发助手，采用独立实现路线开发。
 
-当前处于 `0.1.0-SNAPSHOT` 发布候选开发阶段：S0～S12 已形成阶段实现与验收记录，S13 正在收口最近四个稳定 IDE 大版本、三系统、百万行性能、生命周期、签名和正式发布链路。截至 2026-08-19，本地候选已通过一次禁用构建缓存的独占统一门：`BUILD SUCCESSFUL`（2m33s），103 个测试套件中的 744/744 平台测试通过，失败/错误/跳过均为 0，整体行覆盖率 15389/18234（84.40%），各分区覆盖率、SBOM、本地化、结构与最低 `IU-252.28539.54` Verifier 均通过；候选 ZIP SHA-256 为 `57b1d53bd1a8f359b3d41206408e78dbb04c7150619f3b936f756a6ce5697e12`。2026-08-20，提交 `bb4a93c` 的主 CI、CodeQL、三系统、五宿主、加固生命周期 1/1、可选依赖隔离 5/5 与生命周期 100/100 全部通过，13 个发布必需检查已按同一 SHA 聚合验证；100 轮报告中 Inspection、MCP、项目清洁、进程退出和错误分类逐轮通过，异常、插件错误与孤儿进程均为 0。该提交仍位于 Draft 堆叠分支，尚未成为 `main` 的正式候选；副屏/独立测试机实机、真实数据库、生产签名、Marketplace 初始化及升降级仍未取证，因此不标记阶段已验收。
+当前版本为 `0.1.0-alpha.1` 内部候选。S0～S12 的功能链已合入 `main`，S13 的无界面自动化与正式发布链路已经建立。`main` 集成基线 `37bedad9` 在 2026-08-20 通过主 CI、CodeQL、三系统、五宿主、加固生命周期 1/1、可选依赖隔离 5/5 与生命周期 100/100，13 个发布必需检查均属于同一 SHA；该基线包含 105 个测试套件、760/760 平台测试、15389/18234（84.40%）整体行覆盖率、最低 `IU-252.28539.54` Verifier `Compatible`，CI ZIP SHA-256 为 `72fd5d7a3d514bed6ca21e418529fd62523010b148537c85ca2a9f58aa48e7ad`。任何后续 Alpha 提交仍须在其精确 `main` SHA 上重新通过同一组门。副屏/独立测试机实机、真实数据库、生产签名、Marketplace 首次初始化及升降级属于独立交付证据；取得前不把 S13 或 1.0 标记为已验收。
+
+本轮 `alpha.1` 已在本地通过 760/760 平台测试、84.40% 整体行覆盖率、三类样例、结构/本地化/SBOM、最低 IDE Verifier 以及临时签名、验签和篡改拒绝；本地 ZIP SHA-256 为 `0143c7b234d4c12c3955adbcfd8d62d5f8a28dc282d7122c7e0d0a46e5fd779f`。这些是本地候选证据，不替代合入后精确 `main` SHA 的远端门。
 
 - 识别 Java Mapper 接口；
 - 识别 MyBatis XML 的 `namespace`；
@@ -53,7 +55,7 @@
 - IntelliJ IDEA 2025.2.6.2 / Build 252（最低编译 SDK）
 - IntelliJ IDEA 2025.2～2026.2（交付兼容矩阵）
 - Java 21
-- Gradle 9.3 Wrapper
+- Gradle 9.7 Wrapper
 - IntelliJ Platform Gradle Plugin 2.18.1
 
 ## 常用命令
@@ -82,7 +84,7 @@ S13 正式候选需把生命周期命令提升为 `./scripts/verify-sandbox-life
 需要构造升级测试包时，可通过项目属性覆盖版本号：
 
 ```bash
-./gradlew buildPlugin -PpluginVersion=0.1.1-SNAPSHOT
+./gradlew buildPlugin -PpluginVersion=0.1.0-alpha.2
 ```
 
 ## 项目资料

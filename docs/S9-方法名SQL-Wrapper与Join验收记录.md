@@ -20,7 +20,7 @@
 
 ## 原 S9 自动化证据快照
 
-本节 467 个测试、覆盖率、ZIP 和远端运行属于 set-based 批量增量前的 S9 快照。新增批量/失败关闭路径已进入本地统一门，并随 `bb4a93c` 完成三系统、兼容、CodeQL、隔离与生命周期 100/100。
+本节 467 个测试、覆盖率、ZIP 和远端运行属于 set-based 批量增量前的 S9 快照。新增批量/失败关闭路径已进入本地统一门，并随 `37bedad9` 完成三系统、兼容、CodeQL、隔离与生命周期 100/100。
 
 当前代码已经在一次任务图中执行并通过：
 
@@ -42,15 +42,15 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 
 ### 2026-08-19 当前候选本地证据
 
-- 禁用构建缓存并强制重跑 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m33s）；103 个测试套件中的 744/744 平台测试通过，失败、错误和跳过均为 0。
+- 禁用构建缓存并强制重跑 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m33s）；105 个测试套件中的 760/760 平台测试通过，失败、错误和跳过均为 0。
 - 整体行覆盖率 15389/18234（84.40%）；各分区覆盖率、Checkstyle、本地化、SBOM、项目与插件结构均通过。
 - Java/MyBatis 样例 8/8、语义语料 11/11、Gradle Spring 四模块 2/2 及 `bootJar` 通过；最低 `IU-252.28539.54` Verifier 为 `Compatible`。
-- 候选 ZIP SHA-256 为 `57b1d53bd1a8f359b3d41206408e78dbb04c7150619f3b936f756a6ce5697e12`。
+- `0.1.0-alpha.1` 本地候选 ZIP SHA-256 为 `0143c7b234d4c12c3955adbcfd8d62d5f8a28dc282d7122c7e0d0a46e5fd779f`。
 
 ## 尚未关闭的验收项
 
-- `bb4a93c` 的加固生命周期 1/1、100/100 与两轮 5/5 Database Tools 可选依赖隔离已通过；最终 `main` SHA 仍须复验；
-- 最终 `main` SHA 的主 CI、三系统、CodeQL、五宿主和加固生命周期远端门；`bb4a93c` 的对应 Draft 候选门已全部通过；
+- `37bedad9` 的加固生命周期 1/1、100/100 与两轮 5/5 Database Tools 可选依赖隔离已通过；后续发布候选的精确 `main` SHA 仍须复验；
+- 后续发布候选的精确 `main` SHA 的主 CI、三系统、CodeQL、五宿主和加固生命周期远端门；`37bedad9` 的对应 main 集成基线门已全部通过；
 - 检测到真实副屏后，在副屏 IDEA 2026.1 验证方法名写入的预览/冲突/Undo，以及 Wrapper/Join 的框架、关系、字段选择和只读预览；
 - 当前无可用副屏，因此未启动 IDEA、`runIde` 或 Computer Use，也未占用主屏幕。
 
