@@ -64,10 +64,133 @@ write_fixture() {
   printf ']}' >> "${output}"
 }
 
+write_analysis_fixture() {
+  local output="$1"
+  local analysis_sha="${2:-${sha}}"
+  local analysis_error="${3:-}"
+  local analysis_warning="${4:-}"
+  local results_count="${5:-0}"
+  local rules_count="${6:-76}"
+  local analysis_ref="${7:-refs/heads/main}"
+  local analysis_key="${8:-.github/workflows/security.yml:codeql}"
+  local category="${9:-/language:java-kotlin}"
+  local tool_name="${10:-CodeQL}"
+
+  jq -cn \
+    --arg sha "${analysis_sha}" \
+    --arg error "${analysis_error}" \
+    --arg warning "${analysis_warning}" \
+    --argjson results "${results_count}" \
+    --argjson rules "${rules_count}" \
+    --arg ref "${analysis_ref}" \
+    --arg key "${analysis_key}" \
+    --arg category "${category}" \
+    --arg tool "${tool_name}" '
+      [{id:1001,commit_sha:$sha,ref:$ref,analysis_key:$key,category:$category,
+        tool:{name:$tool,version:"2.26.3"},error:$error,warning:$warning,
+        results_count:$results,rules_count:$rules,
+        created_at:"2026-08-20T00:00:00Z"}]
+    ' > "${output}"
+}
+
 success_fixture="${temporary_dir}/success.json"
 write_fixture "${success_fixture}"
 MYBATIS_ASSISTANT_CHECK_RUNS_FILE="${success_fixture}" \
   "${verifier}" "${sha}" owner/repo >/dev/null
+
+analysis_fixture="${temporary_dir}/analysis-success.json"
+write_analysis_fixture "${analysis_fixture}"
+fallback_fixture="${temporary_dir}/fallback.json"
+jq '
+  .check_runs |= map(
+    select(.name != "CodeQL" or .app.slug != "github-advanced-security")
+  )
+' "${success_fixture}" > "${fallback_fixture}"
+MYBATIS_ASSISTANT_CHECK_RUNS_FILE="${fallback_fixture}" \
+MYBATIS_ASSISTANT_CODE_SCANNING_ANALYSES_FILE="${analysis_fixture}" \
+  "${verifier}" "${sha}" owner/repo >/dev/null
+
+if MYBATIS_ASSISTANT_CHECK_RUNS_FILE="${fallback_fixture}" \
+  "${verifier}" "${sha}" owner/repo >/dev/null 2>&1; then
+  echo "缺少独立 CodeQL 检查时错误跳过了分析证据" >&2
+  exit 1
+fi
+
+codeql_failed_fixture="${temporary_dir}/codeql-failed.json"
+write_fixture "${codeql_failed_fixture}" "CodeQL" completed failure
+if MYBATIS_ASSISTANT_CHECK_RUNS_FILE="${codeql_failed_fixture}" \
+  "${verifier}" "${sha}" owner/repo >/dev/null 2>&1; then
+  echo "失败的独立 CodeQL 检查被错误接受" >&2
+  exit 1
+fi
+
+analysis_wrong_sha="${temporary_dir}/analysis-wrong-sha.json"
+write_analysis_fixture \
+  "${analysis_wrong_sha}" "1123456789abcdef0123456789abcdef01234567"
+if MYBATIS_ASSISTANT_CHECK_RUNS_FILE="${fallback_fixture}" \
+  MYBATIS_ASSISTANT_CODE_SCANNING_ANALYSES_FILE="${analysis_wrong_sha}" \
+  "${verifier}" "${sha}" owner/repo >/dev/null 2>&1; then
+  echo "其他提交的 CodeQL 分析被错误接受" >&2
+  exit 1
+fi
+
+analysis_wrong_identity="${temporary_dir}/analysis-wrong-identity.json"
+write_analysis_fixture \
+  "${analysis_wrong_identity}" "${sha}" "" "" 0 76 \
+  "refs/heads/main" ".github/workflows/other.yml:codeql"
+if MYBATIS_ASSISTANT_CHECK_RUNS_FILE="${fallback_fixture}" \
+  MYBATIS_ASSISTANT_CODE_SCANNING_ANALYSES_FILE="${analysis_wrong_identity}" \
+  "${verifier}" "${sha}" owner/repo >/dev/null 2>&1; then
+  echo "其他工作流的 CodeQL 分析被错误接受" >&2
+  exit 1
+fi
+
+analysis_with_error="${temporary_dir}/analysis-error.json"
+write_analysis_fixture "${analysis_with_error}" "${sha}" "upload failed"
+if MYBATIS_ASSISTANT_CHECK_RUNS_FILE="${fallback_fixture}" \
+  MYBATIS_ASSISTANT_CODE_SCANNING_ANALYSES_FILE="${analysis_with_error}" \
+  "${verifier}" "${sha}" owner/repo >/dev/null 2>&1; then
+  echo "包含错误的 CodeQL 分析被错误接受" >&2
+  exit 1
+fi
+
+analysis_with_warning="${temporary_dir}/analysis-warning.json"
+write_analysis_fixture "${analysis_with_warning}" "${sha}" "" "partial analysis"
+if MYBATIS_ASSISTANT_CHECK_RUNS_FILE="${fallback_fixture}" \
+  MYBATIS_ASSISTANT_CODE_SCANNING_ANALYSES_FILE="${analysis_with_warning}" \
+  "${verifier}" "${sha}" owner/repo >/dev/null 2>&1; then
+  echo "包含告警的 CodeQL 分析被错误接受" >&2
+  exit 1
+fi
+
+analysis_with_results="${temporary_dir}/analysis-results.json"
+write_analysis_fixture "${analysis_with_results}" "${sha}" "" "" 1
+if MYBATIS_ASSISTANT_CHECK_RUNS_FILE="${fallback_fixture}" \
+  MYBATIS_ASSISTANT_CODE_SCANNING_ANALYSES_FILE="${analysis_with_results}" \
+  "${verifier}" "${sha}" owner/repo >/dev/null 2>&1; then
+  echo "包含 CodeQL 结果的分析被错误接受" >&2
+  exit 1
+fi
+
+analysis_without_rules="${temporary_dir}/analysis-no-rules.json"
+write_analysis_fixture "${analysis_without_rules}" "${sha}" "" "" 0 0
+if MYBATIS_ASSISTANT_CHECK_RUNS_FILE="${fallback_fixture}" \
+  MYBATIS_ASSISTANT_CODE_SCANNING_ANALYSES_FILE="${analysis_without_rules}" \
+  "${verifier}" "${sha}" owner/repo >/dev/null 2>&1; then
+  echo "未执行规则的 CodeQL 分析被错误接受" >&2
+  exit 1
+fi
+
+analysis_with_later_failure="${temporary_dir}/analysis-later-failure.json"
+jq '
+  . += [.[0] + {id:2000,error:"later failure",created_at:"2026-08-20T00:01:00Z"}]
+' "${analysis_fixture}" > "${analysis_with_later_failure}"
+if MYBATIS_ASSISTANT_CHECK_RUNS_FILE="${fallback_fixture}" \
+  MYBATIS_ASSISTANT_CODE_SCANNING_ANALYSES_FILE="${analysis_with_later_failure}" \
+  "${verifier}" "${sha}" owner/repo >/dev/null 2>&1; then
+  echo "较新的失败 CodeQL 分析被旧成功分析掩盖" >&2
+  exit 1
+fi
 
 failed_fixture="${temporary_dir}/failed.json"
 write_fixture "${failed_fixture}" "Windows 自动化回归" completed failure

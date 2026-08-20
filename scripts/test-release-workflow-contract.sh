@@ -19,6 +19,8 @@ require_text() {
 
 require_text "${release_workflow}" 'GH_TOKEN: ${{ github.token }}' \
   "必需检查 API 认证"
+require_text "${release_workflow}" '  security-events: read' \
+  "CodeQL 分析读取权限"
 require_text "${release_workflow}" \
   'signed_zip="${unsigned_zip%.zip}-signed.zip"' \
   "输入候选同级签名产物定位"
