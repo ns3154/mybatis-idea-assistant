@@ -72,4 +72,4 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 ./scripts/verify-optional-dependency-isolation.sh
 ```
 
-截至 2026-08-19，S5-A～S5-E 已通过 744/744、84.40%、各分区覆盖率、最低 Verifier、结构、本地化和 SBOM；2026-08-20，`bb4a93c` 的远端必需检查、生命周期 1/1、100/100 与隔离 5/5 全部通过。最终 `main` SHA 和副屏真实 IDEA 验收仍是阻断项；全部通过后，S5 才能标记为已验收。
+截至 2026-08-19，S5-A～S5-E 已通过 760/760、84.40%、各分区覆盖率、最低 Verifier、结构、本地化和 SBOM；2026-08-20，`37bedad9` 的远端必需检查、生命周期 1/1、100/100 与隔离 5/5 全部通过。后续发布候选的精确 `main` SHA 和副屏真实 IDEA 验收仍是阻断项；全部通过后，S5 才能标记为已验收。

@@ -2,7 +2,7 @@
 
 > 日期：2026-08-12
 > 分支：`codex/s12-productization`
-> 状态：原 S12 自动门保留；发布链加固已通过本地统一门与 `bb4a93c` 远端必需检查，最终 `main` SHA、真实签名、Marketplace 和副屏实机待收口
+> 状态：原 S12 自动门保留；发布链加固已通过本地统一门与 `37bedad9` 远端必需检查，后续发布候选的精确 `main` SHA、真实签名、Marketplace 和副屏实机待收口
 
 ## 已验证实现
 
@@ -15,7 +15,7 @@
 
 ## 原 S12 自动化证据快照
 
-本节 634 个测试、覆盖率、ZIP、SBOM 和远端运行属于发布链加固前的阶段快照，不得当作当前候选的数字。当前候选的统一本地证据单独记录于下节；`bb4a93c` 的统一 CI、三系统、兼容矩阵和 CodeQL 已通过，最终 `main` SHA 仍待。
+本节 634 个测试、覆盖率、ZIP、SBOM 和远端运行属于发布链加固前的阶段快照，不得当作当前候选的数字。当前候选的统一本地证据单独记录于下节；`37bedad9` 的统一 CI、三系统、兼容矩阵和 CodeQL 已通过，后续发布候选的精确 `main` SHA 仍待。
 
 执行：
 
@@ -40,10 +40,10 @@ go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
 
 ## 2026-08-19 当前候选本地证据
 
-- 禁用构建缓存并强制重跑 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m33s）；103 个测试套件中的 744/744 平台测试通过，失败、错误和跳过均为 0。
+- 禁用构建缓存并强制重跑 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m33s）；105 个测试套件中的 760/760 平台测试通过，失败、错误和跳过均为 0。
 - 整体行覆盖率为 15389/18234（84.40%）；各分区覆盖率、Checkstyle、SBOM、`verifyLocalizedUserInterface`、项目与插件结构均通过。
 - Java/MyBatis 样例 8/8、语义语料 11/11、Gradle Spring 四模块 2/2 及 `bootJar` 通过；最低 `IU-252.28539.54` Verifier 为 `Compatible`。
-- 临时密钥签名、验签、篡改拒绝、归档身份、加固生命周期 1/1、可选依赖隔离 5/5 以及发布静态契约均通过；本地候选 ZIP SHA-256 为 `57b1d53bd1a8f359b3d41206408e78dbb04c7150619f3b936f756a6ce5697e12`。
+- `0.1.0-alpha.1` 的临时密钥签名、验签、篡改拒绝和发布静态契约均通过；本地候选 ZIP SHA-256 为 `0143c7b234d4c12c3955adbcfd8d62d5f8a28dc282d7122c7e0d0a46e5fd779f`。加固生命周期 1/1 与可选依赖隔离 5/5 仍为 `37bedad9` 远端基线证据，待 Alpha 精确 SHA 复验。
 - 这些签名证据使用临时密钥，只验证失败关闭与制品契约，不代表生产证书、Environment 审批或 Marketplace 发布已完成。
 
 ## 仍未验收

@@ -3,7 +3,7 @@
 > 日期：2026-08-12
 > 当前结论：代码与平台自动化开发完成；最终阶段验收尚未关闭
 
-> 证据分层：下列 386 个测试与覆盖率是 ResultMap 增量前的 S7 阶段快照。`column` 补全与缺失映射保守 Quick Fix 已纳入本地统一门，并随 `bb4a93c` 完成远端必需检查与生命周期 100/100。
+> 证据分层：下列 386 个测试与覆盖率是 ResultMap 增量前的 S7 阶段快照。`column` 补全与缺失映射保守 Quick Fix 已纳入本地统一门，并随 `37bedad9` 完成远端必需检查与生命周期 100/100。
 
 ## 已实现范围
 
@@ -42,10 +42,10 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 
 ## 2026-08-19 当前候选本地证据
 
-- 禁用构建缓存并强制重跑 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m33s）；103 个测试套件中的 744/744 平台测试通过，失败、错误和跳过均为 0。
+- 禁用构建缓存并强制重跑 `./gradlew clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin` 成功（`BUILD SUCCESSFUL`，2m33s）；105 个测试套件中的 760/760 平台测试通过，失败、错误和跳过均为 0。
 - 整体行覆盖率 15389/18234（84.40%）；各分区覆盖率、Checkstyle、本地化、SBOM、项目与插件结构均通过。
 - Java/MyBatis 样例 8/8、语义语料 11/11、Gradle Spring 四模块 2/2 及 `bootJar` 通过；最低 `IU-252.28539.54` Verifier 为 `Compatible`。
-- 候选 ZIP SHA-256 为 `57b1d53bd1a8f359b3d41206408e78dbb04c7150619f3b936f756a6ce5697e12`。`bb4a93c` 远端全门通过；仍不替代最终 `main` SHA 或副屏 Database Tools 实机证据。
+- `0.1.0-alpha.1` 本地候选 ZIP SHA-256 为 `0143c7b234d4c12c3955adbcfd8d62d5f8a28dc282d7122c7e0d0a46e5fd779f`。`37bedad9` 远端全门通过；仍不替代后续发布候选的精确 `main` SHA 或副屏 Database Tools 实机证据。
 
 ## 关键保守边界
 
@@ -57,10 +57,10 @@ mvn --batch-mode --file samples/semantic-corpus/pom.xml clean verify
 
 ## 尚未关闭的验收项
 
-- `bb4a93c` 的加固生命周期 1/1 与 100/100 报告均已审查通过；最终 `main` SHA 仍须复验；
+- `37bedad9` 的加固生命周期 1/1 与 100/100 报告均已审查通过；后续发布候选的精确 `main` SHA 仍须复验；
 - 当前 S7 工作区的 5/5 可选依赖隔离已通过，已验证禁用 `com.intellij.database` 后核心插件加载和专用语义 Inspection；仍需远端同一 SHA 复验；
-- 最终 `main` SHA 的三系统/兼容/CodeQL 远端门；
+- 后续发布候选的精确 `main` SHA 的三系统/兼容/CodeQL 远端门；
 - 检测到真实副屏后，只在副屏运行 IDEA 2026.1，人工验证动态 SQL 注入、方言、表列/函数/别名补全、表列与 ResultMap 警告刷新及数据库模型变化失效；
 - 提交并推送 S7 分支后的远端 CI 证据。
 
-本批没有启动可见 IDEA 或 Computer Use；当前候选本地统一门与 `bb4a93c` 的生命周期 1/1、100/100、隔离 5/5 和远端必需检查已通过。最终 `main` SHA 与副屏门禁通过前，S7 状态保持“开发完成，待最终验收”。
+本批没有启动可见 IDEA 或 Computer Use；当前候选本地统一门与 `37bedad9` 的生命周期 1/1、100/100、隔离 5/5 和远端必需检查已通过。后续发布候选的精确 `main` SHA 与副屏门禁通过前，S7 状态保持“开发完成，待最终验收”。

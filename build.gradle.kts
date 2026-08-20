@@ -27,7 +27,7 @@ plugins {
 
 group = "io.github.ns3154.mybatisassistant"
 val configuredPluginVersion = providers.gradleProperty("pluginVersion")
-    .orElse("0.1.0-SNAPSHOT")
+    .orElse("0.1.0-alpha.1")
 version = configuredPluginVersion.get()
 
 val configuredPlatformVersion = providers.gradleProperty("platformVersion").orElse("2025.2.6.2")
@@ -70,7 +70,7 @@ dependencyLocking {
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
-    testImplementation("com.h2database:h2:2.3.232")
+    testImplementation("com.h2database:h2:2.4.240")
 
     intellijPlatform {
         val platformVersion = configuredPlatformVersion.get()

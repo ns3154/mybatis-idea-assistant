@@ -54,5 +54,5 @@
 - 真实 MyBatis/H2 样例必须运行生成形态的查询、集合失败关闭、动态条件、set-based 插入、更新和计数；NOT IN 及目标数据库特有方言仍需各自语料/实库门；
 - `MyBatisWrapperGeneratedCompileFixtureTest` 必须先证明 Maven 编译语料与当前生成器输出逐字一致，再由 Maven 在 Plus 3.5.17/Flex 1.11.8 真实依赖下编译运行 5/5；该证据不外推其他版本；
 - 最低 IDEA 2025.2.6.2（`IU-252.28539.54`）Plugin Verifier 不得出现兼容、内部 API 或实验 API 阻断；
-- 原 S9 快照已有独立自动门；set-based 批量增量已通过本地统一门（744/744，15389/18234，84.40%，最低 Verifier `Compatible`），并随 `bb4a93c` 通过远端必需检查、生命周期 1/1、100/100 与隔离 5/5；最终 `main` SHA 和副屏 Database Tools 三个动作的实机复核仍待；
+- 原 S9 快照已有独立自动门；set-based 批量增量已通过本地统一门（760/760，15389/18234，84.40%，最低 Verifier `Compatible`），并随 `37bedad9` 通过远端必需检查、生命周期 1/1、100/100 与隔离 5/5；后续发布候选的精确 `main` SHA 和副屏 Database Tools 三个动作的实机复核仍待；
 - 上述门全部关闭前，S9 状态保持“开发完成，待最终统一验收”。
