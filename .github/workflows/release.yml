@@ -118,6 +118,13 @@ jobs:
           clean check verifyPluginProjectConfiguration verifyPluginStructure verifyPlugin
           -PpluginVersion=${{ steps.release.outputs.version }}
 
+      - name: 重新提取发布说明
+        run: |
+          # 完整质量门包含 clean，会清理前置步骤生成的 build 目录。
+          mkdir -p build
+          ./scripts/extract-release-notes.sh \
+            "${{ steps.release.outputs.version }}" CHANGELOG.md build/release-notes.md
+
       - name: 固化未签名候选
         run: |
           candidate_dir="build/release-unsigned"
