@@ -2,7 +2,7 @@
 
 面向 IntelliJ IDEA 的 MyBatis 智能开发助手，采用独立实现路线开发。
 
-当前版本为 `0.1.0-alpha.1` 内部候选。S0～S12 的功能链已合入 `main`，S13 的无界面自动化与正式发布链路已经建立。`main` 集成基线 `37bedad9` 在 2026-08-20 通过主 CI、CodeQL、三系统、五宿主、加固生命周期 1/1、可选依赖隔离 5/5 与生命周期 100/100，13 个发布必需检查均属于同一 SHA；该基线包含 105 个测试套件、760/760 平台测试、15389/18234（84.40%）整体行覆盖率、最低 `IU-252.28539.54` Verifier `Compatible`，CI ZIP SHA-256 为 `72fd5d7a3d514bed6ca21e418529fd62523010b148537c85ca2a9f58aa48e7ad`。任何后续 Alpha 提交仍须在其精确 `main` SHA 上重新通过同一组门。副屏/独立测试机实机、真实数据库、生产签名、Marketplace 首次初始化及升降级属于独立交付证据；取得前不把 S13 或 1.0 标记为已验收。
+当前版本为 `0.1.0-alpha.1` 候选，当前 `main` 精确提交为 `2a41e1bb0a595ca86704cadee2ed15f66e8d18e2`。根据维护者确认，本候选人工验收已经完成；该提交的 GitHub Actions 发布必需检查与 CodeQL 也已全部成功。本地候选 ZIP SHA-256 为 `0143c7b234d4c12c3955adbcfd8d62d5f8a28dc282d7122c7e0d0a46e5fd779f`。当前仍不是公开 Release：生产签名材料、Marketplace token 和首次 Marketplace 建档属于受保护的外部发布动作，完成前不把 alpha.1 宣称为已公开上架版本。
 
 本轮 `alpha.1` 已在本地通过 760/760 平台测试、84.40% 整体行覆盖率、三类样例、结构/本地化/SBOM、最低 IDE Verifier 以及临时签名、验签和篡改拒绝；本地 ZIP SHA-256 为 `0143c7b234d4c12c3955adbcfd8d62d5f8a28dc282d7122c7e0d0a46e5fd779f`。这些是本地候选证据，不替代合入后精确 `main` SHA 的远端门。
 
