@@ -81,13 +81,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          release_json="$(gh release view "${{ inputs.tag }}" \
-            --json isDraft,tagName,assets)"
-          if [[ "$(jq -r .tagName <<<"${release_json}")" != "${{ inputs.tag }}" ]]; then
+          release_json="$(
+            gh api --paginate --slurp \
+              "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
+              jq -c --arg tag "${{ inputs.tag }}" \
+                '[.[][] | select(.tag_name == $tag)] | first // {}'
+          )"
+          if [[ "$(jq -r '.tag_name // ""' <<<"${release_json}")" != "${{ inputs.tag }}" ]]; then
             echo "Release 标签与请求不一致" >&2
             exit 1
           fi
-          if [[ "$(jq -r .isDraft <<<"${release_json}")" != "true" ]]; then
+          if [[ "$(jq -r '.draft // false' <<<"${release_json}")" != "true" ]]; then
             echo "Marketplace 发布前 GitHub Release 必须保持草稿状态" >&2
             exit 1
           fi
@@ -217,10 +221,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          release_json="$(gh release view "${{ inputs.tag }}" \
-            --json isDraft,tagName,assets)"
-          test "$(jq -r .tagName <<<"${release_json}")" = "${{ inputs.tag }}"
-          test "$(jq -r .isDraft <<<"${release_json}")" = "true"
+          release_json="$(
+            gh api --paginate --slurp \
+              "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
+              jq -c --arg tag "${{ inputs.tag }}" \
+                '[.[][] | select(.tag_name == $tag)] | first // {}'
+          )"
+          test "$(jq -r '.tag_name // ""' <<<"${release_json}")" = "${{ inputs.tag }}"
+          test "$(jq -r '.draft // false' <<<"${release_json}")" = "true"
 
           mapfile -t release_assets < <(jq -r '.assets[].name' <<<"${release_json}")
           signed_asset_count=0
