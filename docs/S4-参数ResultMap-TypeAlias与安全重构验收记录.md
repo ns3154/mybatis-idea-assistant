@@ -4,6 +4,12 @@
 > 目标版本：IntelliJ IDEA 2026.1 / Build 261
 > 当前结论：原 S4 快照保留；ResultMap 新增路径已纳入 2026-08-19 工作区本地统一候选门并通过，远端和实机证据仍待补齐
 
+## 2026-08-23 当前 checkout 复核
+
+- 验收对象为本记录随附提交后的当前 checkout 精确 HEAD；不沿用父提交历史报告。S4～S6 分组测试 326/326、全量 Gradle 门 760/760、84.40% 行覆盖率均通过。
+- S4 参数命名、ResultMap/TypeAlias 引用与属性路径、Rename 冲突停止、TOCTOU 和单次 Undo 的平台测试均在该分组内通过；当前功能改动只补充了安全门脚本与 Database Tools 国际化资源。
+- 真实副屏 preview/Undo、真实 IDE 交互和最终 SHA 的 GitHub 远端门仍待外部环境；因此自动门通过，外部实机不伪造为已验收。
+
 ## 1. 交付范围
 
 - MyBatis 参数命名上下文：`@Param`、`paramN`、实际名/回退名、特殊参数、单对象、集合、数组、Map 和继承泛型；

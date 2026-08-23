@@ -854,6 +854,35 @@ mybatis_assistant_count_lines() {
     fi
 }
 
+# 提取唯一的 problem 块；IDE 偶尔会重复写入完全相同的块，但不同结果必须拒绝。
+mybatis_assistant_extract_unique_problem_block() {
+    local file="$1"
+    awk '
+        /<problem>/ {
+            if (active) exit 2
+            count++
+            active = 1
+            block = $0 ORS
+            next
+        }
+        active { block = block $0 ORS }
+        /<\/problem>/ {
+            if (!active) exit 2
+            active = 0
+            closed++
+            if (closed == 1) {
+                first = block
+            } else if (block != first) {
+                different = 1
+            }
+        }
+        END {
+            if (count < 1 || count != closed || active || different) exit 1
+            printf "%s", first
+        }
+    ' "${file}"
+}
+
 mybatis_assistant_verify_inspection_output() {
     local inspection_output="$1"
     local evidence_file="$2"
@@ -861,6 +890,8 @@ mybatis_assistant_verify_inspection_output() {
     local descriptions_file="${inspection_output}/.descriptions.xml"
     local inspection_file
     local problem_block
+    local inspection_problem_block
+    local unique_problem_block=""
     local normalized_problem_block
     local description_match_count
     local expected_problem_count
@@ -874,24 +905,8 @@ mybatis_assistant_verify_inspection_output() {
             "${descriptions_file}" || true
     } | wc -l | tr -d '[:space:]')"
     (( description_match_count == 1 )) || return 1
-    expected_problem_count="$(grep -c '<problem>' "${expected_file}" || true)"
-    (( expected_problem_count == 1 )) || return 1
-    problem_block="$(awk '
-        /<problem>/ {
-            count++
-            if (count > 1 || active) exit 2
-            active = 1
-        }
-        active { print }
-        /<\/problem>/ {
-            if (!active) exit 2
-            active = 0
-            closed++
-        }
-        END {
-            if (count != 1 || closed != 1 || active) exit 1
-        }
-    ' "${expected_file}")" || return 1
+    problem_block="$(mybatis_assistant_extract_unique_problem_block "${expected_file}")" || return 1
+    expected_problem_count=1
     normalized_problem_block="$(printf '%s\n' "${problem_block}" \
         | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
     printf '%s\n' "${normalized_problem_block}" | awk '
@@ -921,8 +936,14 @@ mybatis_assistant_verify_inspection_output() {
         || return 1
 
     while IFS= read -r inspection_file; do
-        total_problem_count=$((total_problem_count \
-            + $(grep -c '<problem>' "${inspection_file}" || true)))
+        inspection_problem_block="$(mybatis_assistant_extract_unique_problem_block "${inspection_file}")" \
+            || return 1
+        if [[ -z "${unique_problem_block}" ]]; then
+            unique_problem_block="${inspection_problem_block}"
+            total_problem_count=1
+        elif [[ "${inspection_problem_block}" != "${unique_problem_block}" ]]; then
+            total_problem_count=2
+        fi
     done < <(find "${inspection_output}" -maxdepth 1 -type f \
         -name 'MyBatis*.xml' -print | LC_ALL=C sort)
     (( total_problem_count == 1 )) || return 1

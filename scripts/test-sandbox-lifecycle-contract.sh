@@ -63,6 +63,17 @@ test_inspection_contract() {
 
     {
         printf '%s\n' '<problems>'
+        awk '/  <problem>/{active=1} active{print} /  <\/problem>/{if (active) exit}' \
+            "${valid_problem}"
+        awk '/  <problem>/{active=1} active{print} /  <\/problem>/{if (active) exit}' \
+            "${valid_problem}"
+        printf '%s\n' '</problems>'
+    } > "${output}/MyBatisUnusedStatement.xml"
+    mybatis_assistant_verify_inspection_output "${output}" "${evidence}"
+    assert_file_contains "${evidence}" $'2026-08-19.v3\tMyBatisUnusedStatement\t1\t1'
+
+    {
+        printf '%s\n' '<problems>'
         printf '%s\n' '  <problem><line>1</line></problem>'
         printf '%s\n' '</problems>'
     } > "${output}/MyBatisMissingStatement.xml"
@@ -71,6 +82,20 @@ test_inspection_contract() {
         return 1
     fi
     rm -f -- "${output}/MyBatisMissingStatement.xml"
+
+    {
+        printf '%s\n' '<problems>'
+        awk '/  <problem>/{active=1} active{print} /  <\/problem>/{if (active) exit}' \
+            "${valid_problem}"
+        sed 's/findSummary/findSummaryOther/g' "${valid_problem}" \
+            | awk '/  <problem>/{active=1} active{print} /  <\/problem>/{if (active) exit}'
+        printf '%s\n' '</problems>'
+    } > "${output}/MyBatisUnusedStatement.xml"
+    if mybatis_assistant_verify_inspection_output "${output}" "${evidence}"; then
+        echo "不同的重复问题不应通过检查契约" >&2
+        return 1
+    fi
+    cp "${valid_problem}" "${output}/MyBatisUnusedStatement.xml"
 
     sed 's/shortName="MyBatisUnusedStatement"/shortName="MyBatisUnusedStatementBackup"/' \
         "${valid_descriptions}" > "${output}/.descriptions.xml"

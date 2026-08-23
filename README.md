@@ -2,9 +2,11 @@
 
 面向 IntelliJ IDEA 的 MyBatis 智能开发助手，采用独立实现路线开发。
 
-当前版本为 `0.1.0-alpha.1` 候选，当前 `main` 精确提交为 `2a41e1bb0a595ca86704cadee2ed15f66e8d18e2`。根据维护者确认，本候选人工验收已经完成；该提交的 GitHub Actions 发布必需检查与 CodeQL 也已全部成功。本地候选 ZIP SHA-256 为 `0143c7b234d4c12c3955adbcfd8d62d5f8a28dc282d7122c7e0d0a46e5fd779f`。当前仍不是公开 Release：生产签名材料、Marketplace token 和首次 Marketplace 建档属于受保护的外部发布动作，完成前不把 alpha.1 宣称为已公开上架版本。
+当前验收对象是本轮提交后的 `main` 精确 HEAD；文档不硬编码自身提交 SHA，避免文档提交后产生自引用失真，执行 `git rev-parse HEAD` 取准。验收从 `3edd33978dc1071c438bce32f6936445dac57c17` 开始，保留用户已有的 `samples/semantic-corpus/.idea/misc.xml` 改动。
 
-本轮 `alpha.1` 已在本地通过 760/760 平台测试、84.40% 整体行覆盖率、三类样例、结构/本地化/SBOM、最低 IDE Verifier 以及临时签名、验签和篡改拒绝；本地 ZIP SHA-256 为 `0143c7b234d4c12c3955adbcfd8d62d5f8a28dc282d7122c7e0d0a46e5fd779f`。这些是本地候选证据，不替代合入后精确 `main` SHA 的远端门。
+已存在的 `v0.1.0-alpha.3` GitHub Release 已公开为 Pre-release；Marketplace 插件 33742 的 alpha.3 仍为 Hidden、Under review。本轮不重新上传 alpha.3，不改变 Marketplace Hidden 状态，也不触发 release/marketplace 发布工作流。
+
+本轮当前 checkout 已通过 760/760 平台测试、84.40% 整体行覆盖率、三类样例、结构/本地化/SBOM、最低 IDE Verifier、临时签名/验签/篡改拒绝、发布静态契约、真实生命周期 1/1 与 100/100、可选依赖隔离 5/5。默认开发构建 ZIP 的 SHA-256 为 `74e91045bbd4b4639634c0c5b1fad6e54c7b3610ebec353e94b93d0b30428eb4`；这些本地证据不替代最终精确 SHA 的 GitHub 门禁或外部真实 IDE/数据库验收。
 
 - 识别 Java Mapper 接口；
 - 识别 MyBatis XML 的 `namespace`；

@@ -4,6 +4,12 @@
 > 分支：`codex/s12-productization`
 > 状态：原 S12 自动门保留；发布链加固已通过本地统一门与 `37bedad9` 远端必需检查，后续发布候选的精确 `main` SHA、真实签名、Marketplace 和副屏实机待收口
 
+## 2026-08-23 当前 checkout 复核
+
+- Kotlin/Spring/设置/MCP/JDBC 分组测试 55/55、全量 Gradle 门 760/760、84.40% 行覆盖率、SBOM、本地化、插件结构和发布静态契约通过。
+- Database Tools 5 个动作已改用中英文 Bundle 键；真实生命周期 100/100、可选依赖隔离 5/5、临时签名/验签/篡改拒绝和候选身份检查通过。
+- 已存在 alpha.3 GitHub Release 保持公开 Pre-release；Marketplace 33742 alpha.3 保持 Hidden、Under review；本轮不重传、不改状态。生产签名、Environment 审批、真实 MCP 客户端、Marketplace 行为和副屏升降级仍待外部环境。
+
 ## 已验证实现
 
 - 设置 schema v2：默认离线、MCP/写工具默认关闭、端口与白名单归一化、v1→v2 迁移、确定性非敏感导入导出、损坏/未来版本/重复键/敏感键整体拒绝。

@@ -5,6 +5,12 @@
 
 > 证据分层：下列 280 个测试与覆盖率是 S5 原阶段快照；`dynamic-sql-golden/v1` 三组版本化黄金已纳入本地统一门，并随 `37bedad9` 完成远端必需检查与生命周期 100/100。
 
+## 2026-08-23 当前 checkout 复核
+
+- 当前 checkout 的 S4～S6 分组测试 326/326 通过，包含动态 SQL 符号 IR、`v1` 黄金、source map round-trip、include/property、取消、Dumb/失效源边界；全量门 760/760、84.40% 行覆盖率通过。
+- 本轮还以真实 IntelliJ 沙箱在同一 checkout 完成生命周期 1/1 与 100/100；重复且完全相同的 Inspection 问题块按一个结果核算，不同问题仍失败。
+- 副屏真实 XML 注入、分支回映射和编辑器刷新，以及最终 SHA 的 GitHub 远端门仍待外部环境。
+
 ## 已实现范围
 
 - 不依赖平台状态的不可变符号 IR：文本、序列、If、Choose、Trim、ForEach、Bind 与 Include；

@@ -3,6 +3,12 @@
 > 日期：2026-08-12
 > 当前结论：注解 SQL、Spring 注入、Kotlin K2、框架模型与数据库兼容代码均完成本地及远端自动化；隔离和实机尚未完成
 
+## 2026-08-23 当前 checkout 复核
+
+- Kotlin/Spring/设置/MCP/JDBC 分组测试 55/55 通过；语义语料 11/11、可选依赖隔离 5/5、全量 Gradle 门 760/760、84.40% 行覆盖率通过。
+- 核心描述符与 Kotlin/Spring/Database Tools 继续由 optional config file 隔离；JDBC 密码只经 PasswordSafe，未读取或输出任何凭据。
+- Android Studio、Community JDBC/PasswordSafe 实机、真实 DM8 和框架安装交互仍待外部环境；没有把文本方言夹具作为实机结论。
+
 ## 已实现范围
 
 - 在 Java MyBatis 直接 SQL 注解内为 `#{}`/`${}` 建立根参数和嵌套属性引用，接入已注入 SQL 的补全，并提供默认开启、仅报告可证明缺失路径的 Inspection；
