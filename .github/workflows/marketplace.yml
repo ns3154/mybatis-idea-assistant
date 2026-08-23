@@ -129,21 +129,18 @@ jobs:
             --source-digest "${{ steps.release.outputs.candidate_sha }}" \
             --deny-self-hosted-runners
 
-      - name: 验证 Marketplace 已完成首次人工建档
+      - name: 确认 Marketplace 发布目标身份
         run: |
-          response="$(mktemp)"
-          status="$(curl --silent --show-error --output "${response}" --write-out '%{http_code}' \
-            --get 'https://plugins.jetbrains.com/plugins/list' \
-            --data-urlencode 'pluginId=io.github.ns3154.mybatis-idea-assistant')"
-          if [[ "${status}" == "404" ]]; then
-            echo "Marketplace 尚无插件条目；首次发布必须先由维护者人工上传并决定 Hidden 状态" >&2
+          mapfile -t signed_zips < <(
+            find build/marketplace-input -maxdepth 1 -type f \
+              -name '*-signed.zip' -print
+          )
+          if [[ "${#signed_zips[@]}" -ne 1 ]]; then
+            echo "Marketplace 发布目标 ZIP 数量必须为 1，实际为 ${#signed_zips[@]}" >&2
             exit 1
           fi
-          if [[ "${status}" != "200" ]] || \
-            ! grep -Fq 'io.github.ns3154.mybatis-idea-assistant' "${response}"; then
-            echo "无法确认 Marketplace 插件身份，停止自动发布（HTTP ${status}）" >&2
-            exit 1
-          fi
+          ./scripts/verify-plugin-archive-identity.sh \
+            "${signed_zips[0]}" "${{ steps.release.outputs.version }}"
 
       - name: 发布签名候选
         env:
