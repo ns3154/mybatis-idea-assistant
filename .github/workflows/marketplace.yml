@@ -85,7 +85,7 @@ jobs:
           release_run_json="$(
             gh api --paginate --slurp \
               "repos/${GITHUB_REPOSITORY}/actions/workflows/release.yml/runs?head_sha=${{ steps.release.outputs.candidate_sha }}&event=push&status=completed&per_page=100" |
-              jq -c '[.[][] | select(.conclusion == "success")] | first // {}'
+              jq -c '[.[] | .workflow_runs[]? | select(.conclusion == "success")] | first // {}'
           )"
           release_run_id="$(jq -r '.id // empty' <<<"${release_run_json}")"
           if [[ -z "${release_run_id}" ]] || \
