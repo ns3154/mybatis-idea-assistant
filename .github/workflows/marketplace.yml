@@ -33,6 +33,7 @@ jobs:
     environment: ${{ inputs.channel == 'default' && 'marketplace-production' || 'marketplace-preview' }}
     permissions:
       contents: read
+      actions: read
       attestations: read
     outputs:
       prerelease: ${{ steps.release.outputs.prerelease }}
@@ -77,63 +78,25 @@ jobs:
           fi
           echo "candidate_sha=${candidate_sha}" >> "${GITHUB_OUTPUT}"
 
-      - name: 下载 GitHub Release 中的同一签名制品
+      - name: 下载签名发布工作流中的同一候选
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          release_json="$(
+          release_run_json="$(
             gh api --paginate --slurp \
-              "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
-              jq -c --arg tag "${{ inputs.tag }}" \
-                '[.[][] | select(.tag_name == $tag)] | first // {}'
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/release.yml/runs?head_sha=${{ steps.release.outputs.candidate_sha }}&event=push&status=completed&per_page=100" |
+              jq -c '[.[][] | select(.conclusion == "success")] | first // {}'
           )"
-          if [[ "$(jq -r '.tag_name // ""' <<<"${release_json}")" != "${{ inputs.tag }}" ]]; then
-            echo "Release 标签与请求不一致" >&2
-            exit 1
-          fi
-          if [[ "$(jq -r '.draft // false' <<<"${release_json}")" != "true" ]]; then
-            echo "Marketplace 发布前 GitHub Release 必须保持草稿状态" >&2
-            exit 1
-          fi
-          mapfile -t release_assets < <(jq -r '.assets[].name' <<<"${release_json}")
-          signed_asset_count=0
-          bom_json_count=0
-          bom_xml_count=0
-          checksums_count=0
-          metadata_count=0
-          notes_count=0
-          for asset_name in "${release_assets[@]}"; do
-            case "${asset_name}" in
-              *-signed.zip) signed_asset_count=$((signed_asset_count + 1)) ;;
-              bom.json) bom_json_count=$((bom_json_count + 1)) ;;
-              bom.xml) bom_xml_count=$((bom_xml_count + 1)) ;;
-              SHA256SUMS) checksums_count=$((checksums_count + 1)) ;;
-              release-metadata.txt) metadata_count=$((metadata_count + 1)) ;;
-              release-notes.md) notes_count=$((notes_count + 1)) ;;
-              *)
-                echo "Release 包含未经允许的资产：${asset_name}" >&2
-                exit 1
-                ;;
-            esac
-          done
-          if [[ "${#release_assets[@]}" -ne 6 \
-              || "${signed_asset_count}" -ne 1 \
-              || "${bom_json_count}" -ne 1 \
-              || "${bom_xml_count}" -ne 1 \
-              || "${checksums_count}" -ne 1 \
-              || "${metadata_count}" -ne 1 \
-              || "${notes_count}" -ne 1 ]]; then
-            echo "Release 资产必须恰为 1 个签名 ZIP 和 5 个固定文件" >&2
+          release_run_id="$(jq -r '.id // empty' <<<"${release_run_json}")"
+          if [[ -z "${release_run_id}" ]] || \
+            [[ "$(jq -r '.head_sha // ""' <<<"${release_run_json}")" != "${{ steps.release.outputs.candidate_sha }}" ]]; then
+            echo "找不到候选提交对应的成功签名发布工作流" >&2
             exit 1
           fi
           mkdir -p build/marketplace-input
-          gh release download "${{ inputs.tag }}" \
-            --pattern '*-signed.zip' \
-            --pattern 'bom.json' \
-            --pattern 'bom.xml' \
-            --pattern 'SHA256SUMS' \
-            --pattern 'release-metadata.txt' \
-            --pattern 'release-notes.md' \
+          gh run download "${release_run_id}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name "signed-release-${{ steps.release.outputs.version }}-${{ steps.release.outputs.candidate_sha }}" \
             --dir build/marketplace-input
           (cd build/marketplace-input && sha256sum -c SHA256SUMS)
           grep -qx \
@@ -213,6 +176,7 @@ jobs:
     environment: release-github
     permissions:
       contents: write
+      actions: read
       attestations: read
 
     steps:
@@ -229,6 +193,8 @@ jobs:
           )"
           test "$(jq -r '.tag_name // ""' <<<"${release_json}")" = "${{ inputs.tag }}"
           test "$(jq -r '.draft // false' <<<"${release_json}")" = "true"
+          release_id="$(jq -r '.id // empty' <<<"${release_json}")"
+          test -n "${release_id}"
 
           mapfile -t release_assets < <(jq -r '.assets[].name' <<<"${release_json}")
           signed_asset_count=0
@@ -295,8 +261,12 @@ jobs:
             --source-digest "${{ needs.publish.outputs.candidate_sha }}" \
             --deny-self-hosted-runners
 
-          release_args=("${{ inputs.tag }}" --draft=false)
+          release_edit_args=(
+            --method PATCH
+            "repos/${GITHUB_REPOSITORY}/releases/${release_id}"
+            -F draft=false
+          )
           if [[ "${{ needs.publish.outputs.prerelease }}" == "true" ]]; then
-            release_args+=(--prerelease)
+            release_edit_args+=(-F prerelease=true)
           fi
-          gh release edit "${release_args[@]}" --repo "${GITHUB_REPOSITORY}"
+          gh api "${release_edit_args[@]}" >/dev/null
