@@ -244,7 +244,8 @@ jobs:
           fi
           ./scripts/verify-plugin-archive-identity.sh \
             "${signed_zip}" "${{ needs.build-candidate.outputs.version }}"
-          ./scripts/run-gradle-with-infrastructure-retry.sh \
+          env -u CERTIFICATE_CHAIN -u PRIVATE_KEY -u PRIVATE_KEY_PASSWORD \
+            ./scripts/run-gradle-with-infrastructure-retry.sh \
             verifyPluginSignature -x signPlugin -x buildPlugin \
             -PpluginVersion=${{ needs.build-candidate.outputs.version }} \
             -PpluginSignatureVerificationArchiveFile="${signed_zip}" \
