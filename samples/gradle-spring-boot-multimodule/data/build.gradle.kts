@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
     api(project(":api"))
-    implementation("org.mybatis:mybatis:3.5.19")
+    implementation("org.mybatis:mybatis:3.6.0")
 
     testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")

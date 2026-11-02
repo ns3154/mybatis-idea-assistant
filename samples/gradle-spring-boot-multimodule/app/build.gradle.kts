@@ -3,7 +3,7 @@ plugins {
     id("org.springframework.boot")
 }
 
-val springBootVersion = "4.1.0"
+val springBootVersion = "4.1.2"
 
 dependencies {
     implementation(platform("org.springframework.boot:spring-boot-dependencies:$springBootVersion"))
